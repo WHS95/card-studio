@@ -2,6 +2,15 @@
 
 버전은 `package.json` version, git 태그 `v<버전>`.
 
+## 0.5.1 — 2026-10-06 · 로컬 우선 · 공개 저장소
+
+- 임시 터널·터널 허용 설정 제거 — 이 컴퓨터(127.0.0.1)에서 돌리는 것이 기본
+- 'AI 앱 연결'을 로컬 순서로: Claude Code(개인 토큰) · Claude Desktop(mcp-remote) · Codex CLI(ChatGPT 로그인) 설정을 토큰이 채워진 채로 복사. 웹 커넥터는 '배포했을 때'
+- `pnpm setup:local`: `.env.local` 무작위 값 + 데모 데이터(STUDIO), ffmpeg 확인
+- 공개 저장소 github.com/WHS95/card-studio (운영 데이터·내부 메모 없이 새 기록), README·CI·글꼴 라이선스
+- 복사 버튼: 클립보드가 막힌 브라우저에서 대체 복사·직접 복사 안내
+- 흑백 기본 테마에서 '강조색 글자' 강조가 안 보이던 것 → 강조색이 밝으면 채움
+
 ## 0.5.0 — 2026-10-06 · 내 Claude·ChatGPT 구독으로 쓰기 (AI 앱 연결)
 
 - API 키 없이 Claude(Pro·Max)·ChatGPT 구독자가 이 스튜디오를 커넥터(원격 MCP)로 연결해 씀 — AI 비용은 그 구독
