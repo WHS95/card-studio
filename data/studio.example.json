@@ -1,0 +1,119 @@
+{
+ "workspaces": [
+  {
+   "id": "studio",
+   "name": "STUDIO",
+   "handle": "@studio",
+   "theme": {
+    "dark": "#111111",
+    "light": "#FFFFFF",
+    "ink": "#111111",
+    "muted": "#5F5F5F",
+    "accent": "#D9D9D9",
+    "onAccent": "#111111",
+    "wordmark": {
+     "text": "STUDIO",
+     "color": "#FFFFFF",
+     "bg": "#111111"
+    },
+    "font": {
+     "regular": "NotoSansKR-Medium.ttf",
+     "bold": "NotoSansKR-ExtraBold.ttf"
+    }
+   },
+   "categories": [
+    "팁",
+    "도구",
+    "정보",
+    "사례"
+   ],
+   "slots": [
+    "12:30"
+   ],
+   "days": 30,
+   "startDate": null,
+   "defaultTemplate": "news",
+   "brief": {
+    "industry": "saas",
+    "about": "작은 팀의 일을 쉽게 만드는 업무 도구 (데모)",
+    "audience": "반복 업무에 지친 3~10명 팀의 실무자",
+    "goals": [
+     "가입",
+     "인지"
+    ],
+    "tone": "명료하게, 기능보다 해결하는 문제 먼저",
+    "keywords": [],
+    "banned": [
+     "최고",
+     "무조건"
+    ],
+    "hashtags": [
+     "#생산성",
+     "#업무자동화"
+    ],
+    "cta": "프로필 링크에서 무료로 시작하기",
+    "link": "",
+    "references": []
+   },
+   "pillars": [
+    {
+     "name": "팁",
+     "description": "바로 따라 하는 업무 요령",
+     "share": 35,
+     "template": "news",
+     "examples": [
+      "회의록 10분 정리법",
+      "반복 업무 줄이는 3단계"
+     ]
+    },
+    {
+     "name": "도구",
+     "description": "기능 소개·사용법",
+     "share": 25,
+     "template": "poster",
+     "examples": [
+      "이번 업데이트 한눈에"
+     ]
+    },
+    {
+     "name": "정보",
+     "description": "업무 트렌드·상식",
+     "share": 20,
+     "template": "magazine",
+     "examples": [
+      "재택과 출근, 집중이 잘 되는 조건"
+     ]
+    },
+    {
+     "name": "사례",
+     "description": "쓰는 팀 이야기",
+     "share": 20,
+     "template": "interview",
+     "examples": [
+      "작은 팀이 쓰는 법"
+     ]
+    }
+   ]
+  }
+ ],
+ "posts": [],
+ "ideas": [
+  {
+   "id": "demo-idea-1",
+   "workspace": "studio",
+   "title": "회의록 10분 정리법",
+   "pillar": "팁",
+   "angle": "회의 직후 3줄 요약 → 할 일 → 담당자 순서",
+   "template": "news",
+   "status": "idea",
+   "research": [],
+   "by": "user",
+   "createdAt": "2026-10-06T00:00:00.000Z",
+   "updatedAt": "2026-10-06T00:00:00.000Z"
+  }
+ ],
+ "research": [],
+ "users": [],
+ "tokens": [],
+ "oauthClients": []
+}
