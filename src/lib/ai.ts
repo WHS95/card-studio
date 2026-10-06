@@ -1,24 +1,15 @@
 import "server-only";
-import Anthropic from "@anthropic-ai/sdk";
 import { templateOf, TEMPLATES } from "./templates";
 import { validatePost, type Field } from "./fields";
 import { OpError } from "./ops";
-import { getKey } from "./secrets";
+import { ask, aiReady } from "./llm";
+import type { Actor } from "./auth";
 import type { PostData, Workspace } from "./types";
 
-// 화면 안 AI (선택): ANTHROPIC_API_KEY 가 있을 때만 켜진다. 없으면 MCP(Claude Code)로 같은 일을 한다.
-// 돈이 드는 호출이라 사람이 버튼을 누를 때만 부른다. 결과는 늘 사람이 고친 뒤 저장·승인한다.
+// 화면 안 AI (선택): 설정 · AI 에서 연결한 것(이 Mac 의 Claude Code·Codex, API 키)으로 작업 등급마다 부른다(llm.ts).
+// 연결이 없으면 MCP(내 Claude·ChatGPT)로 같은 일을 한다. 돈이 드는 호출이라 사람이 버튼을 누를 때만. 결과는 늘 사람이 고친 뒤 저장·승인한다.
 
-const MODEL = process.env.STUDIO_AI_MODEL || "claude-opus-5-5";
-export const aiEnabled = () => !!getKey("anthropic");
-
-let client: { key: string; c: Anthropic } | null = null;
-const ai = () => {
-  const key = getKey("anthropic");
-  if (!key) throw new OpError("AI 를 쓰려면 운영자가 'AI 연동'에서 Claude 키를 넣어 주세요 (또는 MCP 로 Claude Code 에서)");
-  if (client?.key !== key) client = { key, c: new Anthropic({ apiKey: key }) };
-  return client.c;
-};
+export const aiEnabled = (actor: Actor | null) => aiReady(actor);
 
 const RULES = [
   "모든 글은 한국어로 쓴다.",
@@ -44,72 +35,35 @@ export function briefText(w: Workspace) {
   ].filter(Boolean).join("\n");
 }
 
-type Msg = Anthropic.Beta.BetaMessage;
-type Param = Anthropic.Beta.BetaMessageParam;
-
-function textOf(m: Msg) {
-  if (m.stop_reason === "refusal") throw new OpError("AI 가 이 요청을 거절했어요. 표현을 바꿔 다시 해 주세요");
-  return m.content.filter((b): b is Anthropic.Beta.BetaTextBlock => b.type === "text").map((b) => b.text).join("");
-}
 function jsonOf<T>(s: string): T {
   const m = s.match(/```(?:json)?\s*([\s\S]*?)```/) ?? [null, s.slice(s.indexOf("{"), s.lastIndexOf("}") + 1)];
   try { return JSON.parse(m[1] ?? ""); } catch { throw new OpError("AI 답을 읽지 못했어요. 다시 해 주세요"); }
 }
-/** 거절되면 서버가 다른 모델로 이어 쓰게 (fallbacks "default") */
-async function call(params: Omit<Anthropic.Beta.Messages.MessageCreateParamsNonStreaming, "model">) {
-  try {
-    return await ai().beta.messages.stream({ model: MODEL, betas: ["server-side-fallback-2026-07-01"], fallbacks: "default", ...params }).finalMessage();
-  } catch (e) {
-    if (e instanceof OpError) throw e;
-    if (e instanceof Anthropic.AuthenticationError) throw new OpError("ANTHROPIC_API_KEY 가 맞지 않아요");
-    if (e instanceof Anthropic.RateLimitError) throw new OpError("AI 사용량이 많아요. 잠시 뒤 다시 해 주세요");
-    if (e instanceof Anthropic.APIError) throw new OpError(`AI 호출이 실패했어요 (${e.status})`);
-    throw e;
-  }
-}
 
 export type IdeaSuggestion = { title: string; pillar: string; angle: string; template: string };
 
-/** 브리프·기둥을 보고 아이디어 n개 (이미 있는 제목은 피한다) */
-export async function suggestIdeas(w: Workspace, o: { pillar?: string; count?: number; avoid?: string[]; hint?: string }): Promise<IdeaSuggestion[]> {
+/** 브리프·기둥을 보고 아이디어 n개 (이미 있는 제목은 피한다) · 판단 등급 */
+export async function suggestIdeas(w: Workspace, o: { pillar?: string; count?: number; avoid?: string[]; hint?: string }, actor: Actor | null): Promise<IdeaSuggestion[]> {
   const count = Math.min(10, Math.max(1, o.count ?? 5));
   const pillars = (w.pillars ?? []).map((p) => p.name);
-  const m = await call({
-    max_tokens: 16000,
-    output_config: {
-      effort: "medium",
-      format: {
-        type: "json_schema",
-        schema: {
-          type: "object", additionalProperties: false, required: ["ideas"],
-          properties: { ideas: { type: "array", items: { type: "object", additionalProperties: false, required: ["title", "pillar", "angle", "template"], properties: {
-            title: { type: "string", description: "카드뉴스 기획 제목, 40자 이내" },
-            pillar: { type: "string", description: `기둥 이름 (${pillars.join(", ") || "없음"}) 또는 빈 문자열` },
-            angle: { type: "string", description: "어떤 각도·구성으로 풀지 2~3문장" },
-            template: { type: "string", enum: TEMPLATES.map((t) => t.id) },
-          } } } },
-        },
-      },
-    },
+  const { text } = await ask("judge", actor, {
     system: `너는 인스타그램 카드뉴스 기획자다.\n${RULES}`,
-    messages: [{ role: "user", content: `${briefText(w)}\n\n템플릿: ${TEMPLATES.map((t) => `${t.id}=${t.name}(${t.description})`).join(", ")}\n이미 있는 아이디어(피할 것): ${(o.avoid ?? []).slice(0, 60).join(" / ") || "없음"}\n${o.pillar ? `기둥 '${o.pillar}'에 맞는 ` : ""}카드뉴스 아이디어 ${count}개를 제안해 줘.${o.hint ? `\n요청: ${o.hint}` : ""}` }],
+    prompt: `${briefText(w)}\n\n템플릿: ${TEMPLATES.map((t) => `${t.id}=${t.name}(${t.description})`).join(", ")}\n이미 있는 아이디어(피할 것): ${(o.avoid ?? []).slice(0, 60).join(" / ") || "없음"}\n${o.pillar ? `기둥 '${o.pillar}'에 맞는 ` : ""}카드뉴스 아이디어 ${count}개를 제안해 줘.${o.hint ? `\n요청: ${o.hint}` : ""}\n답은 \`\`\`json 블록 하나: {"ideas":[{"title":"40자 이내","pillar":"기둥 이름(${pillars.join(", ") || "없음"}) 또는 빈 문자열","angle":"어떤 각도·구성으로 풀지 2~3문장","template":"${TEMPLATES.map((t) => t.id).join("|")}"}]}`,
   });
-  const out = jsonOf<{ ideas: IdeaSuggestion[] }>(textOf(m));
-  return (out.ideas ?? []).slice(0, count);
+  const out = jsonOf<{ ideas: IdeaSuggestion[] }>(text);
+  return (out.ideas ?? []).filter((x) => x && x.title).map((x) => ({ ...x, template: TEMPLATES.some((t) => t.id === x.template) ? x.template : w.defaultTemplate })).slice(0, count);
 }
 
 export type SourceNote = { title: string; url: string; summary: string };
 
-/** 웹 검색으로 주제 자료 조사: 출처 주소 + 한국어 요약 */
-export async function researchTopic(w: Workspace, topic: string): Promise<SourceNote[]> {
-  const messages: Param[] = [{ role: "user", content: `${briefText(w)}\n\n주제: ${topic}\n\n이 주제로 카드뉴스를 만들 근거 자료를 웹에서 찾아 줘. 믿을 만한 출처 3~6개. 마지막에 다음 JSON 만 \`\`\`json 블록으로 답해: {"sources":[{"title":"자료 제목","url":"https://...","summary":"카드뉴스에 쓸 핵심 사실 3~5줄 (한국어)"}]}` }];
-  let m: Msg | null = null;
-  for (let i = 0; i < 4; i++) {
-    m = await call({ max_tokens: 16000, output_config: { effort: "medium" }, system: `너는 꼼꼼한 자료 조사원이다. 검색 결과에 실제로 있는 주소만 쓴다.\n${RULES}`, tools: [{ type: "web_search_20260209", name: "web_search", max_uses: 6 }], messages });
-    if (m.stop_reason !== "pause_turn") break;
-    messages.push({ role: "assistant", content: m.content });
-  }
-  const out = jsonOf<{ sources: SourceNote[] }>(textOf(m!));
+/** 웹 검색으로 주제 자료 조사: 출처 주소 + 한국어 요약 · 쓰기 등급 */
+export async function researchTopic(w: Workspace, topic: string, actor: Actor | null): Promise<SourceNote[]> {
+  const { text } = await ask("write", actor, {
+    webSearch: true,
+    system: `너는 꼼꼼한 자료 조사원이다. 검색 결과에 실제로 있는 주소만 쓴다.\n${RULES}`,
+    prompt: `${briefText(w)}\n\n주제: ${topic}\n\n이 주제로 카드뉴스를 만들 근거 자료를 웹에서 찾아 줘. 믿을 만한 출처 3~6개. 마지막에 다음 JSON 만 \`\`\`json 블록으로 답해: {"sources":[{"title":"자료 제목","url":"https://...","summary":"카드뉴스에 쓸 핵심 사실 3~5줄 (한국어)"}]}`,
+  });
+  const out = jsonOf<{ sources: SourceNote[] }>(text);
   return (out.sources ?? []).filter((s) => s.title && /^https:\/\//.test(s.url)).slice(0, 6);
 }
 
@@ -124,31 +78,20 @@ function schemaText(fields: Field[], pad = "  "): string {
 }
 
 /** 기획(제목·메모·자료)으로 장 글·캡션 초안. 템플릿 검사를 통과할 때까지 한 번 더 고친다 */
-export async function draftPostData(w: Workspace, p: { template: string; title: string; category: string; note: string; current: PostData | null }, extra: string): Promise<PostData> {
+export async function draftPostData(w: Workspace, p: { template: string; title: string; category: string; note: string; current: PostData | null }, extra: string, actor: Actor | null): Promise<PostData> {
   const t = templateOf(p.template);
   const kinds = t.kinds.map((k) => `- kind "${k.kind}" (${k.label}${k.fixed ? ", 첫 장 고정" : ""}):\n${schemaText(k.fields)}`).join("\n");
-  const messages: Param[] = [{ role: "user", content: `${briefText(w)}\n\n기획 제목: ${p.title}\n카테고리: ${p.category}\n메모·자료:\n${p.note || "없음"}\n${extra ? `추가 요청: ${extra}\n` : ""}\n템플릿 '${t.name}' (최대 ${t.maxSlides}장, 첫 장은 ${t.kinds[0].kind}). 장 종류와 칸:\n${kinds}\n\n이 틀에 맞춰 카드뉴스 장 글과 인스타 캡션을 써 줘. 글자 수 제한을 꼭 지킨다(넘치면 안 된다). 캡션은 브리프 말투로, 끝에 기본 해시태그(${w.brief?.hashtags.join(" ") || "없음"})를 포함해 해시태그 30개 이하. 답은 \`\`\`json 블록 하나: {"slides":[{"kind":"...", ...칸}], "caption":"..."}` }];
+  let prompt = `${briefText(w)}\n\n기획 제목: ${p.title}\n카테고리: ${p.category}\n메모·자료:\n${p.note || "없음"}\n${extra ? `추가 요청: ${extra}\n` : ""}\n템플릿 '${t.name}' (최대 ${t.maxSlides}장, 첫 장은 ${t.kinds[0].kind}). 장 종류와 칸:\n${kinds}\n\n이 틀에 맞춰 카드뉴스 장 글과 인스타 캡션을 써 줘. 글자 수 제한을 꼭 지킨다(넘치면 안 된다). 캡션은 브리프 말투로, 끝에 기본 해시태그(${w.brief?.hashtags.join(" ") || "없음"})를 포함해 해시태그 30개 이하. 답은 \`\`\`json 블록 하나: {"slides":[{"kind":"...", ...칸}], "caption":"..."}`;
   for (let i = 0; i < 2; i++) {
-    const m = await call({ max_tokens: 16000, output_config: { effort: "medium" }, system: `너는 인스타그램 카드뉴스 카피라이터다. 짧고 또렷하게 쓴다.\n${RULES}`, messages });
-    const raw = textOf(m);
+    const { text: raw } = await ask("write", actor, { system: `너는 인스타그램 카드뉴스 카피라이터다. 짧고 또렷하게 쓴다.\n${RULES}`, prompt });
     const out = jsonOf<{ slides: Record<string, unknown>[]; caption: string }>(raw);
     const data: PostData = { photos: p.current?.photos ?? [], caption: String(out.caption ?? ""), slides: (out.slides ?? []).map((s) => ({ ...s, kind: String(s.kind) })) };
     // 사진 칸은 지금 고른 사진을 그대로 (같은 순서의 장이면)
     data.slides.forEach((s, n) => { const old = p.current?.slides[n]; if (old && old.kind === s.kind) for (const k of Object.keys(old)) if (/^(photo|photoH|photoY|video)/.test(k)) s[k] = old[k]; });
     const err = validatePost(t, data);
     if (!err) return data;
-    messages.push({ role: "assistant", content: raw }, { role: "user", content: `검사에서 틀렸어: ${err}\n고친 JSON 전체를 다시 줘.` });
+    prompt += `\n\n앞선 답:\n${raw}\n\n검사에서 틀렸어: ${err}\n고친 JSON 전체를 다시 줘.`;
   }
   throw new OpError("AI 초안이 칸 제한을 맞추지 못했어요. 다시 해 주세요");
 }
 
-/** 연결 확인: 모델 정보 한 번 읽기 (돈 안 드는 호출) */
-export async function testClaude() {
-  try { await ai().models.retrieve(MODEL); return `연결됐어요 (${MODEL})`; }
-  catch (e) {
-    if (e instanceof OpError) throw e;
-    if (e instanceof Anthropic.AuthenticationError) throw new OpError("Claude 키가 맞지 않아요");
-    if (e instanceof Anthropic.NotFoundError) throw new OpError(`키는 맞지만 ${MODEL} 모델을 쓸 수 없어요`);
-    throw new OpError("Claude 에 연결하지 못했어요");
-  }
-}

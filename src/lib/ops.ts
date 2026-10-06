@@ -5,7 +5,8 @@ import { PLANS, planOf, thisMonth } from "./plans";
 import { hashPassword, tempPassword, verifyPassword } from "./auth";
 import { templateOf } from "./templates";
 import { validatePost } from "./fields";
-import { IDEA_STATUS, NEXT_STATUS, POST_STATUS, type Brief, type Idea, type IdeaStatus, type Metrics, type Role, type User, ROLES, type PlanId, type Pillar, type Post, type PostData, type PostStatus, type Research, type Theme, type Workspace } from "./types";
+import { ruleWarnings, ruleLine } from "./rules";
+import { CHECKS_MAX, CONFIDENCE, DEFAULT_CHECKS, IDEA_STATUS, NEXT_STATUS, NO_RULES, POST_STATUS, type Activity, type Brief, type Confidence, type ContentRules, type Idea, type IdeaStatus, type Metrics, type Role, type User, ROLES, type PlanId, type Pillar, type Post, type PostData, type PostStatus, type Research, type Theme, type Workspace } from "./types";
 
 // 화면(server action)과 MCP 가 같이 쓰는 규칙 한 곳. 틀리면 OpError(사용자에게 보여 줄 문구).
 
@@ -56,7 +57,7 @@ export async function createWorkspace(input: { id: unknown; name: unknown; handl
 }
 
 export type WorkspacePatch = Partial<{
-  name: string; handle: string; categories: string[]; slots: string[]; days: number; startDate: string | null; defaultTemplate: string;
+  name: string; handle: string; categories: string[]; slots: string[]; days: number; startDate: string | null; defaultTemplate: string; metricsDays: number;
   theme: Partial<Omit<Theme, "wordmark" | "font">> & { wordmark?: Partial<Theme["wordmark"]> };
 }>;
 export async function updateWorkspace(id: string, p: WorkspacePatch) {
@@ -72,6 +73,7 @@ export async function updateWorkspace(id: string, p: WorkspacePatch) {
     days: p.days !== undefined ? Math.min(90, Math.max(1, Math.round(Number(p.days)) || w.days)) : w.days,
     startDate: p.startDate === undefined ? w.startDate : p.startDate && /^\d{4}-\d{2}-\d{2}$/.test(p.startDate) ? p.startDate : null,
     defaultTemplate: p.defaultTemplate ? templateOf(p.defaultTemplate).id : w.defaultTemplate,
+    metricsDays: p.metricsDays !== undefined ? Math.min(30, Math.max(1, Math.round(Number(p.metricsDays)) || 7)) : w.metricsDays,
     theme: {
       ...w.theme,
       dark: hex(t.dark, w.theme.dark), light: hex(t.light, w.theme.light), ink: hex(t.ink, w.theme.ink), muted: hex(t.muted, w.theme.muted),
@@ -113,14 +115,18 @@ export async function savePost(id: string, p: { template?: string; title?: strin
     const e = validatePost(templateOf(template), p.data);
     if (e) fail(e);
     patch.data = p.data as PostData;
-    // 승인된 뒤 글을 고치면 다시 검수 받도록 초안으로
+    // 승인된 뒤 글을 고치면 다시 검수 받도록 초안으로 (체크 기록도 지운다)
     patch.status = cur.status === "plan" || cur.status === "approved" ? "draft" : cur.status;
+    if (cur.status === "approved") patch.review = undefined;
   } else if (template !== cur.template && cur.data) fail("템플릿을 바꿀 때는 새 틀에 맞는 data 도 같이 보내 주세요");
   return (await updatePost(id, patch))!;
 }
 
-/** 상태는 NEXT_STATUS 길로만. 승인은 저장된 내용이 있어야, 게시는 승인된 것 + 인스타 링크 */
-export async function setStatus(id: string, status: PostStatus, postedUrl?: string) {
+/** 승인 체크리스트 = 기본 항목 + 서비스가 더한 항목 */
+export const requiredChecks = (w: Workspace) => [...DEFAULT_CHECKS, ...(w.brief?.checklist ?? [])];
+
+/** 상태는 NEXT_STATUS 길로만. 승인은 저장된 내용 + 체크리스트를 모두 체크, 게시는 승인된 것 + 인스타 링크 */
+export async function setStatus(id: string, status: PostStatus, postedUrl?: string, opts: { checks?: string[]; by?: string } = {}) {
   const cur = (await getPost(id)) ?? fail("게시물을 찾지 못했어요");
   if (!POST_STATUS.includes(status)) fail("모르는 상태예요");
   if (!NEXT_STATUS[cur.status].includes(status)) fail(`${cur.status} 에서 ${status} 로는 바꿀 수 없어요 (가능: ${NEXT_STATUS[cur.status].join(", ") || "없음"})`);
@@ -130,14 +136,45 @@ export async function setStatus(id: string, status: PostStatus, postedUrl?: stri
   if ((to === "approved" || to === "posted") && cur.data?.photos.some((p) => /^\/samples\//.test(p.url))) fail("샘플 그림이 남아 있어요. 실제 사진으로 바꾼 뒤 승인해 주세요");
   const url = (postedUrl ?? "").trim();
   if (to === "posted" && !/^https:\/\/(www\.)?instagram\.com\/(p|reel)\/[A-Za-z0-9_-]+\/?/.test(url)) fail("게시 링크(https://www.instagram.com/p/…)가 필요해요");
+  const patch: Partial<Post> = { status: to };
+  // 초안 → 승인: 체크리스트를 모두 체크해야 (게시 취소로 돌아온 승인은 이미 체크한 것)
+  if (to === "approved" && cur.status === "draft") {
+    const w = (await getWorkspace(cur.workspace)) ?? fail("서비스를 찾지 못했어요");
+    const got = new Set((opts.checks ?? []).map((x) => String(x).trim()));
+    const miss = requiredChecks(w).filter((c) => !got.has(c));
+    if (miss.length) fail(`승인 전 체크리스트를 모두 체크해 주세요 (남은 것 ${miss.length}개: ${miss[0]}${miss.length > 1 ? " 외" : ""})`);
+    patch.review = { by: s(opts.by, 30) || "?", at: new Date().toISOString(), checks: requiredChecks(w) };
+  }
+  if (to === "draft" || to === "skip") patch.review = undefined;
+  if (to === "posted") { patch.postedUrl = url; patch.postedAt = new Date().toISOString(); }
   // 게시 취소(posted → approved)면 게시 링크도 지운다
-  return (await updatePost(id, { status: to, ...(to === "posted" ? { postedUrl: url } : cur.status === "posted" ? { postedUrl: "" } : {}) }))!;
+  else if (cur.status === "posted") { patch.postedUrl = ""; patch.postedAt = undefined; }
+  return (await updatePost(id, patch))!;
+}
+
+/** 승인 전 확인: 사람이 체크할 항목 + 스튜디오가 알 수 있는 것(규칙 경고 · '확인 필요' 자료). 인스타 마진은 편집기가 따로 그린다 */
+export async function checklistOf(postId: string) {
+  const p = (await getPost(postId)) ?? fail("게시물을 찾지 못했어요");
+  const w = (await getWorkspace(p.workspace)) ?? fail("서비스를 찾지 못했어요");
+  const db = await readDb();
+  const rids = new Set(db.ideas.filter((i) => i.postId === p.id).flatMap((i) => i.research));
+  const unsure = db.research.filter((r) => rids.has(r.id) && r.confidence === "check");
+  const warns = ruleWarnings(w.brief?.rules, w.defaultTemplate, p.template, p.data);
+  return {
+    required: requiredChecks(w),
+    auto: [
+      ...(warns.length ? warns.map((x) => ({ ok: false, text: ruleLine(x) })) : [{ ok: true, text: "콘텐츠 규칙 경고 없음" }]),
+      ...(unsure.length ? unsure.map((r) => ({ ok: false, text: `'확인 필요' 자료: ${r.title}`, researchId: r.id })) : []),
+    ],
+    review: p.review ?? null,
+  };
 }
 
 // ── 브리프 · 콘텐츠 기둥 ─────────────────────────────────────────────
 
 const list = (v: unknown, n: number, each: number) => (Array.isArray(v) ? v : typeof v === "string" ? v.split(/[,\n]/) : []).map((x) => s(x, each)).filter(Boolean).slice(0, n);
 const tag = (x: string) => (x.startsWith("#") ? x : `#${x}`).replace(/\s+/g, "");
+const rulesOf = (v: unknown): ContentRules => { const o = (v && typeof v === "object" ? v : {}) as Record<string, unknown>; return Object.fromEntries(Object.keys(NO_RULES).map((k) => [k, o[k] === true || o[k] === "on" || o[k] === "true"])) as ContentRules; };
 
 export async function updateBrief(id: string, p: Partial<Record<keyof Brief, unknown>>) {
   const w = (await getWorkspace(id)) ?? fail("서비스를 찾지 못했어요");
@@ -155,6 +192,8 @@ export async function updateBrief(id: string, p: Partial<Record<keyof Brief, unk
     cta: has("cta") ? s(p.cta, 60) : b.cta,
     link: has("link") ? s(p.link, 200) : b.link,
     references: has("references") ? list(p.references, 10, 60) : b.references,
+    rules: has("rules") ? rulesOf(p.rules) : b.rules,
+    checklist: has("checklist") ? list(p.checklist, CHECKS_MAX, 80).filter((x) => !(DEFAULT_CHECKS as readonly string[]).includes(x)) : b.checklist,
   };
   if (brief.link && !/^https?:\/\//.test(brief.link)) fail("링크는 http(s):// 로 시작해요");
   return upsertWorkspace({ ...w, brief });
@@ -197,7 +236,7 @@ export async function createIdea(wsId: string, p: { title: unknown; pillar?: unk
     const ids = new Set(db.research.filter((r) => r.workspace === w.id).map((r) => r.id));
     const idea: Idea = {
       id: newId(), workspace: w.id, title, pillar: pl ? pl.name : "", angle: s(p.angle, 1000),
-      template: templateOf(s(p.template, 30) || pl?.template || w.defaultTemplate).id, status: "idea",
+      template: templateOf(s(p.template, 30) || pl?.template || w.defaultTemplate).id, status: "review",
       research: list(p.research, 20, 40).filter((id) => ids.has(id)), by: p.by ?? "user", createdAt: now, updatedAt: now,
     };
     db.ideas.push(idea);
@@ -205,7 +244,8 @@ export async function createIdea(wsId: string, p: { title: unknown; pillar?: unk
   });
 }
 
-export async function updateIdea(id: string, p: { title?: unknown; pillar?: unknown; angle?: unknown; template?: unknown; status?: unknown; research?: unknown }) {
+/** status: review(검수 대기로 되돌리기) · approved(승인 — 부르는 쪽이 approve 권한을 확인) · dropped(보류). planned 는 달력에 넣기로만 */
+export async function updateIdea(id: string, p: { title?: unknown; pillar?: unknown; angle?: unknown; template?: unknown; status?: unknown; research?: unknown }, by = "") {
   const cur = (await getIdea(id)) ?? fail("아이디어를 찾지 못했어요");
   const w = (await getWorkspace(cur.workspace)) ?? fail("서비스를 찾지 못했어요");
   return mutate((db) => {
@@ -216,8 +256,11 @@ export async function updateIdea(id: string, p: { title?: unknown; pillar?: unkn
     if (p.template !== undefined) it.template = templateOf(s(p.template, 30)).id;
     if (p.status !== undefined) {
       if (!IDEA_STATUS.includes(p.status as IdeaStatus)) fail("모르는 상태예요");
-      if (p.status === "planned" && !it.postId) fail("달력에 넣기로 바꿔 주세요");
+      if (p.status === "planned") fail("달력에 넣기로 바꿔 주세요");
+      if (it.status === "planned" && it.postId && db.posts.some((x) => x.id === it.postId && !x.archivedAt)) fail("이미 달력에 들어간 주제예요. 게시물을 보관함으로 뺀 뒤 바꿀 수 있어요");
       it.status = p.status as IdeaStatus;
+      if (it.status === "approved") { it.approvedBy = s(by, 30) || "?"; it.approvedAt = new Date().toISOString(); }
+      else { it.approvedBy = undefined; it.approvedAt = undefined; }
     }
     if (p.research !== undefined) { const ids = new Set(db.research.filter((r) => r.workspace === w.id).map((r) => r.id)); it.research = list(p.research, 20, 40).filter((x) => ids.has(x)); }
     it.updatedAt = new Date().toISOString();
@@ -237,6 +280,7 @@ export async function nextEmptySlot(wsId: string, fromDay = 1) {
 export async function scheduleIdea(id: string, at?: { day?: unknown; slot?: unknown }) {
   const it = (await getIdea(id)) ?? fail("아이디어를 찾지 못했어요");
   if (it.postId && (await getPost(it.postId))) fail("이미 달력에 들어간 아이디어예요");
+  if (it.status !== "approved") fail("승인한 주제만 달력에 넣을 수 있어요");
   const spot = at?.day !== undefined && at?.slot !== undefined ? { day: Number(at.day), slot: String(at.slot) } : await nextEmptySlot(it.workspace);
   if (!spot) fail("빈 칸이 없어요. 설정에서 일수를 늘려 주세요");
   const db = await readDb();
@@ -248,22 +292,38 @@ export async function scheduleIdea(id: string, at?: { day?: unknown; slot?: unkn
   return r.post;
 }
 
+/** 승인한 주제 여러 개를 고른 순서대로 빈 칸에 하루씩 (from = 시작 일차, 없으면 처음부터) */
+export async function scheduleIdeas(ids: string[], from?: number) {
+  const out: Post[] = [];
+  let day = Math.max(1, Math.round(Number(from)) || 1);
+  for (const id of ids.slice(0, 30)) {
+    const it = (await getIdea(id)) ?? fail("아이디어를 찾지 못했어요");
+    if (it.status !== "approved") fail(`'${it.title}'은 아직 승인 전이에요`);
+    const spot = (await nextEmptySlot(it.workspace, day)) ?? fail(`빈 칸이 모자라요 (${out.length}개 넣음). 설정에서 일수를 늘려 주세요`);
+    out.push(await scheduleIdea(id, spot));
+    day = spot.day + 1;
+  }
+  return out;
+}
+
 // ── 자료 조사 ───────────────────────────────────────────────────────
 
-export async function addResearch(wsId: string, p: { title: unknown; url?: unknown; summary?: unknown; memo?: unknown; tags?: unknown; by?: Research["by"] }) {
+const confOf = (v: unknown, d: Confidence = "medium"): Confidence => (CONFIDENCE.includes(v as Confidence) ? (v as Confidence) : d);
+
+export async function addResearch(wsId: string, p: { title: unknown; url?: unknown; summary?: unknown; memo?: unknown; tags?: unknown; confidence?: unknown; by?: Research["by"] }) {
   const w = (await getWorkspace(wsId)) ?? fail("서비스를 찾지 못했어요");
   const title = s(p.title, 120), url = s(p.url, 500);
   if (!title) fail("자료 제목을 적어 주세요");
   if (url && !/^https:\/\/[^\s"'<>]+$/.test(url)) fail("출처 주소는 https:// 로 시작해요");
   return mutate((db) => {
     if (db.research.filter((x) => x.workspace === w.id).length >= RESEARCH_MAX) fail(`자료는 서비스마다 ${RESEARCH_MAX}개까지예요`);
-    const r: Research = { id: newId(), workspace: w.id, title, url, summary: s(p.summary, 2000), memo: s(p.memo, 500), tags: list(p.tags, 10, 20), by: p.by ?? "user", createdAt: new Date().toISOString() };
+    const r: Research = { id: newId(), workspace: w.id, title, url, summary: s(p.summary, 2000), memo: s(p.memo, 500), tags: list(p.tags, 10, 20), confidence: confOf(p.confidence), by: p.by ?? "user", createdAt: new Date().toISOString() };
     db.research.push(r);
     return r;
   });
 }
 
-export async function updateResearch(id: string, p: { title?: unknown; url?: unknown; summary?: unknown; memo?: unknown; tags?: unknown }) {
+export async function updateResearch(id: string, p: { title?: unknown; url?: unknown; summary?: unknown; memo?: unknown; tags?: unknown; confidence?: unknown }) {
   return mutate((db) => {
     const r = db.research.find((x) => x.id === id) ?? fail("자료를 찾지 못했어요");
     if (p.title !== undefined) r.title = s(p.title, 120) || r.title;
@@ -271,6 +331,7 @@ export async function updateResearch(id: string, p: { title?: unknown; url?: unk
     if (p.summary !== undefined) r.summary = s(p.summary, 2000);
     if (p.memo !== undefined) r.memo = s(p.memo, 500);
     if (p.tags !== undefined) r.tags = list(p.tags, 10, 20);
+    if (p.confidence !== undefined) r.confidence = confOf(p.confidence, r.confidence);
     return r;
   });
 }
@@ -339,22 +400,120 @@ export async function setMetrics(id: string, m: Partial<Record<keyof Metrics, un
   return (await updatePost(id, { metrics }))!;
 }
 
-/** 성과 모아 보기: 기둥(카테고리)·템플릿별 평균, 저장률·참여율 순 상위 */
+const rate = (a: number, b: number) => (b ? Math.round((a / b) * 1000) / 10 : 0);
+const eng = (m: Metrics) => m.likes + m.comments + m.saves + m.shares;
+const postedTime = (p: Post) => Date.parse(p.postedAt ?? p.updatedAt);
+export const SUGGEST_FROM = 7; // 성과를 적은 게시물이 이만큼 되면 제안
+const SHARE_STEP = 10; // 기둥 비중은 한 번에 10%p 까지
+
+/** 성과 적을 차례: 게시하고 metricsDays(기본 7)일 지났는데 성과가 없는 게시물 */
+export async function metricsDue(wsId: string) {
+  const w = (await getWorkspace(wsId)) ?? fail("서비스를 찾지 못했어요");
+  const days = w.metricsDays ?? 7;
+  const now = Date.now();
+  return (await listPosts(wsId)).filter((p) => p.status === "posted" && !p.metrics && now - postedTime(p) >= days * 86400_000)
+    .map((p) => ({ id: p.id, day: p.day, slot: p.slot, title: p.title, daysAgo: Math.floor((now - postedTime(p)) / 86400_000) }));
+}
+
+export type Suggestion =
+  | { key: string; kind: "share"; from: string; to: string; fromShare: number; toShare: number; delta: number; why: string }
+  | { key: string; kind: "followup"; postId: string; title: string; pillar: string; saveRate: number; why: string };
+
+/** 다음 기획 제안 (기둥 기준, 적용은 사람이): 비중 옮기기 · 저장률 1위 후속편 */
+function suggest(w: Workspace, posts: Post[]): Suggestion[] {
+  if (posts.length < SUGGEST_FROM) return [];
+  const out: Suggestion[] = [];
+  const sr = (p: Post) => rate(p.metrics!.saves, p.metrics!.reach);
+  const sorted = [...posts].map(sr).sort((a, b) => a - b);
+  const q1 = sorted[Math.floor((sorted.length - 1) * 0.25)];
+  const pillars = w.pillars ?? [];
+  const by = pillars.map((pl) => {
+    const ps = posts.filter((p) => p.category === pl.name).sort((a, b) => postedTime(a) - postedTime(b));
+    const reach = ps.reduce((a, p) => a + p.metrics!.reach, 0), saves = ps.reduce((a, p) => a + p.metrics!.saves, 0);
+    const last2 = ps.slice(-2);
+    return { pl, n: ps.length, saveRate: rate(saves, reach), low2: last2.length === 2 && last2.every((p) => sr(p) <= q1) };
+  }).filter((x) => x.n >= 2);
+  if (by.length >= 2) {
+    const top = [...by].sort((a, b) => b.saveRate - a.saveRate)[0];
+    const from = by.find((x) => x.low2 && x !== top) ?? [...by].sort((a, b) => a.saveRate - b.saveRate)[0];
+    const delta = Math.min(SHARE_STEP, from.pl.share);
+    if (from !== top && delta > 0 && from.saveRate < top.saveRate) {
+      out.push({
+        key: `share:${from.pl.name}>${top.pl.name}:${posts.length}`, kind: "share", from: from.pl.name, to: top.pl.name, fromShare: from.pl.share, toShare: top.pl.share, delta,
+        why: `${from.low2 ? `${from.pl.name} 기둥의 최근 두 편이 모두 저장률 하위 25%예요. ` : `${from.pl.name} 기둥의 저장률(${from.saveRate}%)이 가장 낮아요. `}저장률이 가장 높은 기둥은 ${top.pl.name}(${top.saveRate}%)이에요. 한 번에 ${SHARE_STEP}%p까지만 옮겨요.`,
+      });
+    }
+  }
+  const best = [...posts].sort((a, b) => sr(b) - sr(a))[0];
+  if (best) out.push({ key: `followup:${best.id}`, kind: "followup", postId: best.id, title: best.title, pillar: best.category, saveRate: sr(best), why: `저장률 1위(${sr(best)}%)예요. 같은 기둥(${best.category || "없음"})에 후속 주제를 검수 대기로 넣어요.` });
+  const dismissed = new Set(w.dismissed ?? []);
+  return out.filter((x) => !dismissed.has(x.key));
+}
+
+/** 성과 모아 보기: 기둥별 평균(저장률 순), 저장률 상위, 성과 적을 차례, 다음 기획 제안 */
 export async function insights(wsId: string) {
-  const posts = (await listPosts(wsId)).filter((p) => p.status === "posted" && p.metrics);
-  const rate = (a: number, b: number) => (b ? Math.round((a / b) * 1000) / 10 : 0);
-  const eng = (m: Metrics) => m.likes + m.comments + m.saves + m.shares;
-  const group = (key: (p: Post) => string) => {
-    const g = new Map<string, Post[]>();
-    for (const p of posts) g.set(key(p), [...(g.get(key(p)) ?? []), p]);
-    return [...g].map(([name, ps]) => {
-      const sum = (f: (m: Metrics) => number) => ps.reduce((a, p) => a + f(p.metrics!), 0);
-      return { name, posts: ps.length, reach: Math.round(sum((m) => m.reach) / ps.length), saveRate: rate(sum((m) => m.saves), sum((m) => m.reach)), engagement: rate(sum(eng), sum((m) => m.reach)), follows: sum((m) => m.follows) };
-    }).sort((a, b) => b.saveRate - a.saveRate);
-  };
+  const w = (await getWorkspace(wsId)) ?? fail("서비스를 찾지 못했어요");
+  const all = await listPosts(wsId);
+  const posts = all.filter((p) => p.status === "posted" && p.metrics);
+  const g = new Map<string, Post[]>();
+  for (const p of posts) g.set(p.category || "없음", [...(g.get(p.category || "없음") ?? []), p]);
+  const byPillar = [...g].map(([name, ps]) => {
+    const sum = (f: (m: Metrics) => number) => ps.reduce((a, p) => a + f(p.metrics!), 0);
+    return { name, posts: ps.length, reach: Math.round(sum((m) => m.reach) / ps.length), saveRate: rate(sum((m) => m.saves), sum((m) => m.reach)), engagement: rate(sum(eng), sum((m) => m.reach)), follows: sum((m) => m.follows), share: w.pillars?.find((x) => x.name === name)?.share ?? null };
+  }).sort((a, b) => b.saveRate - a.saveRate);
   const top = [...posts].sort((a, b) => rate(b.metrics!.saves, b.metrics!.reach) - rate(a.metrics!.saves, a.metrics!.reach)).slice(0, 10)
     .map((p) => ({ id: p.id, day: p.day, slot: p.slot, title: p.title, category: p.category, template: p.template, reach: p.metrics!.reach, saveRate: rate(p.metrics!.saves, p.metrics!.reach), engagement: rate(eng(p.metrics!), p.metrics!.reach) }));
-  return { measured: posts.length, byPillar: group((p) => p.category || "없음"), byTemplate: group((p) => templateOf(p.template).name), top };
+  return { posted: all.filter((p) => p.status === "posted").length, measured: posts.length, suggestFrom: SUGGEST_FROM, byPillar, top, due: await metricsDue(wsId), suggestions: suggest(w, posts) };
+}
+
+/** 제안 적용: 비중 옮기기 (합 100 유지) */
+export async function applyShareSuggestion(wsId: string, from: string, to: string, delta: number) {
+  const w = (await getWorkspace(wsId)) ?? fail("서비스를 찾지 못했어요");
+  const pl = w.pillars ?? [];
+  const a = pl.find((x) => x.name === from) ?? fail("기둥을 찾지 못했어요"), b = pl.find((x) => x.name === to) ?? fail("기둥을 찾지 못했어요");
+  const d = Math.max(0, Math.min(SHARE_STEP, Math.round(Number(delta)) || 0, a.share));
+  if (!d) fail("옮길 비중이 없어요");
+  return setPillars(wsId, pl.map((x) => ({ ...x, share: x === a ? x.share - d : x === b ? x.share + d : x.share })));
+}
+/** 제안 적용: 후속편을 주제로 (검수 대기) */
+export async function followUpIdea(postId: string, by: Idea["by"] = "user") {
+  const p = (await getPost(postId)) ?? fail("게시물을 찾지 못했어요");
+  return createIdea(p.workspace, { title: `${p.title} 후속편`.slice(0, 80), pillar: p.category, angle: `저장률이 높았던 '${p.title}'(D${p.day})의 후속. 같은 독자에게 한 걸음 더`, template: p.template, by });
+}
+export async function dismissSuggestion(wsId: string, key: string) {
+  return mutate((db) => {
+    const w = db.workspaces.find((x) => x.id === wsId) ?? fail("서비스를 찾지 못했어요");
+    w.dismissed = [...new Set([...(w.dismissed ?? []), s(key, 120)])].slice(-100);
+  });
+}
+
+// ── 즐겨찾기 · 표시 이름 · AI·MCP 작업 기록 ──────────────────────────
+
+export async function toggleFavorite(uid: string, wsId: string) {
+  return mutate((db) => {
+    const p = db.prefs[uid] ?? { favorites: [] };
+    p.favorites = p.favorites.includes(wsId) ? p.favorites.filter((x) => x !== wsId) : [...p.favorites, wsId].slice(-50);
+    db.prefs[uid] = p;
+    return p;
+  });
+}
+/** 표시 이름: 계정은 계정 이름, 운영자는 화면 설정에 */
+export async function setDisplayName(uid: string, name: unknown) {
+  const n = s(name, 30);
+  if (!n) fail("이름을 적어 주세요");
+  return mutate((db) => {
+    if (uid === "admin") db.prefs.admin = { ...(db.prefs.admin ?? { favorites: [] }), displayName: n };
+    else { const u = db.users.find((x) => x.id === uid) ?? fail("계정을 찾지 못했어요"); u.name = n; }
+  });
+}
+
+const ACTIVITY_MAX = 300; // 서비스마다
+export async function logActivity(a: Omit<Activity, "id" | "at">) {
+  return mutate((db) => {
+    db.activity.push({ ...a, id: newId(), at: new Date().toISOString(), title: a.title.slice(0, 120), lines: a.lines.slice(0, 6).map((x) => x.slice(0, 200)) });
+    const mine = db.activity.filter((x) => x.workspace === a.workspace);
+    if (mine.length > ACTIVITY_MAX) { const drop = new Set(mine.slice(0, mine.length - ACTIVITY_MAX).map((x) => x.id)); db.activity = db.activity.filter((x) => !drop.has(x.id)); }
+  });
 }
 
 // ── 함께 쓰는 사람 · 요금제 ─────────────────────────────────────────

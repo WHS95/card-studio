@@ -9,7 +9,8 @@ import { briefText } from "./ai";
 import { getVeoJob, startVeo, VEO_MODELS, VEO_MODES } from "./veo";
 import { can, roleIn, type Actor, type Perm } from "./auth";
 import { getIdea, getResearch } from "./store";
-import { countVideo, addResearch, createIdea, createPostIn, createWorkspace, duplicatePost, insights, movePost, nextEmptySlot, setMetrics, OpError, savePost, scheduleIdea, setPillars, setStatus, updateBrief, updateIdea, updateResearch, updateWorkspace, type WorkspacePatch } from "./ops";
+import { countVideo, addResearch, applyShareSuggestion, checklistOf, createIdea, createPostIn, createWorkspace, dismissSuggestion, duplicatePost, followUpIdea, insights, logActivity, movePost, nextEmptySlot, setMetrics, OpError, savePost, scheduleIdea, scheduleIdeas, setPillars, setStatus, updateBrief, updateIdea, updateResearch, updateWorkspace, type WorkspacePatch } from "./ops";
+import { flowOf } from "./flow";
 import { importFile, ffmpeg } from "./media";
 import { checkPost } from "./check";
 import { fullCaption, slideFile } from "./exporter";
@@ -94,9 +95,33 @@ model: ${VEO_MODELS.map((m) => m.id).join(" · ")} (기본 lite; frames·referen
   },
   {
     name: "get_insights",
-    description: "성과 모아 보기: 기둥·템플릿별 평균 도달·저장률·참여율, 저장률 상위 게시물. 다음 아이디어·기둥 비중을 정할 때 쓴다.",
+    description: "성과 모아 보기: 기둥별 평균 도달·저장률·참여율(저장률 순), 저장률 상위, 성과 적을 차례(due: 게시 뒤 metricsDays 일 지났는데 성과 없음), 다음 기획 제안(suggestions — 성과를 적은 게시물 7편부터: share=기둥 비중 옮기기, followup=후속편). 적용은 사람이 정하거나 apply_suggestion.",
     inputSchema: obj({ ws: str }, ["ws"]),
     run: (a) => insights(String(a.ws)),
+  },
+  {
+    name: "apply_suggestion",
+    description: "get_insights 의 제안 적용·넘기기. key = 제안 key, action: apply(share 면 기둥 비중을 옮기고, followup 이면 후속 주제를 검수 대기로) | dismiss(다시 안 보이게). 사람이 원할 때만.",
+    inputSchema: obj({ ws: str, key: str, action: { type: "string", enum: ["apply", "dismiss"] } }, ["ws", "key", "action"]),
+    run: async (a) => {
+      const ws = String(a.ws), key = String(a.key);
+      const sg = need((await insights(ws)).suggestions.find((x) => x.key === key), "그 제안을 찾지 못했어요 (이미 넘겼거나 바뀌었어요)");
+      if (a.action === "dismiss") { await dismissSuggestion(ws, key); return { ok: true }; }
+      if (sg.kind === "share") { await applyShareSuggestion(ws, sg.from, sg.to, sg.delta); await dismissSuggestion(ws, key); return { ok: true, pillars: (await getWorkspace(ws))?.pillars }; }
+      const idea = await followUpIdea(sg.postId, "mcp"); await dismissSuggestion(ws, key); return { ok: true, idea };
+    },
+  },
+  {
+    name: "get_flow",
+    description: "서비스의 8단계(목적·자료 조사·주제·템플릿·제작·검수·발행·성과) 지금 상태(done·doing·todo + 숫자 + 설명)와 '지금 할 일'. 무엇부터 할지 정할 때 먼저 본다.",
+    inputSchema: obj({ ws: str }, ["ws"]),
+    run: async (a) => flowOf(need(await getWorkspace(String(a.ws)), "서비스를 찾지 못했어요")),
+  },
+  {
+    name: "get_checklist",
+    description: "게시물 승인 전 확인: required(사람이 모두 체크해야 하는 문구 — set_status approved 의 checks 에 그대로), auto(규칙 경고·'확인 필요' 자료), review(이미 승인했으면 기록).",
+    inputSchema: obj({ id: str }, ["id"]),
+    run: (a) => checklistOf(String(a.id)),
   },
   {
     name: "get_brief",
@@ -109,7 +134,7 @@ model: ${VEO_MODELS.map((m) => m.id).join(" · ")} (기본 lite; frames·referen
   },
   {
     name: "update_brief",
-    description: "브리프 고치기 (준 칸만): industry, about(300), audience(300), goals[], tone(200), keywords[], banned[], hashtags[](최대 30), cta(60), link(http), references[]. pillars 를 주면 기둥을 통째로 바꾼다: [{name(20), description, share(합 100), template, examples[]}] — 기둥 이름은 달력 카테고리가 된다.",
+    description: "브리프 고치기 (준 칸만): industry, about(300), audience(300), goals[], tone(200), keywords[], banned[], hashtags[](최대 30), cta(60), link(http), references[], rules{photoEvery,templateOnly,coverQuestion,ctaComment: 켜면 편집기 경고}, checklist[](승인 체크리스트에 더할 문구, 10개까지). pillars 를 주면 기둥을 통째로 바꾼다: [{name(20), description, share(합 100), template, examples[]}] — 기둥 이름은 달력 카테고리가 된다.",
     inputSchema: obj({ ws: str, brief: { type: "object" }, pillars: { type: "array", items: { type: "object" } } }, ["ws"]),
     run: async (a) => {
       const ws = String(a.ws);
@@ -121,27 +146,37 @@ model: ${VEO_MODELS.map((m) => m.id).join(" · ")} (기본 lite; frames·referen
   },
   {
     name: "list_ideas",
-    description: "아이디어 보관함 (최신 순). status: idea(아직) · planned(달력에 넣음, postId) · dropped(보류). 새 아이디어를 낼 때 겹치지 않게 먼저 본다.",
-    inputSchema: obj({ ws: str, status: { type: "string", enum: ["idea", "planned", "dropped"] }, pillar: str }, ["ws"]),
+    description: "주제(아이디어) 보관함 (최신 순). status: review(검수 대기) · approved(승인, 달력에 넣을 수 있음) · planned(달력에 넣음, postId) · dropped(보류). 새 주제를 낼 때 겹치지 않게 먼저 본다.",
+    inputSchema: obj({ ws: str, status: { type: "string", enum: ["review", "approved", "planned", "dropped"] }, pillar: str }, ["ws"]),
     run: async (a) => (await listIdeas(String(a.ws))).filter((i) => (!a.status || i.status === a.status) && (a.pillar === undefined || i.pillar === a.pillar)),
   },
   {
     name: "add_ideas",
-    description: "아이디어 여러 개 더하기 (최대 20). 각 {title(80), pillar(기둥 이름), angle(어떤 각도로·메모), template?, research?(자료 id[])}. 사실·숫자가 들어가면 add_research 로 출처를 먼저 넣고 research 로 연결한다.",
+    description: "주제 여러 개 더하기 (최대 20, 모두 검수 대기로 들어간다 — 사람이 승인해야 달력에 넣을 수 있다). 각 {title(80), pillar(기둥 이름), angle(어떤 각도로·메모), template?, research?(자료 id[])}. 사실·숫자가 들어가면 add_research 로 출처를 먼저 넣고 research 로 연결한다.",
     inputSchema: obj({ ws: str, ideas: { type: "array", items: obj({ title: str, pillar: str, angle: str, template: str, research: { type: "array", items: str } }, ["title"]) } }, ["ws", "ideas"]),
     run: async (a) => { const out = []; for (const x of (a.ideas as Json[]).slice(0, 20)) out.push(await createIdea(String(a.ws), { ...x, by: "mcp" } as never)); return out; },
   },
   {
     name: "update_idea",
-    description: "아이디어 고치기: title, pillar, angle, template, status(idea|dropped), research(자료 id[] 통째로).",
-    inputSchema: obj({ id: str, title: str, pillar: str, angle: str, template: str, status: { type: "string", enum: ["idea", "dropped"] }, research: { type: "array", items: str } }, ["id"]),
-    run: (a) => updateIdea(String(a.id), a as never),
+    description: "주제 고치기: title, pillar, angle, template, status(review=검수 대기로 | approved=승인 — 소유자·검수자, 사람이 정했을 때만 | dropped=보류), research(자료 id[] 통째로).",
+    inputSchema: obj({ id: str, title: str, pillar: str, angle: str, template: str, status: { type: "string", enum: ["review", "approved", "dropped"] }, research: { type: "array", items: str } }, ["id"]),
+    run: (a, actor) => updateIdea(String(a.id), a as never, actor.name),
   },
   {
     name: "schedule_idea",
-    description: "아이디어를 달력 칸에 넣어 기획 게시물로 만든다. day·slot 을 안 주면 비어 있는 첫 칸. 자료 출처가 게시물 메모에 붙는다. 그다음 create_post 대신 update_post 로 data 를 채운다.",
+    description: "승인한 주제를 달력 칸에 넣어 기획 게시물로 만든다. day·slot 을 안 주면 비어 있는 첫 칸. 자료 출처가 게시물 메모에 붙는다. 그다음 create_post 대신 update_post 로 data 를 채운다.",
     inputSchema: obj({ id: str, day: int, slot: str }, ["id"]),
     run: async (a) => postOut(await scheduleIdea(String(a.id), a.day !== undefined && a.slot !== undefined ? { day: a.day, slot: a.slot } : undefined)),
+  },
+  {
+    name: "schedule_ideas",
+    description: "승인한 주제 여러 개를 ids 순서대로 빈 칸에 하루씩 넣는다 (fromDay 부터, 없으면 1일차부터 비어 있는 칸).",
+    inputSchema: obj({ ws: str, ids: { type: "array", items: str }, fromDay: int }, ["ws", "ids"]),
+    run: async (a) => {
+      const ids = (a.ids as unknown[]).map(String);
+      for (const id of ids) if ((await getIdea(id))?.workspace !== String(a.ws)) throw new OpError("다른 서비스의 주제가 섞여 있어요");
+      return (await scheduleIdeas(ids, a.fromDay as number | undefined)).map(summary);
+    },
   },
   {
     name: "next_empty_slot",
@@ -151,20 +186,20 @@ model: ${VEO_MODELS.map((m) => m.id).join(" · ")} (기본 lite; frames·referen
   },
   {
     name: "list_research",
-    description: "자료 조사 목록 (출처 주소·요약·메모·태그). q 로 찾기.",
-    inputSchema: obj({ ws: str, q: str, tag: str }, ["ws"]),
-    run: async (a) => (await listResearch(String(a.ws))).filter((r) => (!a.tag || r.tags.includes(String(a.tag))) && (!a.q || `${r.title} ${r.summary} ${r.memo}`.includes(String(a.q)))),
+    description: "자료 조사 목록 (출처 주소·요약·메모·태그·신뢰도 high|medium|check). q 로 찾기.",
+    inputSchema: obj({ ws: str, q: str, tag: str, confidence: { type: "string", enum: ["high", "medium", "check"] } }, ["ws"]),
+    run: async (a) => (await listResearch(String(a.ws))).filter((r) => (!a.tag || r.tags.includes(String(a.tag))) && (!a.confidence || (r.confidence ?? "medium") === a.confidence) && (!a.q || `${r.title} ${r.summary} ${r.memo}`.includes(String(a.q)))),
   },
   {
     name: "add_research",
-    description: "자료 더하기 (최대 20). 각 {title(120), url(https, 실제로 연 출처만), summary(2000, 카드에 쓸 핵심 사실), memo, tags[]}. 웹에서 찾은 내용은 반드시 출처 주소를 붙인다.",
-    inputSchema: obj({ ws: str, items: { type: "array", items: obj({ title: str, url: str, summary: str, memo: str, tags: { type: "array", items: str } }, ["title"]) } }, ["ws", "items"]),
+    description: "자료 더하기 (최대 20). 각 {title(120), url(https, 실제로 연 출처만), summary(2000, 카드에 쓸 핵심 사실), memo, tags[], confidence(high=공식·학술 원문을 직접 확인 | medium=2차 요약·블로그(기본) | check=원문 대조 전)}. 웹에서 찾은 내용은 반드시 출처 주소를 붙인다.",
+    inputSchema: obj({ ws: str, items: { type: "array", items: obj({ title: str, url: str, summary: str, memo: str, tags: { type: "array", items: str }, confidence: { type: "string", enum: ["high", "medium", "check"] } }, ["title"]) } }, ["ws", "items"]),
     run: async (a) => { const out = []; for (const x of (a.items as Json[]).slice(0, 20)) out.push(await addResearch(String(a.ws), { ...x, by: "mcp" } as never)); return out; },
   },
   {
     name: "update_research",
-    description: "자료 고치기: title, url, summary, memo, tags[].",
-    inputSchema: obj({ id: str, title: str, url: str, summary: str, memo: str, tags: { type: "array", items: str } }, ["id"]),
+    description: "자료 고치기: title, url, summary, memo, tags[], confidence(high|medium|check).",
+    inputSchema: obj({ id: str, title: str, url: str, summary: str, memo: str, tags: { type: "array", items: str }, confidence: { type: "string", enum: ["high", "medium", "check"] } }, ["id"]),
     run: (a) => updateResearch(String(a.id), a as never),
   },
 ];
@@ -184,7 +219,7 @@ export const TOOLS: Tool[] = [
   },
   {
     name: "update_workspace",
-    description: "서비스 설정 고치기: name, handle, categories[], slots[](HH:MM), days(1~90), startDate(YYYY-MM-DD|null), defaultTemplate, theme{dark,light,ink,muted,accent,onAccent,wordmark{text,color,bg}}. 강조색은 채움으로만 쓴다(그 위 글자 onAccent).",
+    description: "서비스 설정 고치기: name, handle, categories[], slots[](HH:MM), days(1~90), startDate(YYYY-MM-DD|null), defaultTemplate, metricsDays(1~30, 성과 적을 차례), theme{dark,light,ink,muted,accent,onAccent,wordmark{text,color,bg}}. 강조색은 채움으로만 쓴다(그 위 글자 onAccent).",
     inputSchema: obj({ ws: str, patch: { type: "object" } }, ["ws", "patch"]),
     run: (a) => updateWorkspace(String(a.ws), a.patch as WorkspacePatch),
   },
@@ -243,9 +278,9 @@ export const TOOLS: Tool[] = [
   },
   {
     name: "set_status",
-    description: "상태 바꾸기 (plan→skip, draft→approved|skip, approved→posted|draft|skip, posted→approved, skip→draft). posted 는 postedUrl(인스타 게시물 링크) 필수. 사람이 검수·승인하기 전에는 approved 로 올리지 않는다.",
-    inputSchema: obj({ id: str, status: { type: "string", enum: [...POST_STATUS] }, postedUrl: str }, ["id", "status"]),
-    run: async (a) => postOut(await setStatus(String(a.id), a.status as PostStatus, a.postedUrl as string | undefined)),
+    description: "상태 바꾸기 (plan→skip, draft→approved|skip, approved→posted|draft|skip, posted→approved, skip→draft). draft→approved 는 checks(get_checklist 의 required 문구 전부)가 필요하다 — 사람이 직접 확인하고 체크했다고 말했을 때만. posted 는 postedUrl(인스타 게시물 링크) 필수.",
+    inputSchema: obj({ id: str, status: { type: "string", enum: [...POST_STATUS] }, postedUrl: str, checks: { type: "array", items: str } }, ["id", "status"]),
+    run: async (a, actor) => postOut(await setStatus(String(a.id), a.status as PostStatus, a.postedUrl as string | undefined, { checks: a.checks as string[] | undefined, by: actor.name })),
   },
   {
     name: "add_media",
@@ -320,8 +355,8 @@ export const TOOLS: Tool[] = [
 ];
 
 export const INSTRUCTIONS = `카드뉴스 스튜디오(card-studio, ${BASE}) — 여러 서비스의 인스타 카드뉴스(1080×1350 캐러셀)를 기획·편집·검수·내보내기.
-순서: list_workspaces → get_brief(서비스 브리프·기둥) → (자료 조사 add_research · 아이디어 add_ideas → schedule_idea) → list_templates(칸 정의) → list_posts/get_post → draft_post/create_post/update_post → check_safe_zone → render_slide(preview) → 사람 검수 → set_status approved → export_post.
-규칙: 승인(approved)은 사람이 확인한 뒤에만. 게시(posted)는 실제 인스타 링크가 있을 때만. 무료 사진은 주소+출처, 장소 이름이 나오면 실제 그 장소 사진만. 협찬은 #광고. 삭제·인스타 업로드 도구는 없다.`;
+순서(8단계): list_workspaces → get_flow(지금 할 일) → get_brief(목적·기둥·콘텐츠 규칙) → add_research(자료, 신뢰도) → add_ideas(주제, 검수 대기) → 사람이 승인 → schedule_ideas → list_templates(칸 정의) → update_post(제작) → check_safe_zone·render_slide → get_checklist → 사람이 체크하고 승인(set_status approved + checks) → export_post(발행은 사람이) → 7일 뒤 set_metrics → get_insights 제안.
+규칙: 주제 승인·게시물 승인은 사람이 확인한 뒤에만. 게시(posted)는 실제 인스타 링크가 있을 때만. 무료 사진은 주소+출처, 장소 이름이 나오면 실제 그 장소 사진만. 협찬은 #광고. 삭제·인스타 업로드 도구는 없다.`;
 
 // ── 권한: 도구마다 어느 서비스의 무슨 권한이 필요한지 (계정으로 붙은 AI 앱은 그 사람 역할로만) ──
 type On = "ws" | "post" | "idea" | "research";
@@ -333,6 +368,7 @@ const GUARD: Record<string, { on: On; perm: Perm } | "admin"> = {
   move_post: { on: "post", perm: "edit" }, duplicate_post: { on: "post", perm: "edit" }, set_metrics: { on: "post", perm: "edit" }, get_insights: { on: "ws", perm: "view" },
   get_brief: { on: "ws", perm: "view" }, update_brief: { on: "ws", perm: "edit" }, list_ideas: { on: "ws", perm: "view" }, add_ideas: { on: "ws", perm: "edit" },
   update_idea: { on: "idea", perm: "edit" }, schedule_idea: { on: "idea", perm: "edit" }, next_empty_slot: { on: "ws", perm: "view" },
+  schedule_ideas: { on: "ws", perm: "edit" }, get_flow: { on: "ws", perm: "view" }, get_checklist: { on: "post", perm: "view" }, apply_suggestion: { on: "ws", perm: "edit" },
   list_research: { on: "ws", perm: "view" }, add_research: { on: "ws", perm: "edit" }, update_research: { on: "research", perm: "edit" },
 };
 async function wsOf(on: On, a: Json) {
@@ -350,18 +386,45 @@ async function guard(name: string, a: Json, actor: Actor) {
   const role = w ? roleIn(actor, w) : null;
   if (!w || !role) throw new OpError("서비스를 찾지 못했어요");
   // 승인·게시 표시·게시 취소는 검수 권한
-  const perm: Perm = name === "set_status" && (a.status === "approved" || a.status === "posted" || (await getPost(String(a.id)))?.status === "posted") ? "approve" : g.perm;
+  const perm: Perm = (name === "set_status" && (a.status === "approved" || a.status === "posted" || (await getPost(String(a.id)))?.status === "posted")) || (name === "update_idea" && a.status === "approved") ? "approve" : g.perm;
   if (!can(role, perm)) throw new OpError("이 서비스에서 그 일을 할 권한이 없어요");
   if (name === "update_post" && a.postId && (await getPost(String(a.postId)))?.workspace !== w.id) throw new OpError("다른 서비스의 게시물이에요");
 }
 
-/** actor: 토큰 주인 (운영자·계정). 계정이면 그 사람 역할 안에서만 */
-export async function callTool(name: string, args: Json, actor: Actor = { kind: "admin", id: "admin", name: "운영자" }): Promise<{ content: Content[]; isError?: boolean }> {
+// ── AI·MCP 가 한 일 기록 (AI 패널 카드) ──
+const ACT: Record<string, (a: Json, r: unknown) => [string, string[]] | null> = {
+  add_ideas: (a) => [`주제 ${(a.ideas as unknown[]).length}개를 검수 대기로 넣었어요`, (a.ideas as Json[]).map((x) => `${x.title}${x.pillar ? ` · ${x.pillar}` : ""}`)],
+  add_research: (a) => [`자료 ${(a.items as unknown[]).length}건을 넣었어요`, (a.items as Json[]).map((x) => String(x.title))],
+  update_research: (a) => ["자료를 고쳤어요", [String(a.title ?? a.id)]],
+  update_idea: (a) => [a.status === "approved" ? "주제를 승인했어요" : a.status === "dropped" ? "주제를 보류했어요" : "주제를 고쳤어요", [String(a.title ?? "")].filter(Boolean)],
+  schedule_idea: (_a, r) => ["주제를 달력에 넣었어요", [`D${(r as Post).day} ${(r as Post).slot} · ${(r as Post).title}`]],
+  schedule_ideas: (_a, r) => [`주제 ${(r as unknown[]).length}개를 달력에 넣었어요`, (r as { day: number; slot: string; title: string }[]).map((p) => `D${p.day} ${p.slot} · ${p.title}`)],
+  create_post: (_a, r) => ["게시물을 만들었어요", [`${(r as { post: Post }).post.title}`]],
+  update_post: (_a, r) => ["게시물을 고쳤어요", [`D${(r as Post).day} ${(r as Post).slot} · ${(r as Post).title}`]],
+  set_status: (a, r) => [`상태를 ${a.status}(으)로 바꿨어요`, [(r as Post).title]],
+  update_brief: (a) => ["브리프를 고쳤어요", Object.keys((a.brief as Json) ?? {}).concat(a.pillars ? ["기둥"] : [])],
+  update_workspace: () => ["서비스 설정을 고쳤어요", []],
+  set_metrics: (a) => ["성과를 적었어요", [`도달 ${a.reach ?? "-"} · 저장 ${a.saves ?? "-"} · 댓글 ${a.comments ?? "-"}`]],
+  add_media: (a) => ["사진·영상을 더했어요", [String(a.credit || a.url || a.filePath || "")]],
+  move_post: () => ["게시물을 옮겼어요", []], duplicate_post: () => ["게시물을 복제했어요", []],
+  apply_suggestion: (a) => [a.action === "dismiss" ? "제안을 넘겼어요" : "제안을 적용했어요", [String(a.key)]],
+  generate_video: () => ["AI 영상을 만들기 시작했어요", []],
+};
+async function wsOfCall(name: string, a: Json): Promise<string> {
+  if (typeof a.ws === "string") return a.ws;
+  const g = GUARD[name];
+  return g && g !== "admin" ? await wsOf(g.on, a) : "";
+}
+
+/** actor: 토큰 주인 (운영자·계정). 계정이면 그 사람 역할 안에서만. via: mcp(바깥 AI 앱) · ai(스튜디오 AI 패널) */
+export async function callTool(name: string, args: Json, actor: Actor = { kind: "admin", id: "admin", name: "운영자" }, via: "mcp" | "ai" = "mcp"): Promise<{ content: Content[]; isError?: boolean }> {
   const t = TOOLS.find((x) => x.name === name);
   if (!t) return { content: [{ type: "text", text: `모르는 도구예요: ${name}` }], isError: true };
   try {
     await guard(name, args ?? {}, actor);
     const r = await t.run(args ?? {}, actor);
+    const act = ACT[name]?.(args ?? {}, r);
+    if (act) { const ws = await wsOfCall(name, args ?? {}); if (ws) await logActivity({ workspace: ws, via, who: actor.name, tool: name, title: act[0], lines: act[1], ok: true }).catch(() => undefined); }
     if (r && typeof r === "object" && "__content" in r) return { content: (r as { __content: Content[] }).__content };
     return { content: [{ type: "text", text: JSON.stringify(r, null, 1) }] };
   } catch (e) {

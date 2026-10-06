@@ -15,6 +15,10 @@
 - 강조색은 채움으로만(그 위 글자는 onAccent). 도구 화면은 흑백만, 서비스 색은 카드 안에서만.
 - 로그인 `src/lib/auth.ts`: 운영자(환경 변수) + 계정(이메일·scrypt) + 역할(소유자·편집자·검수자). 화면은 `requireWs`, API·action 은 `wsAccess`.
 - MCP 는 토큰 주인 권한으로 돈다(`mcp.ts` GUARD). 토큰은 sha256 만 저장(`src/lib/tokens.ts`). OAuth 2.1(동적 등록·PKCE)은 `/oauth/*`.
+- 8단계(`src/lib/flow.ts`): 목적·자료 조사·주제·템플릿·제작·검수·발행·성과 — 위 탭 상태와 '지금 할 일'. 화면 틀 `src/app/ui/Shell.tsx`.
+- 주제는 review → approved(소유자·검수자) → 달력. 초안 → 승인은 승인 체크리스트(`DEFAULT_CHECKS` + 서비스 항목)를 모두 체크해야(`Post.review` 기록). 콘텐츠 규칙(`src/lib/rules.ts`)은 경고만.
+- 성과 제안(`ops.insights`): 성과 적은 게시물 7편부터, 기둥 비중 ±10%p · 후속편 — 적용은 사람이.
+- AI(`src/lib/llm.ts`): Claude Code·Codex(구독 — 운영자 본인·로컬만, 토큰을 받지 않음) · Anthropic·OpenAI API 키, 작업 등급별 모델. AI 패널은 MCP 도구로 일하고 `logActivity` 로 기록.
 - 상태는 `NEXT_STATUS` 길로만(초안→승인→게시, 게시는 인스타 링크 필수). 게시물은 지우지 않고 보관함으로.
 - 일부러 없는 것: 삭제 도구, 인스타 업로드.
 

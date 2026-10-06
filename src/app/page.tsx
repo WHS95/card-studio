@@ -1,47 +1,48 @@
 import Link from "next/link";
 import { requireAuth, roleIn } from "@/lib/auth";
-import { listPosts, listWorkspaces } from "@/lib/store";
-import { TEMPLATES } from "@/lib/templates";
+import { getPrefs, listWorkspaces } from "@/lib/store";
+import { flowOf } from "@/lib/flow";
 import { PRESETS } from "@/lib/presets";
-import { createWorkspaceAction } from "./actions";
-import Top from "./Top";
+import { createWorkspaceAction, favoriteAction } from "./actions";
+import { WideShell } from "./ui/Shell";
+import Icon from "./ui/Icon";
+import NewService from "./NewService";
 
-/** 서비스 목록 + 새 서비스 */
+/** 홈 · 모든 서비스 (?fav=1 즐겨찾기). 카드: 8단계 진행 띠 · 다음 할 일 · 즐겨찾기 별. 누르면 할 일이 있는 단계로 */
 export default async function Home({ searchParams }: PageProps<"/">) {
   const actor = await requireAuth();
-  const { error } = await searchParams;
-  const ws = (await listWorkspaces()).filter((w) => roleIn(actor, w));
-  const counts = await Promise.all(ws.map(async (w) => (await listPosts(w.id)).filter((p) => p.data).length));
+  const q = await searchParams;
+  const fav = q.fav === "1";
+  const prefs = await getPrefs(actor.kind === "admin" ? "admin" : actor.id);
+  const all = (await listWorkspaces()).filter((w) => roleIn(actor, w));
+  const list = fav ? all.filter((w) => prefs.favorites.includes(w.id)) : all;
+  const flows = await Promise.all(list.map((w) => flowOf(w)));
   return (
-    <>
-      <Top />
-      <main className="wrap">
-        <h1 style={{ margin: 0 }}>서비스</h1>
-        <div className="grid-ws">
-          {ws.map((w, i) => (
-            <Link key={w.id} href={`/w/${w.id}`} className="card" style={{ textDecoration: "none", display: "flex", flexDirection: "column", gap: 8 }}>
-              <span style={{ alignSelf: "flex-start", padding: "4px 12px", borderRadius: 999, background: w.theme.wordmark.bg, color: w.theme.wordmark.color, fontWeight: 800, letterSpacing: 3, fontSize: 13 }}>{w.theme.wordmark.text}</span>
-              <strong>{w.name}</strong>
-              <span className="small muted">{w.handle} · 하루 {w.slots.length}개 × {w.days}일 · 초안 이상 {counts[i]}개</span>
-              <span className="row">{[w.theme.dark, w.theme.light, w.theme.accent].map((c) => <span key={c} className="swatch" style={{ background: c }} />)}</span>
-            </Link>
-          ))}
-        </div>
-        <form action={createWorkspaceAction} className="card newws">
-          <strong style={{ gridColumn: "1 / -1" }}>새 서비스</strong>
-          <label className="fld">서비스 이름<input name="name" className="input" required maxLength={30} /></label>
-          <label className="fld">주소용 영문 (예: my-brand)<input name="id" className="input" required pattern="[a-z0-9-]+" maxLength={30} /></label>
-          <label className="fld">인스타 계정<input name="handle" className="input" placeholder="@account" /></label>
-          <label className="fld">업종 <em>기둥·말투 시작값</em>
-            <select name="industry" className="input" defaultValue=""><option value="">고르지 않음</option>{PRESETS.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select>
-          </label>
-          <label className="fld">강조색<input name="accent" type="color" className="input" defaultValue="#D9D9D9" /></label>
-          <label className="fld" style={{ gridColumn: "1 / -1" }}>한 줄 소개 (선택)<input name="about" className="input" maxLength={300} placeholder="무엇을 하는 서비스인지 한 줄로" /></label>
-          <button className="btn primary">만들고 브리프 쓰기</button>
-        </form>
-        {typeof error === "string" && <p className="err">{error}</p>}
-        <p className="small muted">템플릿 {TEMPLATES.length}개: {TEMPLATES.map((t) => `${t.name}(${t.description})`).join(" · ")}</p>
-      </main>
-    </>
+    <WideShell active={fav ? "fav" : "home"}>
+      <div className="row" style={{ justifyContent: "space-between" }}>
+        <h1>{fav ? "즐겨찾기" : "모든 서비스"}</h1>
+        <NewService presets={PRESETS.map((p) => ({ id: p.id, name: p.name }))} action={createWorkspaceAction} open={q.new === "1"} />
+      </div>
+      {typeof q.error === "string" && <p className="err">{q.error}</p>}
+      <div className="svc-cards">
+        {list.map((w, i) => {
+          const f = flows[i];
+          const on = prefs.favorites.includes(w.id);
+          return (
+            <article key={w.id} className="svc-card">
+              <div className="hero" aria-hidden>{(w.name.trim()[0] ?? "?").toUpperCase()}</div>
+              <form action={favoriteAction} className="fav"><input type="hidden" name="ws" value={w.id} />
+                <button aria-pressed={on} aria-label={on ? `${w.name} 즐겨찾기 빼기` : `${w.name} 즐겨찾기`}><Icon name="star" /></button></form>
+              <Link href={`/w/${w.id}/go`} style={{ fontSize: 17, fontWeight: 800, textDecoration: "none" }}>{w.name}</Link>
+              <p className="small muted clamp2" style={{ margin: 0 }}>{w.handle || "계정 없음"}{w.brief?.about ? ` · ${w.brief.about}` : ""}</p>
+              <div className="prog" aria-label={`8단계 중 됨 ${f.counts.done}`}>{f.steps.map((s) => <span key={s.key} data-s={s.state} title={`${s.label} · ${s.note}`} />)}</div>
+              <p className="small" style={{ margin: 0 }}><b>다음 할 일</b> {f.now ? f.now.note : "막힌 단계가 없어요"}</p>
+            </article>
+          );
+        })}
+      </div>
+      {!list.length && <p className="hint">{fav ? "서비스 카드의 별을 누르면 여기 모여요." : "아직 서비스가 없어요. '새 서비스'로 시작해 보세요."}</p>}
+      <p className="small muted" style={{ margin: 0 }}>진행 띠 = 8단계(목적·자료 조사·주제·템플릿·제작·검수·발행·성과) · 진한 칸 = 됨 · 흐린 칸 = 진행 중</p>
+    </WideShell>
   );
 }

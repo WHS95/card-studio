@@ -5,7 +5,7 @@ import { aiResearchAction } from "../../../actions";
 
 export default function AiResearch({ ws, enabled }: { ws: string; enabled: boolean }) {
   const [st, act, pending] = useActionState(aiResearchAction, undefined);
-  if (!enabled) return <p className="hint">ANTHROPIC_API_KEY를 넣으면 주제만 적어도 웹에서 출처 3~6개를 찾아 요약해 둬요. 키 없이도 Claude Code(MCP)에서 &quot;○○ 자료 조사해서 스튜디오에 넣어 줘&quot;라고 하면 돼요.</p>;
+  if (!enabled) return <p className="hint">AI 연결이 없어요. 운영자가 <a href="/settings">설정 · AI</a>에서 이 Mac 의 Claude Code·Codex 또는 API 키를 연결하면 여기서 바로 써요. 연결 없이도 내 Claude·ChatGPT(MCP)로 할 수 있어요.</p>;
   return (
     <form action={act} className="col" style={{ gap: 8 }}>
       <input type="hidden" name="ws" value={ws} />

@@ -3,7 +3,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { checkLogin, clearSession, loginUser, requireAuth, setSession, setUserSession, wsAccess, type Perm } from "@/lib/auth";
-import { addMember, changePassword, removeMember, resetMemberPassword, setMemberRole, setPlan, countAi, addResearch, archivePost, createIdea, createPostIn, duplicatePost, movePost, nextEmptySlot, restorePost, setMetrics, createWorkspace, OpError, removeResearch, savePost, scheduleIdea, setPillars, setStatus, updateBrief, updateIdea, updateResearch, updateWorkspace } from "@/lib/ops";
+import { addMember, changePassword, removeMember, resetMemberPassword, setMemberRole, setPlan, countAi, addResearch, applyShareSuggestion, archivePost, createIdea, createPostIn, dismissSuggestion, duplicatePost, followUpIdea, insights, movePost, nextEmptySlot, restorePost, scheduleIdeas, setDisplayName, setMetrics, createWorkspace, OpError, removeResearch, savePost, scheduleIdea, setPillars, setStatus, toggleFavorite, updateBrief, updateIdea, updateResearch, updateWorkspace } from "@/lib/ops";
 import { type PostData, type PostStatus } from "@/lib/types";
 import { getIdea, getPost, getResearch, listIdeas } from "@/lib/store";
 import { templateOf } from "@/lib/templates";
@@ -12,7 +12,10 @@ import { createPat, getClient, issueCode, revokeToken } from "@/lib/tokens";
 import { baseUrl } from "@/lib/baseurl";
 import { headers } from "next/headers";
 import { testGemini } from "@/lib/veo";
-import { draftPostData, researchTopic, suggestIdeas, testClaude, type IdeaSuggestion } from "@/lib/ai";
+import { draftPostData, researchTopic, suggestIdeas, type IdeaSuggestion } from "@/lib/ai";
+import { chat, countsAgainstPlan, saveAiConfig, testVia, type ChatTurn } from "@/lib/llm";
+import { callTool, TOOLS } from "@/lib/mcp";
+import { AI_VIA, type AiTier, type AiVia } from "@/lib/types";
 
 // 화면용 얇은 껍데기 — 규칙은 전부 src/lib/ops.ts (MCP 와 같이 씀)
 
@@ -58,22 +61,24 @@ export async function createWorkspaceAction(fd: FormData) {
   redirect(`/w/${id}/brief?new=1`);
 }
 
-export async function saveWorkspaceAction(fd: FormData) {
+/** 서비스 설정(이름·계정·달력·성과 날짜·요금제) 또는 템플릿 탭(기본 틀·카드 색·워드마크) — 보낸 칸만 바꾼다 */
+export async function saveWorkspaceAction(_p: SaveState, fd: FormData): Promise<SaveState> {
   await requireAuth();
   const id = String(fd.get("ws"));
   const list = (k: string) => String(fd.get(k) ?? "").split(/[,\n]/).map((x) => x.trim()).filter(Boolean);
-  const g = (k: string) => String(fd.get(k) ?? "");
+  const g = (k: string) => (fd.has(k) ? String(fd.get(k) ?? "") : undefined);
   try {
     const { actor } = await gateWs(id, "manage");
     if (actor.kind === "admin" && fd.get("plan")) await setPlan(id, String(fd.get("plan")));
+    const theme = fd.has("accent") ? { dark: g("dark"), light: g("light"), ink: g("ink"), muted: g("muted"), accent: g("accent"), onAccent: g("onAccent"), wordmark: { text: g("wordmark"), color: g("wmColor"), bg: g("wmBg") } } : undefined;
     await updateWorkspace(id, {
-      name: g("name"), handle: g("handle"), categories: list("categories"), slots: list("slots"), days: Number(g("days")),
-      startDate: g("startDate") || null, defaultTemplate: g("defaultTemplate"),
-      theme: { dark: g("dark"), light: g("light"), ink: g("ink"), muted: g("muted"), accent: g("accent"), onAccent: g("onAccent"), wordmark: { text: g("wordmark"), color: g("wmColor"), bg: g("wmBg") } },
+      name: g("name"), handle: g("handle"), categories: fd.has("categories") ? list("categories") : undefined, slots: fd.has("slots") ? list("slots") : undefined,
+      days: fd.has("days") ? Number(g("days")) : undefined, startDate: fd.has("startDate") ? g("startDate") || null : undefined, defaultTemplate: g("defaultTemplate"),
+      metricsDays: fd.has("metricsDays") ? Number(g("metricsDays")) : undefined, theme,
     });
-  } catch (e) { redirect(`/w/${id}/settings?error=${encodeURIComponent(msg(e))}`); }
-  revalidatePath(`/w/${id}`);
-  redirect(`/w/${id}`);
+    revalidatePath(`/w/${id}`, "layout");
+    return { ok: true };
+  } catch (e) { return { error: msg(e) }; }
 }
 
 /** 달력 빈칸 → 기획 게시물 만들고 편집기로 (이미 있으면 그 게시물로) */
@@ -106,8 +111,8 @@ export async function setStatusAction(_p: SaveState, fd: FormData): Promise<Save
     const to = String(fd.get("status")) as PostStatus;
     const cur = (await getPost(String(fd.get("id"))))?.status;
     // 승인·게시 표시·게시 취소는 검수 권한, 나머지(초안으로·건너뛰기)는 편집 권한
-    await gatePost(String(fd.get("id")), to === "approved" || to === "posted" || cur === "posted" ? "approve" : "edit");
-    const p = await setStatus(String(fd.get("id")), to, String(fd.get("postedUrl") ?? ""));
+    const { actor } = await gatePost(String(fd.get("id")), to === "approved" || to === "posted" || cur === "posted" ? "approve" : "edit");
+    const p = await setStatus(String(fd.get("id")), to, String(fd.get("postedUrl") ?? ""), { checks: fd.getAll("check").map(String), by: actor.name });
     revalidatePath(`/w/${p.workspace}`);
     revalidatePath(`/w/${p.workspace}/p/${p.id}`);
     return { ok: true };
@@ -145,7 +150,12 @@ export async function updateIdeaAction(fd: FormData) {
   await requireAuth();
   const ws = String(fd.get("ws")), id = String(fd.get("id"));
   const g = (k: string) => (fd.has(k) ? fd.get(k) : undefined);
-  try { await gateOwned("idea", id, ws); await updateIdea(id, { title: g("title"), pillar: g("pillar"), angle: g("angle"), template: g("template"), status: g("status"), research: fd.has("researchSet") ? fd.getAll("research").map(String) : undefined }); }
+  try {
+    const { actor } = await gateOwned("idea", id, ws);
+    // 주제 승인은 소유자·검수자만
+    if (g("status") === "approved") await gateWs(ws, "approve");
+    await updateIdea(id, { title: g("title"), pillar: g("pillar"), angle: g("angle"), template: g("template"), status: g("status"), research: fd.has("researchSet") ? fd.getAll("research").map(String) : undefined }, actor.name);
+  }
   catch (e) { back(`/w/${ws}/ideas`, e); }
   revalidatePath(`/w/${ws}/ideas`);
   redirect(`/w/${ws}/ideas`);
@@ -164,10 +174,25 @@ export async function scheduleIdeaAction(fd: FormData) {
   redirect(`/w/${ws}/p/${post!.id}`);
 }
 
+/** 승인한 주제 여러 개 → 고른 순서대로 빈 칸에 하루씩 */
+export async function scheduleIdeasAction(fd: FormData) {
+  await requireAuth();
+  const ws = String(fd.get("ws"));
+  const ids = String(fd.get("order") ?? "").split(",").map((x) => x.trim()).filter(Boolean);
+  try {
+    await gateWs(ws, "edit");
+    if (!ids.length) throw new OpError("달력에 넣을 주제를 골라 주세요");
+    for (const id of ids) await gateOwned("idea", id, ws);
+    await scheduleIdeas(ids, Number(fd.get("from") ?? 1));
+  } catch (e) { back(`/w/${ws}/ideas?s=approved`, e); }
+  revalidatePath(`/w/${ws}`, "layout");
+  redirect(`/w/${ws}?ok=${ids.length}`);
+}
+
 export async function addResearchAction(fd: FormData) {
   await requireAuth();
   const ws = String(fd.get("ws"));
-  try { await gateWs(ws, "edit"); await addResearch(ws, { title: fd.get("title"), url: fd.get("url"), summary: fd.get("summary"), memo: fd.get("memo"), tags: fd.get("tags") }); }
+  try { await gateWs(ws, "edit"); await addResearch(ws, { title: fd.get("title"), url: fd.get("url"), summary: fd.get("summary"), memo: fd.get("memo"), tags: fd.get("tags"), confidence: fd.get("confidence") }); }
   catch (e) { back(`/w/${ws}/research`, e); }
   revalidatePath(`/w/${ws}/research`);
   redirect(`/w/${ws}/research`);
@@ -179,7 +204,8 @@ export async function updateResearchAction(fd: FormData) {
   try {
     await gateOwned("research", id, ws);
     if (fd.get("op") === "remove") await removeResearch(id);
-    else await updateResearch(id, { title: fd.get("title"), url: fd.get("url"), summary: fd.get("summary"), memo: fd.get("memo"), tags: fd.get("tags") });
+    else if (fd.get("op") === "confidence") await updateResearch(id, { confidence: fd.get("confidence") });
+    else await updateResearch(id, { title: fd.get("title"), url: fd.get("url"), summary: fd.get("summary"), memo: fd.get("memo"), tags: fd.get("tags"), confidence: fd.get("confidence") ?? undefined });
   } catch (e) { back(`/w/${ws}/research`, e); }
   revalidatePath(`/w/${ws}/research`);
   redirect(`/w/${ws}/research`);
@@ -189,13 +215,18 @@ export async function updateResearchAction(fd: FormData) {
 
 export type AiState<T> = { ok?: T; error?: string } | undefined;
 
+/** 요금제 AI 횟수: 운영자는 세기만, 구독 연결(이 Mac 의 CLI)은 세지 않는다 */
+async function countFor(ws: string, actor: Awaited<ReturnType<typeof requireAuth>>, tier: AiTier) {
+  if (await countsAgainstPlan(tier, actor)) await countAi(ws, actor.kind === "admin");
+}
+
 export async function aiIdeasAction(_p: AiState<IdeaSuggestion[]>, fd: FormData): Promise<AiState<IdeaSuggestion[]>> {
   await requireAuth();
   try {
     const { ws: w, actor } = await gateWs(String(fd.get("ws")), "edit");
-    await countAi(w.id, actor.kind === "admin");
+    await countFor(w.id, actor, "judge");
     const avoid = (await listIdeas(w.id)).map((i) => i.title);
-    return { ok: await suggestIdeas(w, { pillar: String(fd.get("pillar") ?? "") || undefined, count: Number(fd.get("count") ?? 5), avoid, hint: String(fd.get("hint") ?? "").slice(0, 300) }) };
+    return { ok: await suggestIdeas(w, { pillar: String(fd.get("pillar") ?? "") || undefined, count: Number(fd.get("count") ?? 5), avoid, hint: String(fd.get("hint") ?? "").slice(0, 300) }, actor) };
   } catch (e) { return { error: msg(e) }; }
 }
 
@@ -220,9 +251,9 @@ export async function aiResearchAction(_p: AiState<number>, fd: FormData): Promi
     const { ws: w, actor } = await gateWs(String(fd.get("ws")), "edit");
     const topic = String(fd.get("topic") ?? "").trim().slice(0, 200);
     if (!topic) return { error: "주제를 적어 주세요" };
-    await countAi(w.id, actor.kind === "admin");
-    const found = await researchTopic(w, topic);
-    for (const s of found) await addResearch(w.id, { title: s.title, url: s.url, summary: s.summary, tags: [topic.slice(0, 20)], by: "ai" });
+    await countFor(w.id, actor, "write");
+    const found = await researchTopic(w, topic, actor);
+    for (const s of found) await addResearch(w.id, { title: s.title, url: s.url, summary: s.summary, tags: [topic.slice(0, 20)], confidence: "medium", by: "ai" });
     revalidatePath(`/w/${w.id}/research`);
     return { ok: found.length };
   } catch (e) { return { error: msg(e) }; }
@@ -233,8 +264,8 @@ export async function aiDraftAction(input: { post: string; template: string; tit
   await requireAuth();
   try {
     const { post: p, ws: w, actor } = await gatePost(input.post, "edit");
-    await countAi(w.id, actor.kind === "admin");
-    return { ok: await draftPostData(w, { template: input.template, title: input.title, category: input.category, note: p.note, current: input.current }, String(input.extra ?? "").slice(0, 500)) };
+    await countFor(w.id, actor, "write");
+    return { ok: await draftPostData(w, { template: input.template, title: input.title, category: input.category, note: p.note, current: input.current }, String(input.extra ?? "").slice(0, 500), actor) };
   } catch (e) { return { error: msg(e) }; }
 }
 
@@ -325,13 +356,14 @@ export async function integrationAction(_p: KeyState, fd: FormData): Promise<Key
   const actor = await requireAuth();
   if (actor.kind !== "admin") return { error: "운영자만 바꿀 수 있어요" };
   const provider = String(fd.get("provider")) as Provider;
-  if (provider !== "anthropic" && provider !== "gemini") return { error: "모르는 연동이에요" };
+  if (provider !== "anthropic" && provider !== "gemini" && provider !== "openai") return { error: "모르는 연동이에요" };
   try {
-    if (fd.get("op") === "test") return { ok: provider === "gemini" ? await testGemini() : await testClaude() };
+    if (fd.get("op") === "test") return { ok: provider === "gemini" ? await testGemini() : await testVia(provider, actor) };
     const v = String(fd.get("key") ?? "").trim();
-    if (v && !(provider === "gemini" ? /^[A-Za-z0-9_-]{20,}$/ : /^sk-ant-[A-Za-z0-9_-]{20,}$/).test(v)) return { error: "키 모양이 맞지 않아요" };
+    const shape = { gemini: /^[A-Za-z0-9_-]{20,}$/, anthropic: /^sk-ant-[A-Za-z0-9_-]{20,}$/, openai: /^sk-[A-Za-z0-9_-]{20,}$/ }[provider];
+    if (v && !shape.test(v)) return { error: "키 모양이 맞지 않아요" };
     await setKey(provider, fd.get("op") === "remove" ? "" : v);
-    revalidatePath("/integrations");
+    revalidatePath("/settings");
     return { ok: fd.get("op") === "remove" ? "지웠어요" : "저장했어요. '연결 확인'을 눌러 보세요" };
   } catch (e) { return { error: msg(e) }; }
 }
@@ -361,5 +393,72 @@ export async function patAction(_p: PatState, fd: FormData): Promise<PatState> {
     const token = await createPat(uid, String(fd.get("name") ?? ""));
     revalidatePath("/account");
     return { token };
+  } catch (e) { return { error: msg(e) }; }
+}
+
+// ── 0.6: 즐겨찾기 · 표시 이름 · AI 설정 · 성과 제안 · AI 패널 ──
+
+export async function favoriteAction(fd: FormData) {
+  const actor = await requireAuth();
+  const ws = String(fd.get("ws"));
+  if (await wsAccess(ws, "view")) await toggleFavorite(actor.kind === "admin" ? "admin" : actor.id, ws);
+  revalidatePath("/");
+}
+
+export async function profileAction(_p: SaveState, fd: FormData): Promise<SaveState> {
+  const actor = await requireAuth();
+  try { await setDisplayName(actor.kind === "admin" ? "admin" : actor.id, fd.get("name")); revalidatePath("/", "layout"); return { ok: true }; }
+  catch (e) { return { error: msg(e) }; }
+}
+
+/** AI 연결·작업별 모델 (운영자만 — 서비스 모두에 걸린다) */
+export async function aiConfigAction(_p: KeyState, fd: FormData): Promise<KeyState> {
+  const actor = await requireAuth();
+  if (actor.kind !== "admin") return { error: "운영자만 바꿀 수 있어요" };
+  try {
+    const op = String(fd.get("op") ?? "");
+    if (op.startsWith("test:")) { const v = op.slice(5) as AiVia; if (!AI_VIA.includes(v)) return { error: "모르는 연결이에요" }; return { ok: await testVia(v, actor) }; }
+    const tiers: Record<string, unknown> = {};
+    for (const k of ["judge", "write", "polish"]) tiers[k] = { via: fd.get(`${k}.via`), model: fd.get(`${k}.model`), effort: fd.get(`${k}.effort`) };
+    await saveAiConfig({ enabled: AI_VIA.filter((v) => fd.get(`on.${v}`) === "on"), tiers });
+    revalidatePath("/settings");
+    return { ok: "저장했어요" };
+  } catch (e) { return { error: msg(e) }; }
+}
+
+export async function suggestionAction(fd: FormData) {
+  const actor = await requireAuth();
+  const ws = String(fd.get("ws")), key = String(fd.get("key")), op = String(fd.get("op"));
+  try {
+    await gateWs(ws, "edit");
+    const sg = (await insights(ws)).suggestions.find((x) => x.key === key);
+    if (!sg) throw new OpError("그 제안이 바뀌었어요. 다시 확인해 주세요");
+    if (op === "apply") {
+      if (sg.kind === "share") { await gateWs(ws, "manage"); await applyShareSuggestion(ws, sg.from, sg.to, sg.delta); }
+      else await followUpIdea(sg.postId, actor.kind === "admin" ? "user" : "user");
+    }
+    await dismissSuggestion(ws, key);
+  } catch (e) { back(`/w/${ws}/insights`, e); }
+  revalidatePath(`/w/${ws}`, "layout");
+  redirect(`/w/${ws}/insights`);
+}
+
+/** AI 패널: 대화 한 번 (스튜디오 도구를 써서 실제로 일한다 — 한 일은 작업 기록 카드로 남는다) */
+export async function aiChatAction(input: { ws: string; ctx: string; history: ChatTurn[] }): Promise<AiState<{ text: string; via: string; model: string }>> {
+  const actor = await requireAuth();
+  try {
+    const { ws: w } = await gateWs(String(input.ws), "view");
+    const history = (Array.isArray(input.history) ? input.history : []).slice(-12).map((x) => ({ role: x.role === "assistant" ? "assistant" as const : "user" as const, text: String(x.text ?? "").slice(0, 4000) }));
+    if (!history.length || history[history.length - 1].role !== "user") throw new OpError("보낼 말을 적어 주세요");
+    await countFor(w.id, actor, "judge");
+    const tools = {
+      tools: TOOLS.filter((t) => t.name !== "export_post").map(({ name, description, inputSchema }) => ({ name, description, inputSchema })),
+      call: async (name: string, args: Record<string, unknown>) => { const r = await callTool(name, args, actor, "ai"); return { text: r.content.map((c) => (c.type === "text" ? c.text : "[그림]")).join("\n"), isError: r.isError }; },
+    };
+    const token = process.env.STUDIO_MCP_TOKEN;
+    const mcpUrl = `${baseUrl(new Request("http://x", { headers: await headers() }))}/api/mcp`;
+    const out = await chat(actor, `${w.name}(${w.id}) · ${String(input.ctx ?? "").slice(0, 200)}`, history, tools, token ? { url: mcpUrl, token } : null);
+    revalidatePath(`/w/${w.id}`, "layout");
+    return { ok: out };
   } catch (e) { return { error: msg(e) }; }
 }

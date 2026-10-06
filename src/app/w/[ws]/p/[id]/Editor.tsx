@@ -4,14 +4,15 @@ import { useActionState, useCallback, useEffect, useMemo, useRef, useState } fro
 import Link from "next/link";
 import { PHOTO_H, formatOf, slideVideo, validatePost, type Field, type SlideKind } from "@/lib/fields";
 import { TEMPLATES, templateOf } from "@/lib/templates";
-import { NEXT_STATUS, STATUS_LABEL, type Photo, type Post, type PostData, type SlideData } from "@/lib/types";
+import { NEXT_STATUS, STATUS_LABEL, type ContentRules, type Photo, type Post, type PostData, type SlideData } from "@/lib/types";
+import { ruleWarnings } from "@/lib/rules";
 import { aiDraftAction, savePostAction, setStatusAction, type SaveState } from "../../../../actions";
 import { FieldInput, Media, VideoTune } from "./Parts";
 import { LayerToggles, Modal, Overlay, type Check, type Layers } from "./Preview";
 import AskAi from "../../../../AskAi";
 import { copyText } from "@/lib/client/copy";
 
-type Ws = { id: string; handle: string; categories: string[]; slots: string[]; startDate: string | null; hashtags: string[]; cta: string; ai: boolean; veo: boolean; canEdit: boolean; canApprove: boolean };
+type Ws = { id: string; handle: string; categories: string[]; slots: string[]; startDate: string | null; hashtags: string[]; cta: string; ai: boolean; veo: boolean; canEdit: boolean; canApprove: boolean; rules?: ContentRules; defaultTemplate: string };
 type Rec = Record<string, unknown>;
 
 /** 사진을 빼면 장마다 가리키던 번호를 고친다 (빠진 사진 → 없음, 뒤 번호 → 하나 앞으로) */
@@ -181,8 +182,9 @@ export default function Editor({ ws, post }: { ws: Ws; post: Post }) {
           <button type="button" className="btn" onClick={undo} disabled={!hist.past.length} title="⌘Z">되돌리기</button>
           <button type="button" className="btn" onClick={redo} disabled={!hist.future.length} title="⇧⌘Z">다시</button>
         </div>
-        <StatusBar post={post} dirty={dirty} canEdit={ws.canEdit} canApprove={ws.canApprove} />
+        <StatusBar post={post} dirty={dirty} canEdit={ws.canEdit} canApprove={ws.canApprove} wsId={ws.id} />
       </div>
+      <RuleWarnings ws={ws} template={template} data={data} />
       <div className="ed">
         <div className="panel">
           <div className="block">
@@ -328,7 +330,19 @@ export default function Editor({ ws, post }: { ws: Ws; post: Post }) {
 const STATUS_BTN: Record<string, string> = { approved: "승인하기", posted: "게시 표시", draft: "초안으로", skip: "건너뛰기" };
 
 /** 상태 바꾸기: 저장 안 된 고침이 있으면 막는다 (화면과 다른 버전이 승인되지 않게) */
-function StatusBar({ post, dirty, canEdit, canApprove }: { post: Post; dirty: boolean; canEdit: boolean; canApprove: boolean }) {
+/** 콘텐츠 규칙 경고 (브리프 · 저장은 막지 않는다) */
+function RuleWarnings({ ws, template, data }: { ws: Ws; template: string; data: PostData | null }) {
+  const w = ruleWarnings(ws.rules, ws.defaultTemplate, template, data);
+  if (!w.length) return null;
+  return (
+    <div className="block" role="status" style={{ borderWidth: 1.5 }}>
+      <div className="bh"><strong className="small">콘텐츠 규칙 · 경고 {w.length}</strong><span className="small muted">저장은 돼요 · 승인 창에도 떠요</span></div>
+      {w.map((x, i) => <span key={i} className="small">⚠ {x.text}</span>)}
+    </div>
+  );
+}
+
+function StatusBar({ post, dirty, canEdit, canApprove, wsId }: { post: Post; dirty: boolean; canEdit: boolean; canApprove: boolean; wsId: string }) {
   const [st, act, pending] = useActionState(setStatusAction, undefined);
   // 역할에 맞는 버튼만: 승인·게시 표시·게시 취소 = 검수 권한, 나머지 = 편집 권한 (서버도 같은 규칙)
   const next = NEXT_STATUS[post.status].filter((s) => (s === "approved" || s === "posted" || post.status === "posted" ? canApprove : canEdit));
@@ -341,7 +355,10 @@ function StatusBar({ post, dirty, canEdit, canApprove }: { post: Post; dirty: bo
       {st?.error && <span className="err">{st.error}</span>}
       {post.status === "approved" && <input name="postedUrl" className="input posted-url" required pattern="https://(www\.)?instagram\.com/(p|reel)/.+" placeholder="게시 링크 (https://www.instagram.com/p/…)" />}
       {post.postedUrl && <a href={post.postedUrl} target="_blank" rel="noreferrer" className="small">게시물 보기</a>}
-      {next.map((s) => (
+      {next.map((s) => s === "approved" && post.status === "draft" ? (
+        block ? <button key={s} type="button" className="btn primary" disabled>승인…</button>
+          : <Link key={s} className="btn primary" href={`/w/${wsId}/review?p=${post.id}`}>승인…</Link>
+      ) : (
         <button key={s} name="status" value={s} disabled={block || pending} formNoValidate={s !== "posted"} className={s === "approved" || s === "posted" ? "btn primary" : "btn"}>{post.status === "posted" && s === "approved" ? "게시 취소" : post.status === "skip" && !post.data ? "기획으로" : STATUS_BTN[s]}</button>
       ))}
     </form>

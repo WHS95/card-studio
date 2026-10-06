@@ -19,7 +19,7 @@ export default function AskAi({ prompt, label = "내 AI 구독으로 하기" }: 
         <button type="button" className="btn" onClick={async () => { setCopied((await copyText(prompt)) ? "ok" : "fail"); setTimeout(() => setCopied(""), 2500); }}>{copied === "ok" ? "복사했어요" : copied === "fail" ? "복사가 막혔어요" : "요청 복사"}</button>
       </div>
       {copied === "fail" && <textarea className="input" rows={3} readOnly value={prompt} onFocus={(e) => e.currentTarget.select()} aria-label="직접 선택해 복사" />}
-      <span className="small muted">그 앱에 이 스튜디오를 커넥터로 연결해 두어야 해요 — <a href="/account">내 계정 › AI 앱 연결</a></span>
+      <span className="small muted">그 앱에 이 스튜디오를 커넥터로 연결해 두어야 해요 — <a href="/connect">AI 앱 연결</a></span>
     </div>
   );
 }

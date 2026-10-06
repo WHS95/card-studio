@@ -132,7 +132,7 @@ export const plain = (s: string) => s.replace(/\*\*(.+?)\*\*|==(.+?)==/g, "$1$2"
 export function Rich({ c, text, size, color, weight = 500, lh = 1.5, align = "left", hl: hl0 = "fill", gap = 0 }: {
   c: Ctx; text: string; size: number; color: string; weight?: number; lh?: number; align?: "left" | "center"; hl?: string; gap?: number;
 }) {
-  const hl = hlMode(c, hl0);
+  const hl = hlMode(c, hl0, color);
   const jc = align === "center" ? "center" : "flex-start";
   return (
     <div style={{ display: "flex", flexDirection: "column", width: "100%", alignItems: jc, gap }}>
@@ -236,5 +236,11 @@ export function lum(hex: string) {
   const n = parseInt(hex.replace("#", "").slice(0, 6), 16);
   return (0.299 * ((n >> 16) & 255) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) / 255;
 }
-/** '강조색 글자'인데 강조색이 너무 밝으면(흑백 기본 #D9D9D9 등) 글자로는 안 읽혀서 채움으로 바꾼다 */
-export const hlMode = (c: Ctx, hl: string) => (hl === "text" && lum(c.theme.accent) > 0.7 ? "fill" : hl);
+/** 채도 0~1 (가장 큰 채널 − 가장 작은 채널) */
+export function chroma(hex: string) {
+  const n = parseInt(hex.replace("#", "").slice(0, 6), 16), ch = [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+  return (Math.max(...ch) - Math.min(...ch)) / 255;
+}
+/** '강조색 글자'인데 강조색이 너무 밝으면 채움으로 바꾼다 — 밝은 바탕에선 안 읽히고, 어두운 바탕에서도 회색(흑백 기본 #D9D9D9)이면
+ *  흰 글자와 구분이 안 된다. 어두운 바탕 + 색이 있는 밝은 강조색(예: 라임 #CCFF00)만 글자 그대로 */
+export const hlMode = (c: Ctx, hl: string, ink?: string) => (hl === "text" && lum(c.theme.accent) > 0.7 && !(ink && lum(ink) > 0.5 && chroma(c.theme.accent) > 0.3) ? "fill" : hl);

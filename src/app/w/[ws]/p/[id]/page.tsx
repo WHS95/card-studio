@@ -3,7 +3,7 @@ import { can, requireWs } from "@/lib/auth";
 import { getPost, listPosts } from "@/lib/store";
 import { postToolAction } from "../../../../actions";
 import MetricsForm from "./MetricsForm";
-import Top from "../../../../Top";
+import { ServiceShell } from "../../../../ui/Shell";
 import Editor from "./Editor";
 import { aiEnabled } from "@/lib/ai";
 import { veoEnabled } from "@/lib/veo";
@@ -11,7 +11,7 @@ import { veoEnabled } from "@/lib/veo";
 /** 게시물 편집기: 칸 정의(템플릿)로 화면을 만든다 */
 export default async function PostPage({ params, searchParams }: PageProps<"/w/[ws]/p/[id]">) {
   const { ws, id } = await params;
-  const { ws: w, role } = await requireWs(ws, "view");
+  const { ws: w, role, actor } = await requireWs(ws, "view");
   const p = await getPost(id);
   if (!p || p.workspace !== w.id) notFound();
   const { error } = await searchParams;
@@ -21,13 +21,11 @@ export default async function PostPage({ params, searchParams }: PageProps<"/w/[
   const spots = <select name="spot" className="input" style={{ width: "auto" }} aria-label="칸"><option value="">비어 있는 첫 칸</option>{empty.map((e) => { const [d, s] = e.split(" "); return <option key={e} value={e}>D{d} {s}</option>; })}</select>;
   const hidden = <><input type="hidden" name="ws" value={w.id} /><input type="hidden" name="id" value={p.id} /></>;
   return (
-    <>
-      <Top ws={w} tab="post" />
-      <main className="wrap">
+    <ServiceShell ws={w} step="make" ctx={`5단계 제작 · 편집기 D${p.day} ${p.slot} '${p.title}' (게시물 ${p.id})`}>
         {typeof error === "string" && <p className="err">{error}</p>}
         {p.archivedAt && <p className="hint">보관함에 있는 게시물이에요. <a href={`/w/${w.id}?view=archive`}>보관함에서 되살리기 →</a></p>}
-        <Editor key={p.id} ws={{ id: w.id, handle: w.handle, categories: w.categories, slots: w.slots, startDate: w.startDate, hashtags: w.brief?.hashtags ?? [], cta: w.brief?.cta ?? "", ai: aiEnabled(), veo: veoEnabled(), canEdit: can(role, "edit"), canApprove: can(role, "approve") }} post={p} />
-        {p.status === "posted" && <MetricsForm id={p.id} m={p.metrics} />}
+        <Editor key={p.id} ws={{ id: w.id, handle: w.handle, categories: w.categories, slots: w.slots, startDate: w.startDate, hashtags: w.brief?.hashtags ?? [], cta: w.brief?.cta ?? "", ai: await aiEnabled(actor), veo: veoEnabled(), canEdit: can(role, "edit"), canApprove: can(role, "approve"), rules: w.brief?.rules, defaultTemplate: w.defaultTemplate }} post={p} />
+        {p.status === "posted" && <div id="metrics"><MetricsForm id={p.id} m={p.metrics} /></div>}
         {!p.archivedAt && (
           <details className="block">
             <summary className="small" style={{ fontWeight: 700, cursor: "pointer" }}>게시물 관리 · 옮기기 · 복제 · 보관함</summary>
@@ -39,7 +37,6 @@ export default async function PostPage({ params, searchParams }: PageProps<"/w/[
             </div>
           </details>
         )}
-      </main>
-    </>
+    </ServiceShell>
   );
 }

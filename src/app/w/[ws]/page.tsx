@@ -1,29 +1,24 @@
 import { Fragment } from "react";
 import Link from "next/link";
 import { requireWs } from "@/lib/auth";
-import { listArchived, listIdeas, listPosts, listResearch } from "@/lib/store";
-import { briefDone } from "@/lib/presets";
+import { listArchived, listPosts } from "@/lib/store";
+import { ruleWarnings } from "@/lib/rules";
 import { POST_STATUS, STATUS_LABEL, type PostStatus } from "@/lib/types";
 import { templateOf } from "@/lib/templates";
 import { createPostAction, postToolAction } from "../../actions";
-import Top from "../../Top";
+import { ServiceShell } from "../../ui/Shell";
+import Icon from "../../ui/Icon";
 
 const dateOf = (start: string, day: number) => { const d = new Date(`${start}T00:00:00+09:00`); d.setDate(d.getDate() + day - 1); return d.toLocaleDateString("en-CA", { timeZone: "Asia/Seoul" }); };
 
-/** 달력: 일차 × 시간대. 빈칸을 누르면 기획 게시물을 만들고 편집기로. ?view=grid 프로필 그리드 미리보기, ?s=상태 거르기 */
+/** 5단계 제작 · 달력: 일차 × 시간대. 빈칸을 누르면 기획 게시물을 만들고 편집기로. ?view=grid 그리드 · ?view=archive 보관함 · ?s=상태 거르기. ⚠ = 콘텐츠 규칙 경고 */
 export default async function Calendar({ params, searchParams }: PageProps<"/w/[ws]">) {
   const { ws } = await params;
   const q = await searchParams;
   const { ws: w } = await requireWs(ws, "view");
-  const [posts, ideas, research, archived] = await Promise.all([listPosts(w.id), listIdeas(w.id), listResearch(w.id), listArchived(w.id)]);
+  const [posts, archived] = await Promise.all([listPosts(w.id), listArchived(w.id)]);
   const archive = q.view === "archive";
-  // 시작하기 체크리스트 (다 하면 숨김)
-  const steps: [string, boolean, string][] = [
-    ["브리프", briefDone(w.brief), "brief"], ["기둥", !!w.pillars?.length, "brief"], ["자료 1개", research.length > 0, "research"],
-    ["아이디어 3개", ideas.length >= 3, "ideas"], ["첫 초안", posts.some((p) => p.data), ""], ["첫 승인", posts.some((p) => p.status === "approved" || p.status === "posted"), ""],
-    ["첫 게시", posts.some((p) => p.status === "posted"), ""],
-  ];
-  const left = steps.filter((x) => !x[1]).length;
+  const warns = Object.fromEntries(posts.map((p) => [p.id, ruleWarnings(w.brief?.rules, w.defaultTemplate, p.template, p.data).length]));
   // 기둥 비중: 목표 vs 달력 (건너뜀 제외)
   const live = posts.filter((p) => p.status !== "skip");
   const mix = (w.pillars ?? []).map((p) => ({ name: p.name, target: p.share, now: live.length ? Math.round((live.filter((x) => x.category === p.name).length / live.length) * 100) : 0 }));
@@ -37,35 +32,27 @@ export default async function Calendar({ params, searchParams }: PageProps<"/w/[
     return `/w/${w.id}${u.size ? `?${u}` : ""}`;
   };
   return (
-    <>
-      <Top ws={w} tab="" />
-      <main className="wrap">
+    <ServiceShell ws={w} step="make" ctx={archive ? "제작 · 보관함" : grid ? "제작 · 그리드" : "제작 · 달력"}>
         <div className="row" style={{ justifyContent: "space-between" }}>
-          <h1 style={{ margin: 0 }}>{w.name} · {w.days}일 × 하루 {w.slots.length}개</h1>
+          <div className="col"><h1>제작</h1><span className="small muted">{w.days}일 × 하루 {w.slots.length}개 ({w.slots.join(" · ")}) · 빈칸을 누르면 기획 게시물, 칸을 누르면 편집기 · ⚠ = 콘텐츠 규칙 경고</span></div>
           <div className="row">
-            <Link className={grid ? "btn" : "btn primary"} href={href({ view: null })}>달력</Link>
-            <Link className={grid ? "btn primary" : "btn"} href={href({ view: "grid" })}>그리드 미리보기</Link>
-            <Link className={archive ? "btn primary" : "btn"} href={`/w/${w.id}?view=archive`}>보관함 {archived.length}</Link>
-            <a className="btn" href={`/api/ws/${w.id}/export`} title="서비스·게시물·아이디어·자료를 JSON 하나로 (백업)">내보내기</a>
+            <Link className={`chip${!grid && !archive ? " on" : ""}`} href={href({ view: null })}>달력</Link>
+            <Link className={`chip${grid ? " on" : ""}`} href={href({ view: "grid" })}>그리드</Link>
+            <Link className={`chip${archive ? " on" : ""}`} href={`/w/${w.id}?view=archive`}>보관함 {archived.length}</Link>
           </div>
         </div>
-        <div className="row">
+        {!archive && <div className="row">
           <Link className={`chip${filter ? "" : " on"}`} href={href({ s: null })}>전체 {posts.length}</Link>
           {POST_STATUS.map((s) => <Link key={s} className={`chip${filter === s ? " on" : ""}`} href={href({ s })}>{STATUS_LABEL[s]} {counts[s]}</Link>)}
-        </div>
-        {left > 0 && (
-          <div className="block">
-            <div className="bh"><strong>시작하기 · {steps.length - left}/{steps.length}</strong><a className="small" href="/guide">가이드 →</a></div>
-            <div className="checklist">{steps.map(([label, done, to]) => <a key={label} data-done={done} href={to ? `/w/${w.id}/${to}` : "#cal"}>{done ? "✓" : "○"} {label}</a>)}</div>
-          </div>
-        )}
+        </div>}
+        {typeof q.ok === "string" && <p className="ok">주제 {q.ok}개를 달력에 넣었어요. 칸을 눌러 글을 채워 주세요.</p>}
         {mix.length > 0 && live.length > 0 && (
-          <details className="block"><summary className="small" style={{ fontWeight: 700, cursor: "pointer" }}>기둥 비중 · 목표(빨간 선) 대비 달력 {live.length}개</summary>
+          <details className="block"><summary className="small" style={{ fontWeight: 700, cursor: "pointer" }}>기둥 비중 · 목표(세로선) 대비 달력 {live.length}개</summary>
             <div className="mix" style={{ marginTop: 8 }}>{mix.map((m) => <Fragment key={m.name}><span>{m.name}</span><span className="bar2"><span style={{ width: `${m.now}%` }} /><i style={{ left: `${m.target}%` }} /></span><span>{m.now}% / {m.target}%</span></Fragment>)}</div>
           </details>
         )}
         {typeof q.error === "string" && <p className="err">{q.error}</p>}
-        {!w.startDate && <p className="small muted" style={{ margin: 0 }}>설정에서 1일차 날짜를 정하면 칸마다 날짜가 붙어요.</p>}
+        {!w.startDate && <p className="small muted" style={{ margin: 0 }}>서비스 설정에서 1일차 날짜를 정하면 칸마다 날짜가 붙어요.</p>}
         {archive ? (
           <div className="list">
             {archived.map((p) => (
@@ -80,7 +67,7 @@ export default async function Calendar({ params, searchParams }: PageProps<"/w/[
                 </form>
               </div>
             ))}
-            {!archived.length && <p className="hint">보관함이 비었어요. 편집기 아래 &apos;게시물 관리&apos;에서 뺄 수 있어요.</p>}
+            {!archived.length && <p className="hint">보관함이 비었어요. 편집기 아래 &apos;게시물 관리&apos;에서 뺄 수 있어요. 보류한 주제는 3 주제 탭의 &apos;보류&apos;에 있어요.</p>}
           </div>
         ) : grid ? <Grid ws={w.id} posts={posts.filter((p) => p.data && p.status !== "skip" && (!filter || p.status === filter))} /> : (
           <div id="cal" className="cal" style={{ ["--slots" as string]: w.slots.length }}>
@@ -98,7 +85,7 @@ export default async function Calendar({ params, searchParams }: PageProps<"/w/[
                     <Link key={s} href={`/w/${w.id}/p/${p.id}`} className="cell" data-s={p.status} style={filter && p.status !== filter ? { opacity: 0.25 } : undefined}>
                       <span className="c">{p.category} · {templateOf(p.template).name}{p.data?.photos.some((x) => x.kind === "video") ? " · 영상" : ""}</span>
                       <span className="t">{p.title || "제목 없음"}</span>
-                      <span className="s">{STATUS_LABEL[p.status]}{p.data ? ` · ${p.data.slides.length}장` : ""}</span>
+                      <span className="s">{STATUS_LABEL[p.status]}{p.data ? ` · ${p.data.slides.length}장` : ""}{warns[p.id] ? <> · <Icon name="warn" size={12} /> {warns[p.id]}</> : null}</span>
                     </Link>
                   );
                 })}
@@ -106,8 +93,7 @@ export default async function Calendar({ params, searchParams }: PageProps<"/w/[
             ))}
           </div>
         )}
-      </main>
-    </>
+    </ServiceShell>
   );
 }
 

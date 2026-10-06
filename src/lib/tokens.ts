@@ -3,7 +3,7 @@ import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import { mutate, newId, readDb, getUser } from "./store";
 import { OpError } from "./ops";
 import type { Actor } from "./auth";
-import type { ApiToken, OAuthClient } from "./types";
+import type { OAuthClient } from "./types";
 
 // AI 앱 연결 (Claude·ChatGPT·Claude Code 가 이 스튜디오를 MCP 로 쓰게): 개인 토큰(PAT)과 OAuth 토큰.
 // 토큰은 sha256 만 저장한다. MCP 호출은 토큰 주인(계정·역할) 권한으로 돈다 — 구독 계정의 AI 가 그 사람으로 일한다.

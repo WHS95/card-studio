@@ -2,7 +2,7 @@ import "server-only";
 import { createHash, createHmac, randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
 import { cookies } from "next/headers";
 import { notFound, redirect } from "next/navigation";
-import { getUser, getUserByEmail, getWorkspace } from "./store";
+import { getPrefs, getUser, getUserByEmail, getWorkspace } from "./store";
 import type { Role, User, Workspace } from "./types";
 
 // 로그인 두 가지:
@@ -60,7 +60,7 @@ export type Actor = { kind: "admin"; id: "admin"; name: string } | { kind: "user
 /** 지금 로그인한 사람 (없으면 null) */
 export async function getActor(): Promise<Actor | null> {
   const c = await cookies();
-  if (c.get(COOKIE)?.value === token()) return { kind: "admin", id: "admin", name: "운영자" };
+  if (c.get(COOKIE)?.value === token()) return { kind: "admin", id: "admin", name: (await getPrefs("admin")).displayName || "운영자" };
   const raw = c.get(USER_COOKIE)?.value;
   if (!raw) return null;
   const [id, expS, sig] = raw.split(".");

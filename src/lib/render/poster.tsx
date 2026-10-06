@@ -59,7 +59,7 @@ function Point({ c, s }: SlideProps) {
 
 function Items({ c, s }: SlideProps) {
   const [x0, y0, x1, y1] = SAFE.feed;
-  const dark = isDark(s, "items"), hl = hlMode(c, pick(s, "items", "hl"));
+  const dark = isDark(s, "items"), hl = hlMode(c, pick(s, "items", "hl"), ink(c, dark));
   const items = (Array.isArray(s.items) ? s.items : []) as { label: string; sub: string; photo: unknown }[];
   const top = str(s, "top"), bottom = str(s, "bottom");
   // 항목이 많으면 그림을 낮게 (5개 = 3줄)

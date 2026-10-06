@@ -17,17 +17,17 @@ const bearer = (req: Request) => req.headers.get("authorization")?.replace(/^Bea
 // 브라우저에서 오는 요청은 이 Mac·Claude·ChatGPT 주소만 (토큰이 늘 필요하다)
 const badOrigin = (req: Request) => { const o = req.headers.get("origin"); return !!o && !/^https?:\/\/(127\.0\.0\.1|localhost)(:\d+)?$|^https:\/\/([a-z0-9-]+\.)*(claude\.ai|anthropic\.com|chatgpt\.com|openai\.com)$/.test(o); };
 
-async function handle(m: Msg, actor: Actor) {
+async function handle(m: Msg, actor: Actor, via: "mcp" | "ai") {
   const ok = (result: unknown) => ({ jsonrpc: "2.0", id: m.id ?? null, result });
   const err = (code: number, message: string) => ({ jsonrpc: "2.0", id: m.id ?? null, error: { code, message } });
   switch (m.method) {
     case "initialize": {
       const asked = String(m.params?.protocolVersion ?? "");
-      return ok({ protocolVersion: VERSIONS.includes(asked) ? asked : VERSIONS[0], capabilities: { tools: { listChanged: false } }, serverInfo: { name: "card-studio", version: "0.5.0" }, instructions: INSTRUCTIONS });
+      return ok({ protocolVersion: VERSIONS.includes(asked) ? asked : VERSIONS[0], capabilities: { tools: { listChanged: false } }, serverInfo: { name: "card-studio", version: "0.6.0" }, instructions: INSTRUCTIONS });
     }
     case "ping": return ok({});
     case "tools/list": return ok({ tools: TOOLS.map(({ name, description, inputSchema }) => ({ name, description, inputSchema })) });
-    case "tools/call": return ok(await callTool(String(m.params?.name ?? ""), (m.params?.arguments ?? {}) as Record<string, unknown>, actor));
+    case "tools/call": return ok(await callTool(String(m.params?.name ?? ""), (m.params?.arguments ?? {}) as Record<string, unknown>, actor, via));
     default: return err(-32601, `없는 메서드: ${m.method}`);
   }
 }
@@ -41,8 +41,10 @@ export async function POST(req: Request) {
   const body = (await req.json().catch(() => null)) as Msg | Msg[] | null;
   if (!body) return Response.json({ jsonrpc: "2.0", id: null, error: { code: -32700, message: "JSON 이 아니에요" } }, { status: 400 });
   const list = Array.isArray(body) ? body : [body];
+  // 스튜디오 AI 패널이 이 Mac 의 Claude Code·Codex 로 부를 때(운영자 토큰 + 표시) 작업 기록을 'AI' 로
+  const via = req.headers.get("x-studio-via") === "ai" && actor.kind === "admin" ? "ai" : "mcp";
   const replies = [];
-  for (const m of list) if (m.method && m.id !== undefined && m.id !== null) replies.push(await handle(m, actor)); // id 없는 건 알림 → 답 없음
+  for (const m of list) if (m.method && m.id !== undefined && m.id !== null) replies.push(await handle(m, actor, via)); // id 없는 건 알림 → 답 없음
   if (!replies.length) return new Response(null, { status: 202 });
   return Response.json(Array.isArray(body) ? replies : replies[0]);
 }

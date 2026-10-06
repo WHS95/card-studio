@@ -5,7 +5,7 @@ import { TEMPLATES } from "@/lib/templates";
 import { formatOf, sizeOf, type Field } from "@/lib/fields";
 import { videoOf } from "@/lib/video";
 import { startFromTemplateAction } from "../actions";
-import Top from "../Top";
+import { WideShell } from "../ui/Shell";
 
 const controls = (fields: Field[]) => fields.filter((f) => f.type === "choice" || f.type === "toggle").map((f) => f.label);
 
@@ -18,9 +18,7 @@ export default async function Templates({ searchParams }: PageProps<"/templates"
   const w = all.find((x) => x.id === q.ws) ?? null;
   const groups = [...new Set(TEMPLATES.map((t) => t.group ?? "카드뉴스"))];
   return (
-    <>
-      <Top ws={w ?? undefined} />
-      <main className="wrap">
+    <WideShell active="templates">
         <h1 style={{ margin: 0 }}>템플릿 {TEMPLATES.length}</h1>
         <p className="small muted" style={{ margin: 0 }}>샘플은 기본 흑백으로 그리고, 서비스를 고르면 그 서비스의 테마 색·워드마크로 그려요. 사진은 추상 샘플 그림이에요 — 실제 게시물에는 직접 찍은 사진이나 출처를 밝힌 무료 사진을 쓰세요.</p>
         {typeof q.error === "string" && <p className="err">{q.error}</p>}
@@ -87,7 +85,6 @@ export default async function Templates({ searchParams }: PageProps<"/templates"
           </ol>
         </section>
         {!all.length && <p className="hint">서비스를 먼저 만들면 그 서비스에 바로 만들 수 있어요.</p>}
-      </main>
-    </>
+      </WideShell>
   );
 }

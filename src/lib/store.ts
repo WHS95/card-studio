@@ -2,10 +2,10 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 import { readFile, rename, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import type { ApiToken, Idea, OAuthClient, Post, Research, User, Workspace } from "./types";
+import type { Activity, AiConfig, ApiToken, Idea, OAuthClient, Post, Prefs, Research, User, Workspace } from "./types";
 
 // 1단계 저장소: data/studio.json 파일 하나 (혼자 쓰는 로컬 도구). 배포할 때 DB 로 바꾼다 — 이 파일의 함수만 바꾸면 된다.
-export type Db = { workspaces: Workspace[]; posts: Post[]; ideas: Idea[]; research: Research[]; users: User[]; tokens: ApiToken[]; oauthClients: OAuthClient[] };
+export type Db = { workspaces: Workspace[]; posts: Post[]; ideas: Idea[]; research: Research[]; users: User[]; tokens: ApiToken[]; oauthClients: OAuthClient[]; activity: Activity[]; prefs: Record<string, Prefs>; ai?: AiConfig };
 const FILE = join(process.cwd(), "data", "studio.json");
 let chain: Promise<unknown> = Promise.resolve();
 
@@ -13,9 +13,11 @@ export async function readDb(): Promise<Db> {
   try {
     const db = JSON.parse(await readFile(FILE, "utf8")) as Partial<Db>;
     // 예전 저장본에는 없는 묶음 — 읽을 때 채운다
-    return { workspaces: db.workspaces ?? [], posts: db.posts ?? [], ideas: db.ideas ?? [], research: db.research ?? [], users: db.users ?? [], tokens: db.tokens ?? [], oauthClients: db.oauthClients ?? [] };
+    // 0.6 전 아이디어 상태 'idea'(아직) = 검수 대기
+    const ideas = (db.ideas ?? []).map((i) => ((i.status as string) === "idea" ? { ...i, status: "review" as const } : i));
+    return { workspaces: db.workspaces ?? [], posts: db.posts ?? [], ideas, research: db.research ?? [], users: db.users ?? [], tokens: db.tokens ?? [], oauthClients: db.oauthClients ?? [], activity: db.activity ?? [], prefs: db.prefs ?? {}, ai: db.ai };
   } catch {
-    return { workspaces: [], posts: [], ideas: [], research: [], users: [], tokens: [], oauthClients: [] };
+    return { workspaces: [], posts: [], ideas: [], research: [], users: [], tokens: [], oauthClients: [], activity: [], prefs: {} };
   }
 }
 /** 쓰기는 한 줄로 세워서 (동시에 두 번 써도 안 깨지게), 임시 파일에 쓴 뒤 바꿔 끼운다 */
@@ -73,3 +75,5 @@ export const newId = () => randomUUID();
 export async function getUser(id: string) { return (await readDb()).users.find((u) => u.id === id) ?? null; }
 export async function getUserByEmail(email: string) { const e = email.trim().toLowerCase(); return (await readDb()).users.find((u) => u.email === e) ?? null; }
 export async function listUsers(ids: string[]) { const set = new Set(ids); return (await readDb()).users.filter((u) => set.has(u.id)); }
+export async function listActivity(ws: string, n = 30) { return (await readDb()).activity.filter((a) => a.workspace === ws).slice(-n).reverse(); }
+export async function getPrefs(uid: string): Promise<Prefs> { return (await readDb()).prefs[uid] ?? { favorites: [] }; }

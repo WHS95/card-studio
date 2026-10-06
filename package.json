@@ -1,6 +1,6 @@
 {
   "name": "card-studio",
-  "version": "0.5.1",
+  "version": "0.6.0",
   "private": true,
   "scripts": {
     "dev": "next dev -p 3200 -H 127.0.0.1",

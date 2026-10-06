@@ -3,7 +3,7 @@
 import { useActionState } from "react";
 import { integrationAction } from "../actions";
 
-type Props = { provider: "anthropic" | "gemini"; name: string; use: string; get: string; placeholder: string; status: { connected: boolean; from: "env" | "screen" | null; tail: string; envName: string } };
+type Props = { provider: "anthropic" | "gemini" | "openai"; name: string; use: string; get: string; placeholder: string; status: { connected: boolean; from: "env" | "screen" | null; tail: string; envName: string } };
 
 export default function KeyForm({ provider, name, use, get, placeholder, status }: Props) {
   const [st, act, pending] = useActionState(integrationAction, undefined);

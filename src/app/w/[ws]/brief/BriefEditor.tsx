@@ -1,9 +1,9 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import type { Preset } from "@/lib/presets";
-import type { Brief, Pillar } from "@/lib/types";
+import { DEFAULT_CHECKS, CHECKS_MAX, NO_RULES, RULE_LABEL, type Brief, type ContentRules, type Pillar } from "@/lib/types";
 import { saveBriefAction } from "../../../actions";
 
 const join = (a: string[]) => a.join(", ");
@@ -20,13 +20,33 @@ function ListInput({ label, value, onChange, placeholder, hint }: { label: strin
   );
 }
 
-export default function BriefEditor({ ws, brief: b0, pillars: p0, presets, goals, templates, isNew }: {
-  ws: string; brief: Brief; pillars: Pillar[]; presets: Preset[]; goals: string[]; templates: { id: string; name: string }[]; isNew: boolean;
+export default function BriefEditor({ ws, brief: b0, pillars: p0, presets, goals, templates, isNew, canEdit }: {
+  ws: string; brief: Brief; pillars: Pillar[]; presets: Preset[]; goals: string[]; templates: { id: string; name: string }[]; isNew: boolean; canEdit: boolean;
 }) {
   const [b, setB] = useState(b0);
   const [pillars, setPillars] = useState(p0);
   const [ver, setVer] = useState(0); // 업종 묶음을 넣으면 목록 칸을 다시 그린다
-  const [st, act, pending] = useActionState(saveBriefAction, undefined);
+  const [st, setSt] = useState<{ ok?: boolean; error?: string; at?: string } | undefined>(undefined);
+  const [pending, start] = useTransition();
+  const [newCheck, setNewCheck] = useState("");
+  const first = useRef(true);
+  const rules: ContentRules = { ...NO_RULES, ...b.rules };
+  const sum = pillars.reduce((a, p) => a + p.share, 0);
+  const sumErr = pillars.length > 0 && sum !== 100 ? `기둥 비중 합이 ${sum}%예요. 100%가 되면 저장돼요` : "";
+  const checks = b.checklist ?? [];
+  // 자동 저장: 고치고 0.9초 뒤 (기둥 비중 합이 100이 아니면 기다린다)
+  useEffect(() => {
+    if (first.current) { first.current = false; return; }
+    if (!canEdit) return;
+    if (pillars.length && pillars.reduce((a, p) => a + p.share, 0) !== 100) return; // 합이 100 이 될 때까지 기다린다 (안내는 아래 sumErr)
+    const t = setTimeout(() => start(async () => {
+      const fd = new FormData();
+      fd.set("ws", ws); fd.set("body", JSON.stringify({ brief: b, pillars }));
+      const r = await saveBriefAction(undefined, fd);
+      setSt(r?.ok ? { ok: true, at: new Date().toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" }) } : r);
+    }), 900);
+    return () => clearTimeout(t);
+  }, [b, pillars, ws, canEdit]);
   const set = (patch: Partial<Brief>) => setB((x) => ({ ...x, ...patch }));
   const total = pillars.reduce((a, p) => a + p.share, 0);
   const setP = (i: number, patch: Partial<Pillar>) => setPillars((ps) => ps.map((p, j) => (j === i ? { ...p, ...patch } : p)));
@@ -42,9 +62,10 @@ export default function BriefEditor({ ws, brief: b0, pillars: p0, presets, goals
   const even = () => setPillars((ps) => ps.map((p, i) => ({ ...p, share: Math.floor(100 / ps.length) + (i < 100 % ps.length ? 1 : 0) })));
 
   return (
-    <form action={act} className="panel">
-      <input type="hidden" name="ws" value={ws} />
-      <input type="hidden" name="body" value={JSON.stringify({ brief: b, pillars })} />
+    <form className="panel" onSubmit={(e) => e.preventDefault()}>
+      <div className="row small" role="status" aria-live="polite" style={{ position: "sticky", top: 100, zIndex: 2, alignSelf: "flex-end", background: "#fff", padding: "4px 10px", borderRadius: 999, border: "1px solid var(--line2)" }}>
+        {!canEdit ? <span className="muted">보기만 할 수 있어요</span> : pending ? "저장하는 중…" : sumErr ? <span className="err">{sumErr}</span> : st?.error ? <span className="err">{st.error}</span> : st?.ok ? `저장됨 · ${st.at}` : "고치면 자동 저장"}
+      </div>
 
       <div className="block">
         <div className="bh"><strong>1. 어떤 서비스인가요</strong><span className="small muted">초안·캡션·자료 조사의 바탕이 돼요</span></div>
@@ -107,9 +128,35 @@ export default function BriefEditor({ ws, brief: b0, pillars: p0, presets, goals
         <button type="button" className="btn" disabled={pillars.length >= 8} onClick={() => setPillars((ps) => [...ps, { name: "", description: "", share: 0, template: templates[0].id, examples: [] }])}>+ 기둥</button>
       </div>
 
-      <div className="bar">
-        <button className="btn primary" disabled={pending || (pillars.length > 0 && total !== 100)}>{pending ? "저장하는 중" : "저장"}</button>
-        {st?.error ? <p className="err">{st.error}</p> : st?.ok ? <span className="ok">저장했어요 · <Link href={`/w/${ws}/ideas`}>아이디어 모으러 가기 →</Link></span> : isNew ? <Link className="btn" href={`/w/${ws}`}>나중에 하기</Link> : null}
+      <div className="block">
+        <div className="bh"><strong>4. 콘텐츠 규칙</strong><span className="small muted">어기면 편집기에 경고 · 저장은 돼요</span></div>
+        {(Object.keys(RULE_LABEL) as (keyof ContentRules)[]).map((k) => (
+          <label key={k} className="check-row">
+            <input type="checkbox" role="switch" checked={rules[k]} onChange={(e) => set({ rules: { ...rules, [k]: e.target.checked } })} />
+            <span><b>{RULE_LABEL[k].label}</b><br /><span className="small muted">{RULE_LABEL[k].note}{k === "templateOnly" ? " · 기본 틀은 4 템플릿 탭에서" : ""}</span></span>
+          </label>
+        ))}
+      </div>
+
+      <div className="block">
+        <div className="bh"><strong>5. 승인 체크리스트</strong><span className="small muted">게시물을 승인할 때 모두 체크해야 해요</span></div>
+        <span className="small" style={{ fontWeight: 700 }}>기본 {DEFAULT_CHECKS.length} <span className="muted" style={{ fontWeight: 500 }}>모든 서비스 공통 · 뺄 수 없어요</span></span>
+        {DEFAULT_CHECKS.map((c) => <label key={c} className="check-row" style={{ cursor: "default" }}><input type="checkbox" checked disabled readOnly /><span>{c}</span></label>)}
+        <span className="small" style={{ fontWeight: 700 }}>이 서비스가 더한 것 {checks.length} <span className="muted" style={{ fontWeight: 500 }}>{CHECKS_MAX}개까지</span></span>
+        {checks.map((c, i) => (
+          <div key={i} className="check-row" style={{ cursor: "default", alignItems: "center" }}><span style={{ flex: 1 }}>{c}</span>
+            <button type="button" className="btn" style={{ minHeight: 32 }} onClick={() => set({ checklist: checks.filter((_, j) => j !== i) })}>빼기</button></div>
+        ))}
+        <div className="row">
+          <input className="input" style={{ flex: 1, minWidth: 220 }} maxLength={80} value={newCheck} placeholder="예: 부상 주제면 '아프면 병원' 한 줄" onChange={(e) => setNewCheck(e.target.value)} />
+          <button type="button" className="btn" disabled={!newCheck.trim() || checks.length >= CHECKS_MAX} onClick={() => { set({ checklist: [...checks, newCheck.trim()] }); setNewCheck(""); }}>더하기</button>
+        </div>
+        <p className="small muted" style={{ margin: 0 }}>스튜디오가 알 수 있는 것(인스타 마진·규칙 경고·&apos;확인 필요&apos; 자료)은 승인 창 위에 자동으로 보여 줘요.</p>
+      </div>
+
+      <div className="row">
+        {isNew && <Link className="btn" href={`/w/${ws}`}>나중에 하기</Link>}
+        <Link className="btn" href={`/w/${ws}/research`}>다음: 자료 조사 →</Link>
       </div>
     </form>
   );

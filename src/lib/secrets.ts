@@ -6,8 +6,8 @@ import { join } from "node:path";
 // 외부 AI 연동 키: 환경 변수가 먼저, 없으면 운영자가 'AI 연동' 화면에서 넣은 값(.secrets/integrations.json, git 제외, 600).
 // 화면·MCP 로 키를 다시 보여 주지 않는다 (끝 4자리만).
 
-export type Provider = "anthropic" | "gemini";
-const ENV: Record<Provider, string> = { anthropic: "ANTHROPIC_API_KEY", gemini: "GEMINI_API_KEY" };
+export type Provider = "anthropic" | "gemini" | "openai";
+const ENV: Record<Provider, string> = { anthropic: "ANTHROPIC_API_KEY", gemini: "GEMINI_API_KEY", openai: "OPENAI_API_KEY" };
 const DIR = join(process.cwd(), ".secrets");
 const FILE = join(DIR, "integrations.json");
 

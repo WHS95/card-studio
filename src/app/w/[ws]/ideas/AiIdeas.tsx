@@ -6,7 +6,7 @@ import { addAiIdeasAction, aiIdeasAction } from "../../../actions";
 /** AI 아이디어 제안: 받아 보고 고른 것만 더한다. 키가 없으면 MCP 안내 */
 export default function AiIdeas({ ws, enabled }: { ws: string; enabled: boolean }) {
   const [st, ask, pending] = useActionState(aiIdeasAction, undefined);
-  if (!enabled) return <p className="hint">AI 제안: <code>.env.local</code>에 ANTHROPIC_API_KEY를 넣으면 여기서 바로 써요. 키 없이도 Claude Code(MCP)에서 &quot;이 서비스 아이디어 10개 만들어 줘&quot;라고 하면 이 보관함에 들어와요.</p>;
+  if (!enabled) return <p className="hint">AI 연결이 없어요. 운영자가 <a href="/settings">설정 · AI</a>에서 이 Mac 의 Claude Code·Codex 또는 API 키를 연결하면 여기서 바로 써요. 연결 없이도 내 Claude·ChatGPT(MCP)로 할 수 있어요.</p>;
   return (
     <div className="col" style={{ gap: 8, borderTop: "1px solid var(--line)", paddingTop: 10 }}>
       <form action={ask} className="row">
