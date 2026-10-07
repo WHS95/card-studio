@@ -3,7 +3,7 @@ import { can, requireWs } from "@/lib/auth";
 import { listPosts } from "@/lib/store";
 import { fullCaption } from "@/lib/exporter";
 import { ServiceShell } from "../../../ui/Shell";
-import { PostedForm, CopyCaption, UnpostForm } from "./Forms";
+import { PostedForm, CopyCaption, UnpostForm, ReelForm } from "./Forms";
 
 /** 7단계 발행: 승인된 게시물을 내려받아 사람이 직접 인스타에 올리고, 링크를 붙이면 게시. 릴스로 만들기. 게시됨 목록 */
 export default async function Publish({ params }: PageProps<"/w/[ws]/publish">) {
@@ -15,13 +15,13 @@ export default async function Publish({ params }: PageProps<"/w/[ws]/publish">) 
   const canApprove = can(role, "approve");
   return (
     <ServiceShell ws={w} step="publish" ctx="7단계 발행">
-      <div className="col"><h1>발행</h1><span className="small muted">승인된 게시물을 내려받아 인스타에 직접 올리고, 올린 게시물 링크를 붙이면 &apos;게시&apos;가 돼요. 스튜디오는 자동으로 올리지 않아요.</span></div>
+      <div className="mk-head"><h1>발행</h1><p>승인된 게시물을 내려받아 인스타에 직접 올리고, 올린 게시물 링크를 붙이면 &apos;게시&apos;가 돼요. 스튜디오는 자동으로 올리지 않아요.</p></div>
       <section className="sect"><h2>올릴 차례 · 승인 {ready.length}</h2>
         {ready.map((p) => (
-          <div key={p.id} className="pick" style={{ cursor: "default", flexWrap: "wrap", border: "1.5px solid var(--ink)" }}>
+          <div key={p.id} className="mk-row mk-ready">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={`/api/posts/${p.id}/slide/1?png=1&v=${encodeURIComponent(p.updatedAt)}`} alt="" style={{ width: 54, height: 68, objectFit: "cover", borderRadius: 6, border: "1px solid var(--line2)" }} loading="lazy" />
-            <span className="col" style={{ flex: "1 1 200px", gap: 2 }}><Link href={`/w/${w.id}/p/${p.id}`} style={{ fontWeight: 800 }}>{p.title || "제목 없음"}</Link><span className="small muted">D{p.day} {p.slot}{p.review ? ` · 승인 ${p.review.by} ${new Date(p.review.at).toLocaleDateString("ko-KR", { month: "numeric", day: "numeric", timeZone: "Asia/Seoul" })} · 체크 ${p.review.checks.length}/${p.review.checks.length}` : ""}</span></span>
+            <img className="mk-thumb" src={`/api/posts/${p.id}/slide/1?png=1&v=${encodeURIComponent(p.updatedAt)}`} alt="" loading="lazy" />
+            <span className="mk-row-main" style={{ flex: "1 1 200px" }}><Link href={`/w/${w.id}/p/${p.id}`} className="mk-row-title">{p.title || "제목 없음"}</Link><span className="small muted">D{p.day} {p.slot}{p.review ? ` · 승인 ${p.review.by} ${new Date(p.review.at).toLocaleDateString("ko-KR", { month: "numeric", day: "numeric", timeZone: "Asia/Seoul" }).replace(/\. ?/g, "/").replace(/\/$/, "")} · 체크 ${p.review.checks.length}/${p.review.checks.length}` : ""}</span></span>
             <a className="btn" href={`/api/posts/${p.id}/zip`}>전체 ZIP</a>
             <CopyCaption text={fullCaption(p)} />
             {canApprove && <PostedForm id={p.id} />}
@@ -31,16 +31,13 @@ export default async function Publish({ params }: PageProps<"/w/[ws]/publish">) 
         <p className="small muted" style={{ margin: 0 }}>ZIP = 장별 PNG(영상 장은 MP4) + caption.txt · 링크는 https://www.instagram.com/p/… 또는 /reel/… 만</p>
       </section>
       {ready.length > 0 && <section className="sect"><h2>릴스로 만들기</h2>
-        <form action={`/api/posts/${ready[0].id}/reel`} method="get" className="row">
-          <span className="small">첫 승인 게시물({ready[0].title})을 장마다</span><input name="secs" type="number" min={1} max={10} defaultValue={3} className="input" style={{ width: 80 }} /><span className="small">초씩 릴스 MP4로</span>
-          <button className="btn">릴스 MP4 만들기</button>
-        </form>
-        <p className="small muted" style={{ margin: 0 }}>다른 게시물은 편집기의 내려받기에서 만들어요.</p>
+        <ReelForm posts={ready.map((p) => ({ id: p.id, label: `D${p.day} · ${p.title || "제목 없음"}` }))} />
       </section>}
       <section className="sect"><h2>게시됨 · {posted.length}</h2>
         {posted.map((p) => (
-          <div key={p.id} className="check-row" style={{ cursor: "default", alignItems: "center", flexWrap: "wrap" }}>
-            <Link href={`/w/${w.id}/p/${p.id}`} style={{ flex: 1, fontWeight: 700 }}>{p.title || "제목 없음"}</Link><span className="small muted">D{p.day} {p.slot}{p.metrics ? " · 성과 적음" : ""}</span>
+          <div key={p.id} className="mk-row mk-done">
+            <Link href={`/w/${w.id}/p/${p.id}`} className="mk-row-title" style={{ flex: "1 1 160px" }}>{p.title || "제목 없음"}</Link>
+            <span className="small muted">D{p.day} {p.slot}{p.metrics ? " · 성과 적음" : ""}</span>
             {p.postedUrl && <a className="small" href={p.postedUrl} target="_blank" rel="noreferrer">인스타에서 보기</a>}
             {canApprove && <UnpostForm id={p.id} />}
           </div>

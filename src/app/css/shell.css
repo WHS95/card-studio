@@ -1,0 +1,27 @@
+/* 0.6 시안 리팩터 · shell 화면 전용 (이 파일만 그 담당이 고친다) */
+/* 쪽 머리 (시안 page_head): 제목 24 + 회색 한 줄 */
+.pghead { display: flex; flex-direction: column; gap: 4px; }
+.pghead h1 { margin: 0; font-size: 24px; }
+.pghead p { margin: 0; font-size: 13px; color: #6b6b6b; line-height: 1.5; }
+/* 함께 쓰기 */
+.mem-add { display: flex; gap: 8px; flex-wrap: wrap; align-items: flex-end; }
+.mem-add .mem-email { flex: 2 1 220px; } .mem-add .mem-name { flex: 1 1 140px; }
+.mem-temp { display: flex; flex-direction: column; gap: 2px; padding: 12px 14px; border-radius: 10px; border: 1.5px solid var(--ink); }
+.mem-temp code { font-size: 18px; font-weight: 800; user-select: all; word-break: break-all; }
+.mem-list { display: flex; flex-direction: column; }
+.mem-row { display: flex; gap: 10px; align-items: center; padding: 12px 0; border-top: 1px solid #f0f0f0; flex-wrap: wrap; }
+.mem-row b { font-size: 14px; }
+.mem-mail { min-width: 0; overflow-wrap: anywhere; }
+.mem-acts { margin-left: auto; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.mem-acts form { display: flex; gap: 8px; }
+.mem-role { width: auto; min-height: 40px; }
+.mem-empty { margin: 0; padding: 12px 0; border-top: 1px solid #f0f0f0; }
+/* 서비스 설정 */
+.set-form { display: flex; flex-direction: column; gap: 16px; }
+.set-g2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.set-g3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.set-inline { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; font-size: 13px; }
+@media (max-width: 700px) {
+  .set-g2, .set-g3 { grid-template-columns: minmax(0, 1fr); }
+  .mem-acts { margin-left: 0; width: 100%; }
+}

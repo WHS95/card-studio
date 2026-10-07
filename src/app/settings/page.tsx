@@ -21,18 +21,19 @@ export default async function Settings() {
     { provider: "gemini" as const, name: "Gemini · Veo (Google)", use: "카드에 넣을 AI 영상 만들기 (Veo 3.1)", get: "https://aistudio.google.com/apikey", status: keyStatus("gemini"), placeholder: "AIza…" },
   ];
   return (
-    <WideShell active="settings" narrow>
-      <h1>설정</h1>
-      <section className="sect"><h2>프로필</h2><ProfileForm name={name} /></section>
+    <WideShell active="settings">
+      <h1 className="w-1100 w-h1-lg">설정</h1>
+      <section className="sect w-lg"><h2>프로필</h2><ProfileForm name={name} /></section>
       {admin ? (
         <>
           <AiSettings cfg={cfg} status={status} models={models} cli={localCliAllowed(actor)} />
-          <section className="sect"><h2>API 키 <span className="sp small muted">이 Mac 의 .secrets/(git 제외)에 저장 · 다시 보여 주지 않아요 · .env.local 값이 먼저</span></h2>
+          <section className="sect w-lg w-keys"><h2>API 키</h2>
+            <p className="small muted w-m0">이 Mac 의 .secrets/(git 제외)에 저장 · 다시 보여 주지 않아요 · .env.local 값이 먼저</p>
             {keys.map((k) => <KeyForm key={k.provider} {...k} />)}
           </section>
         </>
       ) : (
-        <section className="sect"><h2>AI</h2><p className="small muted" style={{ margin: 0 }}>AI 연결은 운영자가 정해요. 지금 연결: {cfg.enabled.filter((v) => v === "anthropic" || v === "openai").join(", ") || "없음"} (함께 쓰는 계정은 API 키 연결만 써요). 내 Claude·ChatGPT 구독으로 쓰려면 <a href="/connect">AI 앱 연결</a>.</p></section>
+        <section className="sect w-lg"><h2>AI</h2><p className="small muted" style={{ margin: 0 }}>AI 연결은 운영자가 정해요. 지금 연결: {cfg.enabled.filter((v) => v === "anthropic" || v === "openai").join(", ") || "없음"} (함께 쓰는 계정은 API 키 연결만 써요). 내 Claude·ChatGPT 구독으로 쓰려면 <a href="/connect">AI 앱 연결</a>.</p></section>
       )}
     </WideShell>
   );

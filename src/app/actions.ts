@@ -393,9 +393,9 @@ export async function patAction(_p: PatState, fd: FormData): Promise<PatState> {
   const actor = await requireAuth();
   const uid = actor.kind === "admin" ? "admin" : actor.id;
   try {
-    if (fd.get("op") === "revoke") { await revokeToken(uid, String(fd.get("id"))); revalidatePath("/account"); return { ok: "연결을 끊었어요" }; }
+    if (fd.get("op") === "revoke") { await revokeToken(uid, String(fd.get("id"))); revalidatePath("/account"); revalidatePath("/connect"); return { ok: "연결을 끊었어요" }; }
     const token = await createPat(uid, String(fd.get("name") ?? ""));
-    revalidatePath("/account");
+    revalidatePath("/account"); revalidatePath("/connect");
     return { token };
   } catch (e) { return { error: msg(e) }; }
 }

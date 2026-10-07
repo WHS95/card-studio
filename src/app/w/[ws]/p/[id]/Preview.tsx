@@ -72,10 +72,10 @@ export function Overlay({ n, total, layers, video, big, fmt = "feed" }: { n: num
 }
 
 export function LayerToggles({ layers, onChange }: { layers: Layers; onChange: (l: Layers) => void }) {
-  const t = (k: keyof Layers, label: string) => (
-    <label className="chip"><input type="checkbox" checked={layers[k]} onChange={(e) => onChange({ ...layers, [k]: e.target.checked })} />{label}</label>
+  const t = (k: keyof Layers, label: string, title: string) => (
+    <button type="button" className={`chip${layers[k] ? " on" : ""}`} aria-pressed={layers[k]} title={title} onClick={() => onChange({ ...layers, [k]: !layers[k] })}>{label}</button>
   );
-  return <div className="row">{t("grid", "그리드 3:4 잘림")}{t("safe", "안전 영역")}{t("ui", "인스타 UI (대략)")}</div>;
+  return <div className="ed-layers" role="group" aria-label="겹쳐 보기">{t("safe", "안전 영역", "글·장식이 이 안에 있어야 안 가려져요")}{t("grid", "그리드 3:4", "프로필 그리드에서 잘리는 부분 (표지)")}{t("ui", "인스타 UI", "인스타 화면 요소 자리 (대략)")}</div>;
 }
 
 /** 크게 보기: 인스타 피드 모양 + 겹침 + 영상 미리보기 */
@@ -94,26 +94,29 @@ export function Modal({ handle, imgs, n, total, caption, layers, setLayers, isVi
   const play = async () => { setBusy(true); const u = await renderVideo(n); setBusy(false); if (u) setVid({ n, url: u }); };
   const showVid = vid && vid.n === n;
   return (
-    <div className="modal" role="dialog" aria-modal onClick={onClose}>
-      <div className="sheet" onClick={(e) => e.stopPropagation()}>
-        <div className="row" style={{ justifyContent: "space-between" }}>
+    <div className="modal ed-modal" role="dialog" aria-modal aria-label={`크게 보기 ${n + 1}/${total}`} onClick={onClose}>
+      <div className="ed-sheet" onClick={(e) => e.stopPropagation()}>
+        <div className="ed-mhead">
+          <b>크게 보기 · {n + 1}/{total}</b>
           <LayerToggles layers={layers} onChange={setLayers} />
-          <button className="btn" onClick={onClose}>닫기</button>
+          <button type="button" className="btn" onClick={onClose}>닫기 Esc</button>
         </div>
-        <div className="igpost">
-          <div className="ighead"><span className="av" /><b>{handle.replace(/^@/, "") || "account"}</b></div>
-          <div className="igmedia" data-fmt={fmt}>
-            {showVid ? <video src={vid.url} controls autoPlay playsInline style={{ width: "100%", display: "block" }} />
-              : imgs[n] ? <img src={imgs[n]} alt={`${n + 1}번째 장`} /> : <div className="wait">그리는 중</div>}
-            <Overlay n={n} total={total} layers={layers} video={isVideo(n)} big fmt={fmt} />
-            {n > 0 && <button className="nav l" aria-label="이전 장" onClick={() => onMove(n - 1)}>‹</button>}
-            {n < total - 1 && <button className="nav r" aria-label="다음 장" onClick={() => onMove(n + 1)}>›</button>}
+        <div className="ed-mbody">
+          <button type="button" className="btn ed-mnav" aria-label="이전 장" disabled={n === 0} onClick={() => onMove(n - 1)}>←</button>
+          <div className="igpost">
+            <div className="ighead"><span className="av" /><b>{handle.replace(/^@/, "") || "account"}</b></div>
+            <div className="igmedia" data-fmt={fmt}>
+              {showVid ? <video src={vid.url} controls autoPlay playsInline style={{ width: "100%", display: "block" }} />
+                : imgs[n] ? <img src={imgs[n]} alt={`${n + 1}번째 장`} /> : <div className="wait">그리는 중</div>}
+              <Overlay n={n} total={total} layers={layers} video={isVideo(n)} big fmt={fmt} />
+            </div>
+            <div className="dots">{Array.from({ length: total }, (_, i) => <span key={i} className={i === n ? "on" : ""} />)}</div>
+            <p className="igcap"><b>{handle.replace(/^@/, "")}</b> {more || caption.length <= 125 ? caption : <>{caption.slice(0, 125)}… <button onClick={() => setMore(true)}>더 보기</button></>}</p>
           </div>
-          <div className="dots">{Array.from({ length: total }, (_, i) => <span key={i} className={i === n ? "on" : ""} />)}</div>
-          <p className="igcap"><b>{handle.replace(/^@/, "")}</b> {more || caption.length <= 125 ? caption : <>{caption.slice(0, 125)}… <button onClick={() => setMore(true)}>더 보기</button></>}</p>
-          <p className="small muted" style={{ margin: 0 }}>&apos;더 보기&apos; 위치는 기기·글자 폭에 따라 달라서 대략이에요 (약 125자 / 2줄).</p>
+          <button type="button" className="btn ed-mnav" aria-label="다음 장" disabled={n >= total - 1} onClick={() => onMove(n + 1)}>→</button>
         </div>
-        {isVideo(n) && <div className="row"><button className="btn primary" onClick={play} disabled={busy}>{busy ? "영상 만드는 중 (수십 초)" : showVid ? "영상 다시 만들기" : "▶ 영상으로 보기"}</button><span className="small muted">글 + 영상을 합친 실제 MP4예요</span></div>}
+        {isVideo(n) && <div className="ed-row ed-mplay"><button type="button" className="btn" onClick={play} disabled={busy}>{busy ? "영상 만드는 중 (수십 초)" : showVid ? "영상 다시 만들기" : "▶ 영상으로 보기"}</button><span>글 + 영상을 합친 실제 MP4예요</span></div>}
+        <p className="ed-mfoot">영상 장이면 여기서 재생돼요 · ←/→ 로 장 넘기기 · &apos;더 보기&apos; 위치는 기기마다 달라서 대략 (약 125자 / 2줄)</p>
       </div>
     </div>
   );

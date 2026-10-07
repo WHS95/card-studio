@@ -1,0 +1,122 @@
+/* 0.6 시안 리팩터 · stages 화면 전용 (이 파일만 그 담당이 고친다) */
+/* 1 목적 · 2 자료 조사 · 3 주제 · 4 템플릿. 모든 선택자는 stg- 로 시작 (다른 화면에 번지지 않게) */
+
+/* ── 공통: 머리(제목 + 오른쪽 검은 버튼, 누르면 아래로 펼침) ── */
+.stg-head { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; }
+.stg-head-t { flex: 1 1 320px; min-width: 0; }
+.stg-new { display: contents; }
+.stg-new > summary { list-style: none; }
+.stg-new > summary::-webkit-details-marker { display: none; }
+.stg-new-body { flex: 1 1 100%; margin-top: 4px; }
+.stg-new[open] > summary { background: var(--paper); color: var(--ink); }
+.stg-h2 { margin: 8px 0 0; font-size: 17px; display: flex; flex-wrap: wrap; gap: 8px; align-items: baseline; }
+.stg-h2 .small { font-weight: 500; }
+
+/* 거르기 줄: 넓으면 감싸고, 좁으면 옆으로 밀어 본다 */
+.stg-filters { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.stg-chips { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; min-width: 0; }
+.stg-chips .chip { padding: 7px 12px; }
+.stg-search { flex: 1 1 220px; min-width: 0; }
+.stg-search .input { min-height: 40px; }
+
+/* 카드(주제·자료) */
+.stg-list { gap: 16px; }
+.stg-card { background: #fff; border: 1px solid #e6e6e6; border-radius: 14px; padding: 14px 18px; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.stg-card[data-s=dropped] { opacity: .6; }
+.stg-card-t { display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: center; min-width: 0; }
+.stg-title { font-size: 15px; overflow-wrap: anywhere; }
+.stg-right { margin-left: auto; }
+.stg-url { font-size: 13px; overflow-wrap: anywhere; word-break: break-all; }
+.stg-text { margin: 0; font-size: 14px; line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; }
+.stg-p { margin: 0; }
+.stg-acts { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 2px; }
+.stg-acts > form { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.stg-auto { width: auto; max-width: 100%; }
+.stg-edit > summary { list-style: none; }
+.stg-edit > summary::-webkit-details-marker { display: none; }
+.stg-edit[open] { flex-basis: 100%; }
+.stg-edit[open] > summary { background: var(--ink); color: var(--paper); }
+.stg-edit-body { margin-top: 10px; padding: 14px; border-radius: 12px; background: #fafafa; border: 1px solid #eee; }
+.stg-scroll { max-height: 180px; overflow-y: auto; margin-top: 6px; }
+
+/* 주제: 골라서 달력에 */
+.stg-batch { display: flex; flex-direction: column; gap: 10px; }
+.stg-batch .pick { min-width: 0; flex-wrap: wrap; }
+.stg-pick-t { flex: 1 1 160px; font-size: 14px; min-width: 0; }
+.stg-num { display: inline-flex; align-items: center; justify-content: center; min-width: 22px; height: 22px; padding: 0 6px; border-radius: 999px; background: var(--ink); color: #fff; font-size: 11px; font-weight: 800; }
+.stg-bar-sel { width: auto; max-width: 100%; min-height: 36px; color: var(--ink); }
+
+/* ── 1 목적: 문서형 ── */
+.stg-brief { display: flex; flex-direction: column; gap: 16px; }
+.stg-fs { border: 0; margin: 0; padding: 0; min-width: 0; display: flex; flex-direction: column; gap: 16px; }
+.stg-dl { min-width: 0; }
+.stg-dl > span em { font-style: normal; }
+.stg-in { min-width: 0; margin: -4px -8px; padding: 4px 8px; width: calc(100% + 16px); border: 1px solid transparent; border-radius: 8px; background: transparent; color: var(--ink); font: inherit; font-size: 15px; line-height: 1.7; resize: none; field-sizing: content; }
+select.stg-in { appearance: auto; cursor: pointer; }
+.stg-in::placeholder { color: #9a9a9a; }
+.stg-in:hover:not(:disabled) { border-color: #e6e6e6; background: #fafafa; }
+.stg-in:focus { outline: none; border-color: var(--ink); background: #fff; }
+.stg-in:disabled { opacity: 1; cursor: default; }
+.stg-add { display: inline-flex; gap: 6px; align-items: center; align-self: flex-start; margin: 8px 0 4px; padding: 4px 8px; border: 0; border-radius: 8px; background: transparent; font: inherit; font-size: 13px; color: var(--muted); cursor: pointer; }
+.stg-add:hover:not(:disabled) { background: #f4f4f4; color: var(--ink); }
+.stg-add:disabled { opacity: .4; cursor: default; }
+.stg-addwrap { display: flex; flex-direction: column; gap: 6px; padding-bottom: 4px; }
+.stg-link { margin-left: 8px; padding: 0; border: 0; background: none; font: inherit; font-size: 12px; font-weight: 700; color: var(--ink); text-decoration: underline; cursor: pointer; }
+.stg-pillar { display: flex; flex-direction: column; gap: 8px; }
+.stg-prow { display: grid; grid-template-columns: 70px minmax(80px, 1fr) 48px minmax(0, 220px); gap: 10px; align-items: center; width: 100%; padding: 4px 0; border: 0; background: none; font: inherit; font-size: 14px; color: var(--ink); text-align: left; cursor: pointer; border-radius: 6px; }
+.stg-prow:hover:not(:disabled) .stg-pname { text-decoration: underline; }
+.stg-prow:disabled { cursor: default; }
+.stg-pname { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.stg-bar { height: 8px; border-radius: 999px; background: #eee; overflow: hidden; }
+.stg-bar > span { display: block; height: 100%; border-radius: 999px; background: var(--ink); }
+.stg-pct { text-align: right; }
+.stg-pdesc { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.stg-pedit { display: flex; flex-direction: column; gap: 10px; padding: 12px 14px; border-radius: 12px; background: #fafafa; border: 1px solid #eee; margin-bottom: 4px; }
+.stg-sum { margin-top: 4px; }
+.stg-rule { display: flex; gap: 10px; align-items: flex-start; padding: 6px 0; font-size: 14px; cursor: pointer; }
+.stg-rule input { width: 18px; height: 18px; margin: 3px 0 0; accent-color: var(--ink); flex-shrink: 0; }
+.stg-ul { margin: 0; padding-left: 18px; font-size: 14px; }
+.stg-ul li { padding: 4px 0; overflow-wrap: anywhere; }
+
+/* ── 4 템플릿 ── */
+.stg-tpls { display: flex; flex-wrap: wrap; gap: 12px; }
+.stg-tpl { display: flex; flex-direction: column; gap: 8px; align-items: center; padding: 10px; border-radius: 12px; border: 1px solid #e6e6e6; background: #fff; cursor: pointer; font-size: 15px; }
+.stg-tpl:has(input:checked) { border: 2px solid var(--ink); padding: 9px; }
+.stg-tpl img, .stg-tpl .wait { width: 110px; aspect-ratio: 4 / 5; object-fit: cover; border-radius: 6px; border: 1px solid #e6e6e6; display: flex; text-align: center; font-size: 11px; }
+.stg-tpl input { accent-color: var(--ink); margin: 0; }
+.stg-colors { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+.stg-color { display: flex; flex-direction: column; gap: 4px; min-width: 0; font-size: 13px; }
+.stg-color-l { font-weight: 700; }
+.stg-color-in { flex-wrap: nowrap; }
+.stg-swatch { flex-shrink: 0; width: 38px; height: 38px; padding: 0; border: 1px solid #e6e6e6; border-radius: 8px; background: none; cursor: pointer; }
+.stg-swatch::-webkit-color-swatch-wrapper { padding: 0; }
+.stg-swatch::-webkit-color-swatch { border: 0; border-radius: 7px; }
+.stg-swatch::-moz-color-swatch { border: 0; border-radius: 7px; }
+.stg-swatch:disabled { cursor: default; }
+.stg-hex { width: 110px; font-weight: 700; text-transform: uppercase; }
+.stg-wm { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-end; }
+.stg-wm-t { flex: 1 1 200px; min-width: 0; }
+.stg-color.compact .stg-hex { width: 96px; }
+.stg-prev { display: flex; flex-wrap: wrap; gap: 10px; }
+.stg-prev img { width: 180px; max-width: calc(50% - 5px); aspect-ratio: 4 / 5; object-fit: cover; border-radius: 6px; border: 1px solid #e6e6e6; background: #fff; }
+.stg-prev[data-fmt=reel] img { aspect-ratio: 9 / 16; }
+
+@media (max-width: 900px) {
+  .stg-colors { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .stg-prow { grid-template-columns: 64px minmax(60px, 1fr) 44px; }
+  .stg-pdesc { grid-column: 1 / -1; white-space: normal; }
+}
+@media (max-width: 600px) {
+  .stg-head > .btn, .stg-new > summary { width: 100%; }
+  .stg-chips { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; }
+  .stg-chips .chip { flex-shrink: 0; }
+  .stg-chips-search { flex-wrap: wrap; overflow-x: visible; }
+  .stg-search { flex-basis: 100%; }
+  .stg-card { padding: 12px; }
+  .stg-colors { grid-template-columns: minmax(0, 1fr); }
+  .stg-tpl img, .stg-tpl .wait { width: 92px; }
+  .stg-hex { width: 100%; min-width: 0; }
+  .stg-color-in { flex: 1; }
+  .stg-in { font-size: 16px; }
+}
+.stg-auto, .stg-bar-sel { padding-right: 30px; }

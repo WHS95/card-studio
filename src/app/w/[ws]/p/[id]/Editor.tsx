@@ -11,6 +11,9 @@ import { FieldInput, Media, VideoTune } from "./Parts";
 import { LayerToggles, Modal, Overlay, type Check, type Layers } from "./Preview";
 import AskAi from "../../../../AskAi";
 import { copyText } from "@/lib/client/copy";
+import Icon from "../../../../ui/Icon";
+import Manage from "./Manage";
+import MetricsForm from "./MetricsForm";
 
 type Ws = { id: string; handle: string; categories: string[]; slots: string[]; startDate: string | null; hashtags: string[]; cta: string; ai: boolean; veo: boolean; canEdit: boolean; canApprove: boolean; rules?: ContentRules; defaultTemplate: string };
 type Rec = Record<string, unknown>;
@@ -39,7 +42,9 @@ const HASHTAG_MAX = 30;
 const clock = () => Date.now(); // 이벤트 안에서만 부른다
 const tags = (s: string) => s.match(/#[^\s#]+/g) ?? [];
 
-export default function Editor({ ws, post }: { ws: Ws; post: Post }) {
+/** empty = 옮기거나 복제할 수 있는 빈 칸 (null 이면 게시물 관리 숨김: 보관함에 있거나 편집 권한 없음) */
+export default function Editor({ ws, post, empty }: { ws: Ws; post: Post; empty: string[] | null }) {
+  const [sel, setSel] = useState(0); // 가운데에서 고치는 장
   const [template, setTemplate] = useState(post.template);
   const t = templateOf(template);
   const fmt = formatOf(t);
@@ -47,6 +52,8 @@ export default function Editor({ ws, post }: { ws: Ws; post: Post }) {
   const [category, setCategory] = useState(post.category);
   const [data, setData] = useState<PostData>(() => post.data ?? t.draft({ title: post.title, category: post.category, handle: ws.handle }));
   const [dirty, setDirty] = useState(!post.data);
+  // 마지막으로 저장된 모양 (되돌려서 저장한 때와 같아지면 '저장됨'으로)
+  const savedSnap = useRef(post.data ? [post.template, post.title, post.category, JSON.stringify(post.data)].join("\n") : "");
   const [hist, setHist] = useState<{ past: PostData[]; future: PostData[] }>({ past: [], future: [] });
   const lastPush = useRef(0);
   const err = useMemo(() => validatePost(t, data), [t, data]);
@@ -55,12 +62,13 @@ export default function Editor({ ws, post }: { ws: Ws; post: Post }) {
 
   const [state, save, saving] = useActionState(async (prev: SaveState, fd: FormData) => {
     const r = await savePostAction(prev, fd);
-    if (r?.ok) setDirty(false);
+    if (r?.ok) { setDirty(false); savedSnap.current = ["template", "title", "category", "data"].map((k) => String(fd.get(k) ?? "")).join("\n"); }
     return r;
   }, undefined);
 
   /** 고치기 + 되돌리기 기록 (같은 칸을 연달아 칠 때는 0.8초 안이면 한 번으로) */
   const edit = (fn: (d: PostData) => PostData) => {
+    if (!ws.canEdit) return; // 검수자는 보기만
     const now = clock();
     if (now - lastPush.current > 800) setHist((h) => ({ past: [...h.past.slice(-49), data], future: [] }));
     else setHist((h) => ({ ...h, future: [] }));
@@ -68,15 +76,17 @@ export default function Editor({ ws, post }: { ws: Ws; post: Post }) {
     setData((d) => fn(structuredClone(d)));
     setDirty(true);
   };
+  const isDirty = (d: PostData) => [template, title, category, JSON.stringify(d)].join("\n") !== savedSnap.current;
   const undo = () => {
     if (!hist.past.length) return;
     setHist({ past: hist.past.slice(0, -1), future: [data, ...hist.future] });
-    setData(hist.past[hist.past.length - 1]); setDirty(true); lastPush.current = 0;
+    const d = hist.past[hist.past.length - 1];
+    setData(d); setDirty(isDirty(d)); lastPush.current = 0;
   };
   const redo = () => {
     if (!hist.future.length) return;
     setHist({ past: [...hist.past, data], future: hist.future.slice(1) });
-    setData(hist.future[0]); setDirty(true); lastPush.current = 0;
+    setData(hist.future[0]); setDirty(isDirty(hist.future[0])); lastPush.current = 0;
   };
   const setSlide = (i: number, patch: Rec) => edit((d) => { d.slides[i] = { ...d.slides[i], ...patch }; return d; });
 
@@ -163,185 +173,226 @@ export default function Editor({ ws, post }: { ws: Ws; post: Post }) {
     setTemplate(id);
     setData({ ...next, photos: data.photos, caption: data.caption });
     setHist({ past: [], future: [] });
+    setSel(0);
     setDirty(true);
   };
 
-  const move = (i: number, by: number) => edit((d) => { const j = i + by; [d.slides[i], d.slides[j]] = [d.slides[j], d.slides[i]]; return d; });
+  const last = data.slides.length - 1;
+  const cur = Math.max(0, Math.min(sel, last));
+  const move = (i: number, by: number) => { edit((d) => { const j = i + by; [d.slides[i], d.slides[j]] = [d.slides[j], d.slides[i]]; return d; }); setSel(i + by); };
   const canMove = (i: number, by: number) => { const j = i + by; return j >= 0 && j < data.slides.length && !kindOf(data.slides[i].kind)?.fixed && !kindOf(data.slides[j].kind)?.fixed; };
+  const duplicate = (i: number) => { edit((d) => { d.slides.splice(i + 1, 0, structuredClone(d.slides[i])); return d; }); setSel(i + 1); };
+  const remove = (i: number) => { edit((d) => { d.slides.splice(i, 1); return d; }); setSel(Math.max(0, Math.min(i, last - 1))); };
+  const addRef = useRef<HTMLDetailsElement>(null);
+  const addKind = (k: SlideKind) => {
+    const lastK = kindOf(data.slides[last].kind);
+    // 마무리 장이 맨 끝이면 그 앞에 넣는다
+    const at = last > 0 && lastK === t.kinds[t.kinds.length - 1] && k !== lastK ? last : data.slides.length;
+    edit((d) => { d.slides.splice(at, 0, withPlaceholders(k.fields, k.blank()) as SlideData); return d; });
+    setSel(at);
+    if (addRef.current) addRef.current.open = false;
+  };
   const saved = (post.data || state?.ok) && !dirty;
-  const badChecks = checks?.filter((c) => !c.ok) ?? [];
+  const savedLen = post.data?.slides.length ?? data.slides.length;
+  const warns = ruleWarnings(ws.rules, ws.defaultTemplate, template, data);
+  const reasons = (n: number) => warns.filter((w) => w.slide === n + 1).map((w) => WARN_SHORT[w.rule] ?? "규칙");
+
+  const s = data.slides[cur];
+  const k = s && kindOf(s.kind);
+  const vid = videoAt(cur);
+  const tune = k?.fields.find((f) => f.type === "photo" && f.tune && typeof s[f.key] === "number");
+  const firstPart = data.caption.split("\n").filter((x) => x.trim()).slice(0, 2).join(" ");
+  const moreCut = firstPart.length > 125 || data.caption.split("\n").filter((x) => x.trim()).length > 2;
+  const saveBtn = (cls: string) => (
+    <button type="submit" form="ed-save" className={cls} disabled={!!err || saving || !ws.canEdit} title="⌘S">{saving ? "저장하는 중" : <>저장<span className="ed-kbd"> ⌘S</span></>}</button>
+  );
 
   return (
-    <>
-      <div className="row" style={{ justifyContent: "space-between" }}>
-        <div className="row">
-          <Link href={`/w/${ws.id}`} className="btn">← 달력</Link>
-          <strong>D{post.day} · {post.slot}</strong>
-          <span className="small muted">{STATUS_LABEL[post.status]}</span>
-          {dirty && <span className="badge">저장 안 됨</span>}
-          <button type="button" className="btn" onClick={undo} disabled={!hist.past.length} title="⌘Z">되돌리기</button>
-          <button type="button" className="btn" onClick={redo} disabled={!hist.future.length} title="⇧⌘Z">다시</button>
+    <div className="ed-root">
+      <form id="ed-save" ref={formRef} action={save} hidden>
+        <input type="hidden" name="id" value={post.id} />
+        <input type="hidden" name="template" value={template} />
+        <input type="hidden" name="title" value={title} />
+        <input type="hidden" name="category" value={category} />
+        <input type="hidden" name="data" value={JSON.stringify(data)} />
+      </form>
+
+      <div className="ed-top">
+        <Link href={`/w/${ws.id}`} className="ed-back">← 달력</Link>
+        <b className="ed-title">D{post.day} {post.slot} · {title || "제목 없음"}</b>
+        <span className="ed-pill">{STATUS_LABEL[post.status]}</span>
+        <span className="ed-meta">{dirty ? <b>저장 안 됨</b> : "저장됨"} · {t.name} · {category}</span>
+        <div className="ed-actions">
+          <span className="ed-state">{dirty ? "저장 안 됨" : "저장됨"}</span>
+          <button type="button" className="btn ed-undo" onClick={undo} disabled={!hist.past.length} title="⌘Z">되돌리기</button>
+          <button type="button" className="btn ed-redo" onClick={redo} disabled={!hist.future.length} title="⇧⌘Z">다시</button>
+          {saveBtn("btn ed-save")}
+          <StatusBar post={post} dirty={dirty} canEdit={ws.canEdit} canApprove={ws.canApprove} wsId={ws.id} />
         </div>
-        <StatusBar post={post} dirty={dirty} canEdit={ws.canEdit} canApprove={ws.canApprove} wsId={ws.id} />
       </div>
-      <RuleWarnings ws={ws} template={template} data={data} />
-      <div className="ed">
-        <div className="panel">
-          <div className="block">
-            <div className="row">
-              <label className="fld" style={{ flex: 2, minWidth: 220 }}>기획 제목<input className="input" value={title} maxLength={80} onChange={(e) => { setTitle(e.target.value); setDirty(true); }} /></label>
-              <label className="fld" style={{ flex: 1, minWidth: 120 }}>카테고리
+      {(err || state?.error || (state?.ok && !dirty) || !ws.canEdit) && (
+        <div className="ed-msgs">
+          {!ws.canEdit && <span className="small muted">검수자는 보고 승인만 해요 (고치기는 편집자·소유자)</span>}
+          {err ? <span className="err">{err}</span> : state?.error ? <span className="err">{state.error}</span> : state?.ok && !dirty ? <span className="small">저장했어요</span> : null}
+        </div>
+      )}
+
+      <div className="ed-grid">
+        {warns.length > 0 && (
+          <div className="ed-warn" role="status">
+            <Icon name="warn" size={16} />
+            <b>규칙 경고 {warns.length}</b>
+            <span className="ed-warn-t">{warns.map((w) => w.text).join(" · ")}</span>
+            <span className="ed-warn-r">저장은 돼요 · 승인 창에도 떠요</span>
+          </div>
+        )}
+
+        <nav className="ed-list" aria-label="장 목록">
+          {data.slides.map((sl, n) => {
+            const kk = kindOf(sl.kind);
+            const c = checks?.[n];
+            const why = [...reasons(n), ...(c && !err && !c.ok ? [`밖 ${c.outside}`] : [])];
+            return (
+              <button key={n} type="button" className="ed-slide" aria-current={n === cur ? "true" : undefined} onClick={() => setSel(n)} title={`${n + 1}장 고치기`}>
+                <span className="ed-sthumb" data-fmt={fmt}>{imgs[n] ? <img src={imgs[n]} alt="" /> : null}{videoAt(n) && <i className="play">▶</i>}</span>
+                <span className="ed-sinfo">
+                  <b>{n + 1} {kk?.label ?? "없는 종류"}</b>
+                  <span>{why.length ? `⚠ ${why.join(" · ")}` : c && !err ? "✓" : ""}</span>
+                </span>
+              </button>
+            );
+          })}
+          {ws.canEdit && (
+            <details className="ed-add" ref={addRef}>
+              <summary className="btn">+ 장 더하기</summary>
+              <div className="ed-add-menu">
+                {t.kinds.filter((x) => !x.fixed).map((x) => (
+                  <button key={x.kind} type="button" className="btn" disabled={data.slides.length >= t.maxSlides} onClick={() => addKind(x)}>{x.label}</button>
+                ))}
+              </div>
+            </details>
+          )}
+          <span className="ed-count">{data.slides.length}/{t.maxSlides}장</span>
+        </nav>
+
+        <fieldset className="ed-mid" disabled={!ws.canEdit}>
+          {!k ? <section className="ed-card ed-fields"><p className="err">{cur + 1}번째 장: 이 템플릿에 없는 종류예요</p></section> : (
+            <section className="ed-card ed-fields" aria-label={`${cur + 1}장 칸`}>
+              <h2>{cur + 1}장 · {k.label}{vid && <span className="badge">영상</span>}</h2>
+              {k.fields.map((f) => <FieldInput key={`${cur}-${f.key}`} f={f} v={s[f.key]} photos={data.photos} onChange={(v) => setSlide(cur, { [f.key]: v })} />)}
+              {tune && tune.type === "photo" && (
+                <div className="tune">
+                  {tune.tune!.includes("h") && <label className="fld">{vid ? "영상" : "사진"} 높이 {Number(s.photoH ?? PHOTO_H.default)}% <em>나머지가 검은 글 칸</em>
+                    <input type="range" min={PHOTO_H.min} max={PHOTO_H.max} value={Number(s.photoH ?? PHOTO_H.default)} onChange={(e) => setSlide(cur, { photoH: Number(e.target.value) })} /></label>}
+                  {tune.tune!.includes("y") && <label className="fld">{vid ? "영상" : "사진"} 위치 {Number(s.photoY ?? 50)}% <em>위 ↔ 아래</em>
+                    <input type="range" min={0} max={100} value={Number(s.photoY ?? 50)} onChange={(e) => setSlide(cur, { photoY: Number(e.target.value) })} /></label>}
+                </div>
+              )}
+              {vid && <VideoTune s={s} video={vid} max={t.videoMax} onChange={(p) => setSlide(cur, p)} />}
+              {!k.fixed ? (
+                <div className="ed-row">
+                  <button type="button" className="btn" aria-label="위로" title="위로" disabled={!canMove(cur, -1)} onClick={() => move(cur, -1)}>↑</button>
+                  <button type="button" className="btn" aria-label="아래로" title="아래로" disabled={!canMove(cur, 1)} onClick={() => move(cur, 1)}>↓</button>
+                  <button type="button" className="btn" disabled={data.slides.length >= t.maxSlides} onClick={() => duplicate(cur)}>복제</button>
+                  <button type="button" className="btn" disabled={data.slides.length <= 1} onClick={() => remove(cur)}>빼기</button>
+                </div>
+              ) : <p className="ed-note">이 장은 자리가 정해져 있어요 (옮기기·빼기 없음)</p>}
+            </section>
+          )}
+
+          <Media ws={ws.id} veo={ws.veo && ws.canEdit} photos={data.photos} onChange={(photos, removed) => edit((d) => {
+            if (removed !== undefined) d.slides = d.slides.map((x) => shiftPhotos(kindOf(x.kind)?.fields ?? [], x, removed) as SlideData);
+            d.photos = photos; return d;
+          })} />
+
+          <details className="ed-card ed-plan">
+            <summary><h2>기획 · AI 초안</h2><span className="ed-note">제목 · 카테고리 · 템플릿</span></summary>
+            <label className="fld">기획 제목<input className="input" value={title} maxLength={80} onChange={(e) => { setTitle(e.target.value); setDirty(true); }} /></label>
+            <div className="ed-two">
+              <label className="fld">카테고리
                 <select className="input" value={category} onChange={(e) => { setCategory(e.target.value); setDirty(true); }}>
                   {[...new Set([category, ...ws.categories])].filter(Boolean).map((c) => <option key={c}>{c}</option>)}
                 </select>
               </label>
-              <label className="fld" style={{ flex: 1, minWidth: 120 }}>템플릿
+              <label className="fld">템플릿
                 <select className="input" value={template} onChange={(e) => switchTemplate(e.target.value)}>{TEMPLATES.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select>
               </label>
             </div>
-            {post.note && <p className="small muted" style={{ margin: 0, whiteSpace: "pre-wrap" }}>메모: {post.note}</p>}
-          </div>
+            <AiDraft ws={ws} postId={post.id} onDraft={async (extra) => {
+              const r = await aiDraftAction({ post: post.id, template, title, category, current: data, extra });
+              if (r?.ok) { const d = r.ok; edit(() => d); }
+              return r?.error ?? null;
+            }} />
+          </details>
+        </fieldset>
 
-          <AiDraft ws={ws} postId={post.id} onDraft={async (extra) => {
-            const r = await aiDraftAction({ post: post.id, template, title, category, current: data, extra });
-            if (r?.ok) { const d = r.ok; edit(() => d); }
-            return r?.error ?? null;
-          }} />
+        <div className="ed-right">
+          <section className="ed-card ed-prev">
+            <h2>미리보기 · {cur + 1}장<span className="ed-sub">{fmt === "reel" ? "1080×1920 릴스" : "1080×1350"}</span></h2>
+            <button type="button" className="frame ed-bigframe" data-fmt={fmt} onClick={() => setOpen(cur)} aria-label={`${cur + 1}번째 장 크게 보기`}>
+              {imgs[cur] ? <img src={imgs[cur]} alt="" /> : <div className="wait">그리는 중</div>}
+              <Overlay n={cur} total={data.slides.length} layers={layers} video={!!vid} fmt={fmt} />
+              {vid && <i className="play">▶ 영상</i>}
+            </button>
+            <div className="ed-row">
+              <LayerToggles layers={layers} onChange={setLayers} />
+              <button type="button" className="btn" onClick={() => setOpen(cur)}>크게 보기</button>
+            </div>
+            <p className="ed-margin">
+              {err ? <span className="err">미리보기를 멈췄어요: {err}</span>
+                : !checks ? "인스타 마진: 계산 중"
+                : <>인스타 마진: {checks.map((c, i) => <span key={i} className={c.ok ? undefined : "ed-bad"}>{i > 0 ? " · " : ""}{c.n} {c.ok ? "✓" : `밖 ${c.outside}`}</span>)}</>}
+            </p>
+          </section>
 
-          <Media ws={ws.id} veo={ws.veo && ws.canEdit} photos={data.photos} onChange={(photos, removed) => edit((d) => {
-            if (removed !== undefined) d.slides = d.slides.map((s) => shiftPhotos(kindOf(s.kind)?.fields ?? [], s, removed) as SlideData);
-            d.photos = photos; return d;
-          })} />
-
-          {data.slides.map((s, i) => {
-            const k = kindOf(s.kind);
-            if (!k) return <div key={i} className="block err">{i + 1}번째 장: 이 템플릿에 없는 종류예요</div>;
-            const tune = k.fields.find((f) => f.type === "photo" && f.tune && typeof s[f.key] === "number");
-            const vid = videoAt(i);
-            return (
-              <div key={i} className="block">
-                <div className="bh">
-                  <strong>{i + 1}. {k.label}{vid && <span className="badge">영상</span>}</strong>
-                  {!k.fixed && <span>
-                    <button type="button" aria-label="위로" disabled={!canMove(i, -1)} onClick={() => move(i, -1)}>↑</button>
-                    <button type="button" aria-label="아래로" disabled={!canMove(i, 1)} onClick={() => move(i, 1)}>↓</button>
-                    <button type="button" aria-label="복제" title="복제" disabled={data.slides.length >= t.maxSlides} onClick={() => edit((d) => { d.slides.splice(i + 1, 0, structuredClone(d.slides[i])); return d; })}>⧉</button>
-                    <button type="button" aria-label="빼기" disabled={data.slides.length <= 1} onClick={() => edit((d) => { d.slides.splice(i, 1); return d; })}>✕</button>
-                  </span>}
-                </div>
-                {k.fields.map((f) => <FieldInput key={f.key} f={f} v={s[f.key]} photos={data.photos} onChange={(v) => setSlide(i, { [f.key]: v })} />)}
-                {tune && tune.type === "photo" && (
-                  <div className="tune">
-                    {tune.tune!.includes("h") && <label className="fld">{vid ? "영상" : "사진"} 높이 {Number(s.photoH ?? PHOTO_H.default)}% <em>나머지가 검은 글 칸</em>
-                      <input type="range" min={PHOTO_H.min} max={PHOTO_H.max} value={Number(s.photoH ?? PHOTO_H.default)} onChange={(e) => setSlide(i, { photoH: Number(e.target.value) })} /></label>}
-                    {tune.tune!.includes("y") && <label className="fld">{vid ? "영상" : "사진"} 위치 {Number(s.photoY ?? 50)}% <em>위 ↔ 아래</em>
-                      <input type="range" min={0} max={100} value={Number(s.photoY ?? 50)} onChange={(e) => setSlide(i, { photoY: Number(e.target.value) })} /></label>}
-                  </div>
-                )}
-                {vid && <VideoTune s={s} video={vid} max={t.videoMax} onChange={(p) => setSlide(i, p)} />}
-              </div>
-            );
-          })}
-
-          <div className="row">
-            {t.kinds.filter((k) => !k.fixed).map((k) => (
-              <button key={k.kind} type="button" className="btn" disabled={data.slides.length >= t.maxSlides} onClick={() => edit((d) => {
-                const last = d.slides.length - 1, lastK = kindOf(d.slides[last].kind);
-                // 마무리 장이 맨 끝이면 그 앞에 넣는다
-                const at = last > 0 && lastK === t.kinds[t.kinds.length - 1] && k !== lastK ? last : d.slides.length;
-                d.slides.splice(at, 0, withPlaceholders(k.fields, k.blank()) as SlideData); return d;
-              })}>+ {k.label}</button>
-            ))}
-            <span className="small muted">{data.slides.length}/{t.maxSlides}장</span>
-          </div>
-
-          <div className="block">
-            <label className="fld">캡션 <em>{data.caption.length}/2200 · 해시태그 <b style={tagCount > HASHTAG_MAX ? { color: "#111111", textDecoration: "underline" } : undefined}>{tagCount}/{HASHTAG_MAX}</b> · 사진 출처는 복사할 때 끝에 붙어요</em>
-              <textarea className="input" rows={8} value={data.caption} maxLength={2200} onChange={(e) => edit((d) => { d.caption = e.target.value; return d; })} />
-            </label>
-            {ws.hashtags.length > 0 && <div className="row">
+          <section className="ed-card ed-cap">
+            <h2>캡션<button type="button" className="btn ed-hbtn" onClick={copy}>{copied ? "복사했어요" : "캡션 복사"}</button></h2>
+            <textarea className="input" aria-label="캡션" rows={8} readOnly={!ws.canEdit} value={data.caption} maxLength={2200} onChange={(e) => edit((d) => { d.caption = e.target.value; return d; })} />
+            <p className="ed-note">
+              {data.caption.length}/2200 · 해시태그 <b className={tagCount > HASHTAG_MAX ? "ed-bad" : undefined}>{tagCount}/{HASHTAG_MAX}</b>
+              {firstPart && <> · &apos;더 보기&apos; 전: {firstPart.slice(0, 125)}{moreCut ? "…" : ""}</>} · 사진 출처는 끝에 자동
+            </p>
+            {tagCount > HASHTAG_MAX && <p className="err">인스타는 해시태그 {HASHTAG_MAX}개까지만 받아요</p>}
+            {ws.hashtags.length > 0 && ws.canEdit && <div className="ed-row">
               <button type="button" className="btn" onClick={() => edit((d) => { const have = new Set(tags(d.caption)); const add = ws.hashtags.filter((h) => !have.has(h)); if (add.length) d.caption = `${d.caption.trimEnd()}${d.caption.trim() ? "\n\n" : ""}${add.join(" ")}`.slice(0, 2200); return d; })}>기본 해시태그 넣기</button>
               {ws.cta && <button type="button" className="btn" onClick={() => edit((d) => { if (!d.caption.includes(ws.cta)) d.caption = `${d.caption.trimEnd()}${d.caption.trim() ? "\n\n" : ""}${ws.cta}`.slice(0, 2200); return d; })}>기본 CTA 넣기</button>}
-              <span className="small muted">브리프에서 정한 값</span>
+              <span className="ed-note">브리프에서 정한 값</span>
             </div>}
-            {tagCount > HASHTAG_MAX && <p className="err">인스타는 해시태그 {HASHTAG_MAX}개까지만 받아요</p>}
-            {data.caption && <p className="small" style={{ margin: 0 }}><b>피드에 먼저 보이는 부분 (대략)</b><br />{data.caption.split("\n").slice(0, 2).join(" ").slice(0, 125)}{data.caption.length > 125 || data.caption.split("\n").length > 2 ? "… 더 보기" : ""}</p>}
-          </div>
+          </section>
 
-          <form ref={formRef} action={save} className="bar">
-            <input type="hidden" name="id" value={post.id} />
-            <input type="hidden" name="template" value={template} />
-            <input type="hidden" name="title" value={title} />
-            <input type="hidden" name="category" value={category} />
-            <input type="hidden" name="data" value={JSON.stringify(data)} />
-            <button className="btn primary" disabled={!!err || saving || !ws.canEdit} title="⌘S">{saving ? "저장하는 중" : "저장"}</button>
-            {!ws.canEdit && <span className="small muted">검수자는 보고 승인만 해요 (고치기는 편집자·소유자)</span>}
-            {err ? <p className="err">{err}</p> : state?.error ? <p className="err">{state.error}</p> : state?.ok && !dirty ? <span className="small">저장했어요</span> : null}
-          </form>
-        </div>
-
-        <div className="prev">
-          <div className="row" style={{ justifyContent: "space-between" }}>
-            <strong>미리보기 · {fmt === "reel" ? "1080×1920 릴스" : "1080×1350"}</strong>
-            <span className="row">
-              <button type="button" className="btn" onClick={copy}>{copied ? "복사했어요" : "캡션 복사"}</button>
-              {saved ? <>
-                <a className="btn" href={`/api/posts/${post.id}/zip`}>전체 ZIP</a>
-                {fmt === "feed" && <a className="btn" href={`/api/posts/${post.id}/reel?secs=3`} title="장마다 3초, 9:16 MP4 (소리 없음 — 인스타에서 음악을 골라요). 장 수만큼 시간이 걸려요">릴스로 (MP4)</a>}
-              </> : <span className="small muted">저장 후 내려받기</span>}
-            </span>
-          </div>
-          <LayerToggles layers={layers} onChange={setLayers} />
-          <p className={`small ${badChecks.length ? "err" : ""}`} style={{ margin: 0 }}>
-            {err ? "" : !checks ? "안전 영역 계산 중" : badChecks.length ? `안전 영역 밖으로 나간 장: ${badChecks.map((c) => c.n).join(", ")}` : `글·장식이 모두 안전 영역 안이에요 (표지 ${checks[0]?.zone === "cover" ? "그리드 기준" : ""} · ${checks.length}장)`}
-          </p>
-          <div className="thumbs" data-fmt={fmt}>
-            {data.slides.map((_, n) => {
-              const vid = !!videoAt(n);
-              const c = checks?.[n];
-              return (
-                <div key={n}>
-                  <button type="button" className="frame" onClick={() => setOpen(n)} aria-label={`${n + 1}번째 장 크게 보기`}>
-                    {imgs[n] ? <img src={imgs[n]} alt="" /> : <div className="wait">그리는 중</div>}
-                    <Overlay n={n} total={data.slides.length} layers={layers} video={vid} fmt={fmt} />
-                    {vid && <i className="play">▶ 영상</i>}
-                  </button>
-                  <div className="cap">
-                    <span>{n + 1}{c && !err ? (c.ok ? " ✓" : ` · 밖 ${c.outside}`) : ""}</span>
-                    {saved && n < (post.data?.slides.length ?? data.slides.length)
-                      ? <a href={`/api/posts/${post.id}/slide/${n + 1}?download=1`}><button type="button">{vid ? "MP4" : "PNG"}</button></a>
-                      : <span className="muted">저장 후</span>}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-          {err && <p className="err">미리보기를 멈췄어요: {err}</p>}
+          <section className="ed-card ed-out">
+            <h2>내려받기 · 게시물 관리</h2>
+            <div className="ed-row">
+              {saved && cur < savedLen
+                ? <a className="btn" href={`/api/posts/${post.id}/slide/${cur + 1}?download=1`}>이 장 {vid ? "MP4" : "PNG"}</a>
+                : <button type="button" className="btn" disabled>이 장 {vid ? "MP4" : "PNG"}</button>}
+              {saved ? <a className="btn" href={`/api/posts/${post.id}/zip`}>전체 ZIP</a> : <button type="button" className="btn" disabled>전체 ZIP</button>}
+              {fmt === "feed" && (saved
+                ? <a className="btn" href={`/api/posts/${post.id}/reel?secs=3`} title="장마다 3초, 9:16 MP4 (소리 없음 — 인스타에서 음악을 골라요). 장 수만큼 시간이 걸려요">릴스 MP4로</a>
+                : <button type="button" className="btn" disabled>릴스 MP4로</button>)}
+            </div>
+            {!saved && <p className="ed-note">저장한 뒤 내려받을 수 있어요</p>}
+            {empty && <Manage ws={ws.id} id={post.id} posted={post.status === "posted"} empty={empty} />}
+            <p className="ed-note ed-pre">
+              {post.note ? `자료 연결: ${post.note}` : "자료 연결: 없음"}
+              {post.status !== "posted" && " · 게시 뒤엔 여기에 '게시 성과'(도달·좋아요·댓글·저장·공유·팔로우) 칸이 생겨요."}
+            </p>
+            {post.status === "posted" && <div id="metrics"><MetricsForm id={post.id} m={post.metrics} /></div>}
+          </section>
         </div>
       </div>
       {open !== null && open < data.slides.length && (
         <Modal handle={ws.handle} imgs={imgs} n={open} total={data.slides.length} caption={fullCaption} layers={layers} setLayers={setLayers}
           isVideo={(n) => !!videoAt(n)} renderVideo={renderVideo} onClose={() => setOpen(null)} onMove={setOpen} fmt={fmt} />
       )}
-    </>
-  );
-}
-
-const STATUS_BTN: Record<string, string> = { approved: "승인하기", posted: "게시 표시", draft: "초안으로", skip: "건너뛰기" };
-
-/** 상태 바꾸기: 저장 안 된 고침이 있으면 막는다 (화면과 다른 버전이 승인되지 않게) */
-/** 콘텐츠 규칙 경고 (브리프 · 저장은 막지 않는다) */
-function RuleWarnings({ ws, template, data }: { ws: Ws; template: string; data: PostData | null }) {
-  const w = ruleWarnings(ws.rules, ws.defaultTemplate, template, data);
-  if (!w.length) return null;
-  return (
-    <div className="block" role="status" style={{ borderWidth: 1.5 }}>
-      <div className="bh"><strong className="small">콘텐츠 규칙 · 경고 {w.length}</strong><span className="small muted">저장은 돼요 · 승인 창에도 떠요</span></div>
-      {w.map((x, i) => <span key={i} className="small">⚠ {x.text}</span>)}
     </div>
   );
 }
 
+const WARN_SHORT: Record<string, string> = { photoEvery: "사진", coverQuestion: "질문", ctaComment: "댓글" };
+const STATUS_BTN: Record<string, string> = { approved: "승인하기", posted: "게시 표시", draft: "초안으로", skip: "건너뛰기" };
+
+/** 상태 바꾸기: 저장 안 된 고침이 있으면 막는다 (화면과 다른 버전이 승인되지 않게) */
 function StatusBar({ post, dirty, canEdit, canApprove, wsId }: { post: Post; dirty: boolean; canEdit: boolean; canApprove: boolean; wsId: string }) {
   const [st, act, pending] = useActionState(setStatusAction, undefined);
   // 역할에 맞는 버튼만: 승인·게시 표시·게시 취소 = 검수 권한, 나머지 = 편집 권한 (서버도 같은 규칙)
@@ -349,7 +400,7 @@ function StatusBar({ post, dirty, canEdit, canApprove, wsId }: { post: Post; dir
   // 저장된 내용이 있는데 고친 게 저장 안 됐으면 막는다 (내용 없는 기획·건너뜀은 그대로 바꿀 수 있다)
   const block = dirty && !!post.data;
   return (
-    <form action={act} className="row">
+    <form action={act} className="ed-status">
       <input type="hidden" name="id" value={post.id} />
       {block && next.length > 0 && <span className="small muted">저장한 뒤 상태를 바꿔요</span>}
       {st?.error && <span className="err">{st.error}</span>}

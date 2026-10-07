@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { PHOTOS_MAX, VIDEO_DUR, type Field, type TextField } from "@/lib/fields";
 import type { Photo, SlideData } from "@/lib/types";
+import Icon from "../../../../ui/Icon";
 
 type Rec = Record<string, unknown>;
 const lines = (s: string) => s.split("\n").length;
@@ -115,6 +116,7 @@ export function Media({ ws, photos, onChange, veo = false }: { ws: string; photo
   const [url, setUrl] = useState("");
   const [credit, setCredit] = useState("");
   const [msg, setMsg] = useState("");
+  const [veoOpen, setVeoOpen] = useState(false);
   const full = photos.length >= PHOTOS_MAX;
   const add = () => {
     let u: URL;
@@ -137,24 +139,30 @@ export function Media({ ws, photos, onChange, veo = false }: { ws: string; photo
     setMsg("");
   };
   return (
-    <div className="block">
-      <div className="bh"><strong>사진·영상 {photos.length}/{PHOTOS_MAX}</strong><span className="small muted">장마다 아래에서 골라 써요 · 영상은 직접 올린 것만</span></div>
-      {photos.map((p, i) => (
-        <div key={i} className="photo-row">
-          <span className="thumb"><img src={thumbOf(p)} alt="" />{p.kind === "video" && <i className="play">▶ {Math.round(p.duration ?? 0)}초</i>}</span>
-          <input className="input" placeholder="출처 (예: 촬영자 이름)" value={p.credit} onChange={(e) => onChange(photos.map((x, j) => (j === i ? { ...x, credit: e.target.value.slice(0, 60) } : x)))} />
-          <button type="button" className="btn" onClick={() => onChange(photos.filter((_, j) => j !== i), i)}>빼기</button>
-        </div>
-      ))}
-      <div className="row">
-        <input className="input" style={{ flex: 2, minWidth: 200 }} placeholder="무료 사진 주소 (https://images.unsplash.com/…)" value={url} onChange={(e) => setUrl(e.target.value)} disabled={full} />
-        <input className="input" style={{ flex: 1, minWidth: 120 }} placeholder="출처" value={credit} onChange={(e) => setCredit(e.target.value)} disabled={full} />
+    <section className="ed-card ed-media" aria-label="사진·영상">
+      <h2>사진·영상<span className="ed-sub">{photos.length}/{PHOTOS_MAX} · 장마다 위 사진 칸에서 골라 써요</span></h2>
+      {photos.length > 0 && <div className="ed-pool">
+        {photos.map((p, i) => (
+          <div key={i} className="ed-tile">
+            <span className="ed-tile-img"><img src={thumbOf(p)} alt={`${p.kind === "video" ? "영상" : "사진"} ${i + 1}`} />{p.kind === "video" && <i className="play">▶ {Math.round(p.duration ?? 0)}초</i>}
+              <button type="button" className="ed-tile-x" aria-label={`${i + 1}번 빼기`} title="빼기" onClick={() => onChange(photos.filter((_, j) => j !== i), i)}>✕</button></span>
+            <input className="input" aria-label={`${i + 1}번 출처`} placeholder="출처" value={p.credit} onChange={(e) => onChange(photos.map((x, j) => (j === i ? { ...x, credit: e.target.value.slice(0, 60) } : x)))} />
+          </div>
+        ))}
+      </div>}
+      <input className="input" aria-label="무료 사진 주소" placeholder="무료 사진 주소 (images.unsplash.com/…)" value={url} onChange={(e) => setUrl(e.target.value)} disabled={full} />
+      <div className="ed-row ed-nowrap">
+        <input className="input" aria-label="출처" placeholder="출처 (사진가)" value={credit} onChange={(e) => setCredit(e.target.value)} disabled={full} />
         <button type="button" className="btn" onClick={add} disabled={full || !url}>더하기</button>
-        <label className="btn" style={full ? { opacity: .4 } : undefined}>직접 올리기<input type="file" accept="image/jpeg,image/png,video/mp4,video/quicktime" multiple hidden disabled={full} onChange={(e) => { pick(e.target.files); e.target.value = ""; }} /></label>
+      </div>
+      <div className="ed-row">
+        <label className="btn" style={full ? { opacity: .4 } : undefined}>직접 올리기 (사진 8MB · 영상 300MB)<input type="file" accept="image/jpeg,image/png,video/mp4,video/quicktime" multiple hidden disabled={full} onChange={(e) => { pick(e.target.files); e.target.value = ""; }} /></label>
+        {veo && <button type="button" className="btn" aria-expanded={veoOpen} onClick={() => setVeoOpen(!veoOpen)}><Icon name="spark" size={14} />AI 영상 만들기 (Veo)</button>}
       </div>
       {msg && <p className={/중/.test(msg) ? "small" : "err"} style={{ margin: 0 }}>{msg}</p>}
-      <VeoBox ws={ws} enabled={veo} photos={photos} full={full} onDone={(p) => onChange([...photos, p])} />
-    </div>
+      {!veo ? <p className="ed-note">AI 영상(Veo): 운영자가 &apos;설정 · AI&apos;에서 Gemini 키를 넣으면 여기서 글로 영상을 만들 수 있어요.</p>
+        : <div hidden={!veoOpen}><VeoBox ws={ws} enabled={veo} photos={photos} full={full} onDone={(p) => onChange([...photos, p])} /></div>}
+    </section>
   );
 }
 
@@ -216,9 +224,9 @@ function VeoBox({ ws, enabled, photos, full, onDone }: { ws: string; enabled: bo
     <label className="fld">{title}<select className="input" value={value} onChange={(e) => set(e.target.value)}><option value="">고르기</option>{frames.map((p) => <option key={p.url} value={p.url}>{label(p.url)} 사진</option>)}</select></label>
   );
   return (
-    <details>
-      <summary className="small" style={{ fontWeight: 700, cursor: "pointer" }}>AI 영상 만들기 (Google Veo)</summary>
-      <div className="col" style={{ gap: 8, marginTop: 8 }}>
+    <div className="ed-veo" role="group" aria-label="AI 영상 만들기 (Google Veo)">
+      <b className="small">AI 영상 만들기 (Google Veo)</b>
+      <div className="col" style={{ gap: 8 }}>
         <div className="fld">만드는 방식
           <div className="seg" role="radiogroup" aria-label="만드는 방식">{VEO_MODES.map(([v, l]) => <button key={v} type="button" role="radio" aria-checked={mode === v} onClick={() => pickMode(v)}>{l}</button>)}</div>
           <em>{VEO_MODES.find((m) => m[0] === mode)![2]}</em>
@@ -246,6 +254,6 @@ function VeoBox({ ws, enabled, photos, full, onDone }: { ws: string; enabled: bo
         </div>
         <span className="small muted">요금이 나가는 기능이에요 (요금제의 한 달 영상 수로 막아요). 실제 사람·브랜드를 흉내 내지 말고, 인스타에 올릴 땐 &apos;AI 정보&apos; 표시를 켜요.</span>
       </div>
-    </details>
+    </div>
   );
 }
