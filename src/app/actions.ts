@@ -151,9 +151,11 @@ export async function updateIdeaAction(fd: FormData) {
   const ws = String(fd.get("ws")), id = String(fd.get("id"));
   const g = (k: string) => (fd.has(k) ? fd.get(k) : undefined);
   try {
-    const { actor } = await gateOwned("idea", id, ws);
-    // 주제 승인은 소유자·검수자만
-    if (g("status") === "approved") await gateWs(ws, "approve");
+    // 주제 승인·승인 취소는 소유자·검수자(approve) — 검수자는 편집 권한이 없어도 된다. 그 밖의 고침은 편집 권한
+    const cur = await getIdea(id);
+    if (!cur || cur.workspace !== ws) throw new OpError("찾지 못했어요");
+    const approving = g("status") === "approved" || (g("status") === "review" && cur.status === "approved" && !fd.has("title"));
+    const { actor } = approving ? await gateWs(ws, "approve") : await gateOwned("idea", id, ws);
     await updateIdea(id, { title: g("title"), pillar: g("pillar"), angle: g("angle"), template: g("template"), status: g("status"), research: fd.has("researchSet") ? fd.getAll("research").map(String) : undefined }, actor.name);
   }
   catch (e) { back(`/w/${ws}/ideas`, e); }

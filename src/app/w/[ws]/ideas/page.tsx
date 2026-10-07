@@ -132,10 +132,10 @@ export default async function Ideas({ params, searchParams }: PageProps<"/w/[ws]
                       <button className="btn" disabled={!empty.length}>이것만 달력에</button>
                     </form>
                   )}
-                  {canEdit && !post && <form action={updateIdeaAction}>
+                  {!post && (canEdit || (canApprove && i.status === "approved")) && <form action={updateIdeaAction}>
                     <input type="hidden" name="ws" value={w.id} /><input type="hidden" name="id" value={i.id} />
-                    {i.status === "dropped" ? <button name="status" value="review" className="btn">검수 대기로 꺼내기</button>
-                      : <>{i.status === "approved" && <button name="status" value="review" className="btn">승인 취소</button>}<button name="status" value="dropped" className="btn">보류</button></>}
+                    {i.status === "approved" && canApprove && <button name="status" value="review" className="btn">승인 취소</button>}
+                    {canEdit && (i.status === "dropped" ? <button name="status" value="review" className="btn">검수 대기로 꺼내기</button> : <button name="status" value="dropped" className="btn">보류</button>)}
                   </form>}
                 </div>
                 {canEdit && <details><summary>고치기</summary>

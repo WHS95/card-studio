@@ -395,8 +395,8 @@ async function guard(name: string, a: Json, actor: Actor) {
 const ACT: Record<string, (a: Json, r: unknown) => [string, string[]] | null> = {
   add_ideas: (a) => [`주제 ${(a.ideas as unknown[]).length}개를 검수 대기로 넣었어요`, (a.ideas as Json[]).map((x) => `${x.title}${x.pillar ? ` · ${x.pillar}` : ""}`)],
   add_research: (a) => [`자료 ${(a.items as unknown[]).length}건을 넣었어요`, (a.items as Json[]).map((x) => String(x.title))],
-  update_research: (a) => ["자료를 고쳤어요", [String(a.title ?? a.id)]],
-  update_idea: (a) => [a.status === "approved" ? "주제를 승인했어요" : a.status === "dropped" ? "주제를 보류했어요" : "주제를 고쳤어요", [String(a.title ?? "")].filter(Boolean)],
+  update_research: (a, r) => [a.confidence && Object.keys(a).length === 2 ? "자료 신뢰도를 바꿨어요" : "자료를 고쳤어요", [String((r as { title?: string })?.title ?? a.title ?? "")].filter(Boolean)],
+  update_idea: (a, r) => [a.status === "approved" ? "주제를 승인했어요" : a.status === "dropped" ? "주제를 보류했어요" : a.status === "review" ? "주제를 검수 대기로 돌렸어요" : "주제를 고쳤어요", [`${(r as { title?: string })?.title ?? a.title ?? ""}${a.pillar ? ` · 기둥 ${a.pillar}` : ""}`].filter(Boolean)],
   schedule_idea: (_a, r) => ["주제를 달력에 넣었어요", [`D${(r as Post).day} ${(r as Post).slot} · ${(r as Post).title}`]],
   schedule_ideas: (_a, r) => [`주제 ${(r as unknown[]).length}개를 달력에 넣었어요`, (r as { day: number; slot: string; title: string }[]).map((p) => `D${p.day} ${p.slot} · ${p.title}`)],
   create_post: (_a, r) => ["게시물을 만들었어요", [`${(r as { post: Post }).post.title}`]],
