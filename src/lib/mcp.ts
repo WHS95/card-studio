@@ -158,7 +158,7 @@ model: ${VEO_MODELS.map((m) => m.id).join(" · ")} (기본 lite; frames·referen
   },
   {
     name: "update_idea",
-    description: "주제 고치기: title, pillar, angle, template, status(review=검수 대기로 | approved=승인 — 소유자·검수자, 사람이 정했을 때만 | dropped=보류), research(자료 id[] 통째로).",
+    description: "주제 고치기: title, pillar, angle, template, status(review=검수 대기로 | approved=승인 — 소유자·검수자, 사람이 정했을 때만 | dropped=보류). 상태만 바꾸는 승인 취소·보류·꺼내기는 검수자도, research(자료 id[] 통째로).",
     inputSchema: obj({ id: str, title: str, pillar: str, angle: str, template: str, status: { type: "string", enum: ["review", "approved", "dropped"] }, research: { type: "array", items: str } }, ["id"]),
     run: (a, actor) => updateIdea(String(a.id), a as never, actor.name),
   },
@@ -387,7 +387,9 @@ async function guard(name: string, a: Json, actor: Actor) {
   if (!w || !role) throw new OpError("서비스를 찾지 못했어요");
   // 승인·게시 표시·게시 취소는 검수 권한
   const perm: Perm = (name === "set_status" && (a.status === "approved" || a.status === "posted" || (await getPost(String(a.id)))?.status === "posted")) || (name === "update_idea" && a.status === "approved") ? "approve" : g.perm;
-  if (!can(role, perm)) throw new OpError("이 서비스에서 그 일을 할 권한이 없어요");
+  // 주제 보류·보류에서 꺼내기·승인 취소(상태만 바꿀 때)는 검수자도
+  const holding = name === "update_idea" && Object.keys(a).every((k) => k === "id" || k === "status") && (a.status === "dropped" || (a.status === "review" && ["dropped", "approved"].includes((await getIdea(String(a.id)))?.status ?? "")));
+  if (!can(role, perm) && !(holding && can(role, "approve"))) throw new OpError("이 서비스에서 그 일을 할 권한이 없어요");
   if (name === "update_post" && a.postId && (await getPost(String(a.postId)))?.workspace !== w.id) throw new OpError("다른 서비스의 게시물이에요");
 }
 
