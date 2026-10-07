@@ -86,6 +86,17 @@ export async function importFile(ws: string, path: string): Promise<Photo> {
   return saveUpload(ws, Readable.toWeb(createReadStream(path)) as ReadableStream<Uint8Array>);
 }
 
+/** 바깥 사진 주소를 이 서버로 받아 두기 (위키미디어처럼 바로 걸 수 없는 곳) — 사진만, 8MB */
+export async function importUrl(ws: string, url: string, ua: string): Promise<Photo> {
+  if (!/^https:\/\/[^\s"'<>]+$/.test(url)) throw new OpError("https 사진 주소만 받아요");
+  const r = await fetch(url, { headers: { "User-Agent": ua }, signal: AbortSignal.timeout(60_000) }).catch(() => null);
+  if (!r?.ok || !r.body) throw new OpError("사진을 받아 오지 못했어요");
+  if (Number(r.headers.get("content-length") ?? 0) > IMAGE_MAX) throw new OpError("사진은 8MB 이하만 돼요");
+  const p = await saveUpload(ws, r.body);
+  if (p.kind !== "image") throw new OpError("사진(JPG·PNG)만 받아요");
+  return p;
+}
+
 async function finishUpload(ws: string, tmp: string, id: string, size: number): Promise<Photo> {
   const fh = await open(tmp, "r");
   const head = Buffer.alloc(16);

@@ -160,3 +160,53 @@ fieldset.ed-mid { border: 0; padding: 0; margin: 0; min-inline-size: 0; }
 @media (max-width: 900px) {
   body:has(.ed-actions) .ai-toggle { bottom: 80px; }
 }
+
+/* ── AI 초안 쓰는 중 (0.6.4 시안 '편집기 · AI 초안 쓰는 중'): 흐린 칸 → 글이 써짐 → 그 장 미리보기 ── */
+.ed-skel { background: #ececec; position: relative; overflow: hidden; }
+.ed-skel::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, transparent, rgba(255,255,255,.65), transparent); transform: translateX(-100%); animation: ed-shimmer 1.4s ease-in-out infinite; }
+@keyframes ed-shimmer { to { transform: translateX(100%); } }
+.ed-bar { display: block; height: 10px; border-radius: 6px; }
+.ed-draftbar { grid-column: 1 / -1; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; padding: 12px 14px; border-radius: 12px; border: 1.5px solid var(--ink); background: var(--paper); font-size: 14px; min-width: 0; }
+.ed-segs { flex: 1 1 200px; display: flex; gap: 4px; min-width: 140px; }
+.ed-segs i { flex: 1; height: 6px; border-radius: 3px; background: #ececec; transition: background-color .3s ease; }
+.ed-segs i[data-s=done] { background: var(--ink); }
+.ed-segs i[data-s=cur] { background: #8a8a8a; }
+.ed-draftbar-r { flex: 1 1 100%; }
+@media (min-width: 1200px) { .ed-draftbar-r { flex: 0 1 auto; } }
+.ed-slide-wait { cursor: default; border-style: dashed; border-color: #d0d0d0; background: #fafafa; }
+.ed-slide-wait.is-cur { border: 2px solid var(--ink); padding: 5px; background: var(--paper); }
+.ed-slide-wait .ed-sthumb { border: 0; }
+.ed-slide-wait .ed-sinfo { flex: 1; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.ed-slide-wait .ed-sinfo b { color: var(--muted); font-size: 12px; }
+.ed-slide-wait.is-cur .ed-sinfo b { color: var(--ink); }
+.ed-typing .fld > span { font-weight: 700; font-size: 13px; }
+.ed-typing .fld em { font-style: normal; font-weight: 500; color: var(--muted); margin-left: 4px; }
+.ed-ro { padding: 8px 10px; border-radius: 10px; border: 1.5px solid rgba(17,17,17,.15); background: #fafafa; font-size: 14px; min-height: 40px; box-sizing: border-box; white-space: pre-wrap; overflow-wrap: anywhere; }
+.ed-ro-area { min-height: 84px; }
+.ed-ro-wait { display: flex; flex-direction: column; gap: 8px; justify-content: center; border-style: dashed; border-color: #d0d0d0; }
+.ed-cap-typing { min-height: 160px; }
+.ed-caret { display: inline-block; width: 2px; height: 1.1em; background: var(--ink); vertical-align: -2px; margin-left: 1px; animation: ed-blink 1s steps(1) infinite; }
+@keyframes ed-blink { 50% { opacity: 0; } }
+.ed-bigframe .wait.ed-skel { display: flex; align-items: center; justify-content: center; color: var(--muted); }
+.ed-mini { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; }
+.ed-mini .ed-sthumb { width: 52px; padding: 0; cursor: pointer; }
+.ed-mini span.ed-sthumb { cursor: default; border: 0; }
+.ed-toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 40; display: inline-flex; gap: 10px; align-items: center; max-width: calc(100vw - 32px); box-sizing: border-box; padding: 8px 10px 8px 14px; border-radius: 999px; background: var(--ink); color: #fff; border: 1.5px solid var(--ink); font-size: 13px; box-shadow: 0 10px 28px rgba(0,0,0,.18); animation: ed-toast-in .25s cubic-bezier(.2,.8,.2,1); }
+@keyframes ed-toast-in { from { opacity: 0; transform: translate(-50%, 8px); } }
+.ed-toast b { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ed-toast-sub { opacity: .7; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.ed-toast button { flex-shrink: 0; min-height: 30px; padding: 0 12px; border-radius: 999px; border: 1.5px solid currentColor; background: transparent; color: inherit; font: inherit; font-size: 12px; font-weight: 800; cursor: pointer; }
+.ed-toast .ed-toast-x { border: 0; padding: 0 6px; font-size: 16px; }
+.ed-toast.is-light { background: var(--paper); color: var(--ink); }
+.ed-spin { width: 14px; height: 14px; border-radius: 999px; border: 2px solid currentColor; border-right-color: transparent; flex-shrink: 0; animation: ed-spin .8s linear infinite; }
+@keyframes ed-spin { to { transform: rotate(360deg); } }
+@media (max-width: 900px) {
+  .ed-toast { left: 12px; right: 12px; transform: none; bottom: 76px; justify-content: flex-start; }
+  @keyframes ed-toast-in { from { opacity: 0; transform: translateY(8px); } }
+  .ed-toast-sub { display: none; }
+  .ed-mini { display: none; } /* 휴대폰은 장 띠가 이미 위에 있다 */
+  body:has(.ed-toast) .ai-toggle { bottom: 136px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ed-skel::after, .ed-caret, .ed-spin, .ed-toast { animation: none; }
+}

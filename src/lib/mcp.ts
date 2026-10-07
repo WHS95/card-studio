@@ -11,7 +11,8 @@ import { can, roleIn, type Actor, type Perm } from "./auth";
 import { getIdea, getResearch } from "./store";
 import { countVideo, addResearch, applyShareSuggestion, checklistOf, createIdea, createPostIn, createWorkspace, dismissSuggestion, duplicatePost, followUpIdea, insights, logActivity, movePost, nextEmptySlot, setMetrics, OpError, savePost, scheduleIdea, scheduleIdeas, setPillars, setStatus, updateBrief, updateIdea, updateResearch, updateWorkspace, type WorkspacePatch } from "./ops";
 import { flowOf } from "./flow";
-import { importFile, ffmpeg } from "./media";
+import { importFile, importUrl, ffmpeg } from "./media";
+import { searchPhotos, UA } from "./photos";
 import { checkPost } from "./check";
 import { fullCaption, slideFile } from "./exporter";
 import { zip } from "./zip";
@@ -283,15 +284,22 @@ export const TOOLS: Tool[] = [
     run: async (a, actor) => postOut(await setStatus(String(a.id), a.status as PostStatus, a.postedUrl as string | undefined, { checks: a.checks as string[] | undefined, by: actor.name })),
   },
   {
+    name: "search_photos",
+    description: "무료 사진 찾기 (위키미디어 공용, 자유 라이선스 사진만). query 는 영어 장소·사물 이름이 잘 걸린다(예: Seoraksan autumn, mountain trail). 결과마다 url·credit·source·license·크기. 고른 것을 add_media(url, credit, source, postId) 로 넣고, update_post 로 장의 사진 칸(photo 번호)에 넣는다. 장소 이름이 나오는 게시물엔 그 장소 사진만.",
+    inputSchema: obj({ query: str, count: int }, ["query"]),
+    run: async (a) => ({ photos: await searchPhotos(String(a.query ?? ""), Number(a.count ?? 8)) }),
+  },
+  {
     name: "add_media",
-    description: "사진·영상 더하기. url(https 이미지, 무료 사진은 출처 credit 필수 권장) 또는 filePath(이 Mac 의 JPG·PNG·MP4·MOV 절대 경로, 8MB/300MB). postId 를 주면 그 게시물 photos 끝에 붙여 저장하고 번호를 돌려준다.",
-    inputSchema: obj({ ws: str, postId: str, url: str, filePath: str, credit: str, source: str }, ["ws"]),
+    description: "사진·영상 더하기. url(https 이미지, 무료 사진은 출처 credit 필수 권장 — 위키미디어 사진은 이 서버로 받아 둔다, save:true 면 다른 주소도) 또는 filePath(이 Mac 의 JPG·PNG·MP4·MOV 절대 경로, 8MB/300MB). postId 를 주면 그 게시물 photos 끝에 붙여 저장하고 번호를 돌려준다.",
+    inputSchema: obj({ ws: str, postId: str, url: str, filePath: str, credit: str, source: str, save: { type: "boolean" } }, ["ws"]),
     run: async (a) => {
       const ws = String(a.ws);
       const wsObj = need(await getWorkspace(ws), "서비스를 찾지 못했어요");
       let photo: Photo;
       if (typeof a.url === "string" && /unsplash\.com\/photos\//.test(a.url)) throw new OpError("Unsplash는 사진 페이지가 아니라 이미지 주소(images.unsplash.com/…)를 넣어 주세요");
       if (typeof a.filePath === "string" && a.filePath) photo = await importFile(ws, a.filePath);
+      else if (typeof a.url === "string" && /^https:\/\/[^\s"'<>]+$/.test(a.url) && (a.save === true || /(^|\.)wikimedia\.org$/.test(new URL(a.url).hostname))) photo = { ...(await importUrl(ws, a.url, UA)), source: new URL(a.url).hostname.includes("wikimedia") ? "Wikimedia" : new URL(a.url).hostname };
       else if (typeof a.url === "string" && /^https:\/\/[^\s"'<>]+$/.test(a.url)) photo = { url: a.url.replace(/fm=webp/, "fm=jpg"), credit: "", source: new URL(a.url).hostname.includes("unsplash") ? "Unsplash" : new URL(a.url).hostname, kind: "image" };
       else throw new OpError("url(https) 이나 filePath 중 하나가 필요해요");
       photo.credit = String(a.credit ?? photo.credit).slice(0, 60);
@@ -356,7 +364,7 @@ export const TOOLS: Tool[] = [
 
 export const INSTRUCTIONS = `카드뉴스 스튜디오(card-studio, ${BASE}) — 여러 서비스의 인스타 카드뉴스(1080×1350 캐러셀)를 기획·편집·검수·내보내기.
 순서(8단계): list_workspaces → get_flow(지금 할 일) → get_brief(목적·기둥·콘텐츠 규칙) → add_research(자료, 신뢰도) → add_ideas(주제, 검수 대기) → 사람이 승인 → schedule_ideas → list_templates(칸 정의) → update_post(제작) → check_safe_zone·render_slide → get_checklist → 사람이 체크하고 승인(set_status approved + checks) → export_post(발행은 사람이) → 7일 뒤 set_metrics → get_insights 제안.
-규칙: 주제 승인·게시물 승인은 사람이 확인한 뒤에만. 게시(posted)는 실제 인스타 링크가 있을 때만. 무료 사진은 주소+출처, 장소 이름이 나오면 실제 그 장소 사진만. 협찬은 #광고. 삭제·인스타 업로드 도구는 없다.`;
+규칙: 주제 승인·게시물 승인은 사람이 확인한 뒤에만. 게시(posted)는 실제 인스타 링크가 있을 때만. 무료 사진은 search_photos 로 찾아 add_media(출처 포함) → update_post 로 장 사진 칸에, 장소 이름이 나오면 실제 그 장소 사진만. 협찬은 #광고. 삭제·인스타 업로드 도구는 없다.`;
 
 // ── 권한: 도구마다 어느 서비스의 무슨 권한이 필요한지 (계정으로 붙은 AI 앱은 그 사람 역할로만) ──
 type On = "ws" | "post" | "idea" | "research";
@@ -408,6 +416,7 @@ const ACT: Record<string, (a: Json, r: unknown) => [string, string[]] | null> = 
   update_workspace: () => ["서비스 설정을 고쳤어요", []],
   set_metrics: (a) => ["성과를 적었어요", [`도달 ${a.reach ?? "-"} · 저장 ${a.saves ?? "-"} · 댓글 ${a.comments ?? "-"}`]],
   add_media: (a) => ["사진·영상을 더했어요", [String(a.credit || a.url || a.filePath || "")]],
+  search_photos: () => null,
   move_post: () => ["게시물을 옮겼어요", []], duplicate_post: () => ["게시물을 복제했어요", []],
   apply_suggestion: (a) => [a.action === "dismiss" ? "제안을 넘겼어요" : "제안을 적용했어요", [String(a.key)]],
   generate_video: () => ["AI 영상을 만들기 시작했어요", []],

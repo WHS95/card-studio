@@ -161,11 +161,17 @@ async function askOpenAI(t: TierSetting, q: Ask) {
 }
 
 async function askClaudeCode(t: TierSetting, q: Ask, extra: string[] = [], timeout = 300_000) {
+  // 쓸 수 있는 기본 도구를 정해 둔다 (--allowedTools 는 '묻지 않고 허락'일 뿐이라 막지 못한다): 웹 조사면 웹만, 아니면 없음
   const args = ["-p", "--output-format", "json", "--model", t.model || "claude-sonnet-5-5", "--append-system-prompt", q.system,
-    ...(q.webSearch ? ["--allowedTools", "WebSearch WebFetch"] : []), ...extra];
+    "--tools", q.webSearch ? "WebSearch,WebFetch" : "", ...(q.webSearch ? ["--allowedTools", "WebSearch WebFetch"] : []), ...extra];
   const r = await run(BIN["claude-code"], args, { input: q.prompt, timeout });
   if (r.code !== 0) throw new OpError(`Claude Code 실행이 실패했어요${r.err ? ` (${r.err.trim().split("\n").pop()?.slice(0, 120)})` : ""}. 터미널에서 claude 로그인을 확인해 주세요`);
-  try { const j = JSON.parse(r.out); if (j.is_error) throw new OpError(`Claude Code: ${String(j.result ?? "오류").slice(0, 160)}`); return String(j.result ?? ""); }
+  try {
+    const j = JSON.parse(r.out);
+    if (j.subtype === "error_max_turns") throw new OpError(`할 일이 많아 ${j.num_turns ?? ""}단계에서 멈췄어요. 위 카드가 지금까지 한 일이에요 — '이어서 해 줘'라고 보내면 남은 일을 해요`);
+    if (j.is_error) throw new OpError(`Claude Code: ${String(j.result ?? "오류").slice(0, 160)}`);
+    return String(j.result ?? "");
+  }
   catch (e) { if (e instanceof OpError) throw e; return r.out; }
 }
 async function askCodex(t: TierSetting, q: Ask, extra: string[] = [], timeout = 300_000) {
@@ -186,6 +192,95 @@ export async function ask(tier: AiTier, actor: Actor | null, q: Ask) {
   const text = t.via === "anthropic" ? await askAnthropic(t, q) : t.via === "openai" ? await askOpenAI(t, q) : t.via === "claude-code" ? await askClaudeCode(t, q) : await askCodex(t, q);
   return { text, via: t.via, model: t.model };
 }
+// ── 조각으로 받기 (편집기 AI 초안: 글이 써지는 모습을 화면에 보여 준다) ──
+export type OnText = (chunk: string) => void;
+const cliEnv = () => ({ ...process.env, PATH: `${process.env.PATH ?? ""}:/opt/homebrew/bin:/usr/local/bin:${process.env.HOME}/.local/bin` });
+
+function streamClaudeCode(t: TierSetting, q: Ask, onText: OnText, signal?: AbortSignal, timeout = 300_000) {
+  const args = ["-p", "--output-format", "stream-json", "--verbose", "--include-partial-messages", "--model", t.model || "claude-sonnet-5-5", "--append-system-prompt", q.system, "--tools", ""];
+  return new Promise<string>((resolve, reject) => {
+    let p;
+    try { p = spawn(/*turbopackIgnore: true*/ BIN["claude-code"], args, { env: cliEnv(), stdio: ["pipe", "pipe", "pipe"] }); }
+    catch { return reject(new OpError("Claude Code 를 실행하지 못했어요")); }
+    let buf = "", err = "", sent = "", result: { subtype?: string; is_error?: boolean; result?: string } | null = null;
+    const stop = () => p.kill("SIGTERM");
+    const timer = setTimeout(stop, timeout);
+    signal?.addEventListener("abort", stop, { once: true });
+    p.stdout.on("data", (d: Buffer) => {
+      buf += d.toString();
+      let i;
+      while ((i = buf.indexOf("\n")) >= 0) {
+        const line = buf.slice(0, i); buf = buf.slice(i + 1);
+        let j: { type?: string; event?: { type?: string; delta?: { type?: string; text?: string } }; subtype?: string; is_error?: boolean; result?: string };
+        try { j = JSON.parse(line); } catch { continue; }
+        if (j.type === "stream_event" && j.event?.type === "content_block_delta" && j.event.delta?.type === "text_delta" && j.event.delta.text) { sent += j.event.delta.text; onText(j.event.delta.text); }
+        else if (j.type === "result") result = j;
+      }
+    });
+    p.stderr.on("data", (d: Buffer) => (err += d));
+    p.on("error", () => { clearTimeout(timer); reject(new OpError("Claude Code 를 이 Mac 에서 찾지 못했어요")); });
+    p.on("close", (code: number | null) => {
+      clearTimeout(timer);
+      if (signal?.aborted) return reject(new OpError("멈췄어요"));
+      if (!result || code !== 0 || result.is_error) return reject(new OpError(`Claude Code 실행이 실패했어요${result?.result ? ` (${String(result.result).slice(0, 120)})` : err ? ` (${err.trim().split("\n").pop()?.slice(0, 120)})` : ""}. 터미널에서 claude 로그인을 확인해 주세요`));
+      const text = String(result.result ?? sent);
+      if (!sent && text) onText(text); // 조각을 못 받는 버전이면 한 번에
+      resolve(text);
+    });
+    p.stdin.end(q.prompt);
+  });
+}
+
+async function streamAnthropic(t: TierSetting, q: Ask, onText: OnText, signal?: AbortSignal) {
+  let m: Anthropic.Beta.BetaMessage;
+  try {
+    const st = anthropic().beta.messages.stream({
+      model: t.model || DEFAULT_AI.tiers.write.model, max_tokens: q.maxTokens ?? 16000, betas: ["server-side-fallback-2026-07-01"], fallbacks: "default",
+      output_config: { effort: t.effort }, system: q.system, messages: [{ role: "user", content: q.prompt }],
+    } as never, { signal });
+    st.on("text", (d: string) => onText(d));
+    m = await st.finalMessage();
+  } catch (e) { if (signal?.aborted) throw new OpError("멈췄어요"); return anthropicErr(e); }
+  if (m.stop_reason === "refusal") throw new OpError("AI 가 이 요청을 거절했어요. 표현을 바꿔 다시 해 주세요");
+  return m.content.filter((b): b is Anthropic.Beta.BetaTextBlock => b.type === "text").map((b) => b.text).join("");
+}
+
+async function streamOpenAI(t: TierSetting, q: Ask, onText: OnText, signal?: AbortSignal) {
+  if (!t.model) throw new OpError("OpenAI 모델을 설정 · AI 에서 골라 주세요");
+  const key = getKey("openai") ?? (() => { throw new OpError(NO_AI); })();
+  const r = await fetch("https://api.openai.com/v1/responses", { method: "POST", signal, headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ model: t.model, instructions: q.system, input: q.prompt, reasoning: { effort: t.effort }, stream: true }) }).catch((e) => { if (signal?.aborted) throw new OpError("멈췄어요"); throw e; });
+  if (r.status === 401) throw new OpError("OpenAI API 키가 맞지 않아요");
+  if (r.status === 429) throw new OpError("AI 사용량이 많아요. 잠시 뒤 다시 해 주세요");
+  if (!r.ok || !r.body) throw new OpError(`OpenAI 호출이 실패했어요 (${r.status})`);
+  const reader = r.body.getReader(), dec = new TextDecoder();
+  let buf = "", text = "";
+  for (;;) {
+    const { done, value } = await reader.read().catch(() => { throw new OpError(signal?.aborted ? "멈췄어요" : "OpenAI 응답이 끊겼어요"); });
+    if (done) break;
+    buf += dec.decode(value, { stream: true });
+    let i;
+    while ((i = buf.indexOf("\n")) >= 0) {
+      const line = buf.slice(0, i).trim(); buf = buf.slice(i + 1);
+      if (!line.startsWith("data:")) continue;
+      try { const j = JSON.parse(line.slice(5)); if (j.type === "response.output_text.delta" && j.delta) { text += j.delta; onText(j.delta); } } catch {}
+    }
+  }
+  return text;
+}
+
+/** 등급에 맞는 연결로 묻고, 답을 조각으로 흘려 준다 (Codex 는 한 번에) */
+export async function askStream(tier: AiTier, actor: Actor | null, q: Ask, onText: OnText, signal?: AbortSignal) {
+  const t = await pickVia(tier, actor);
+  if (!t) throw new OpError(NO_AI);
+  let text: string;
+  if (t.via === "claude-code") text = await streamClaudeCode(t, q, onText, signal);
+  else if (t.via === "anthropic") text = await streamAnthropic(t, q, onText, signal);
+  else if (t.via === "openai") text = await streamOpenAI(t, q, onText, signal);
+  else { text = await askCodex(t, q); onText(text); }
+  return { text, via: t.via, model: t.model };
+}
+
 /** 요금제 AI 횟수에 세는가 (구독 연결은 그 구독에서 나가므로 세지 않는다) */
 export async function countsAgainstPlan(tier: AiTier, actor: Actor | null) { const t = await pickVia(tier, actor); return !!t && !isCli(t.via); }
 
@@ -218,7 +313,7 @@ export type ChatTurn = { role: "user" | "assistant"; text: string };
 export type ToolRunner = { tools: { name: string; description: string; inputSchema: Record<string, unknown> }[]; call: (name: string, args: Record<string, unknown>) => Promise<{ text: string; isError?: boolean }> };
 
 const CHAT_SYSTEM = (ctx: string) => `너는 카드뉴스 스튜디오 안의 도우미다. 사용자가 보고 있는 서비스·화면: ${ctx}
-스튜디오 도구로 실제로 일한다(주제·자료·게시물·브리프). 규칙: 승인(approved)은 사람이 체크리스트를 보고 한다 — 너는 승인하지 않는다. 사실·숫자는 자료 조사에 출처가 있는 것만. 장소 이름이 나오면 실제 그 장소 사진만. 새 주제는 검수 대기로 들어간다. 답은 한국어로 짧게, 한 일을 한두 줄로 알려 준다.`;
+스튜디오 도구로 실제로 일한다(주제·자료·게시물·브리프). 규칙: 승인(approved)은 사람이 체크리스트를 보고 한다 — 너는 승인하지 않는다. 사실·숫자는 자료 조사에 출처가 있는 것만. 사진은 search_photos 로 찾아(장소 이름이 나오면 실제 그 장소 사진만) add_media(postId·credit·source) 로 넣고 update_post 로 장의 사진 칸에 번호를 넣는다 — 영상은 직접 올린 것·AI 영상만 되니 사람에게 부탁한다. 새 주제는 검수 대기로 들어간다. 답은 한국어로 짧게, 한 일을 한두 줄로 알려 준다.`;
 
 export async function chat(actor: Actor, ctx: string, history: ChatTurn[], tools: ToolRunner, mcp: { url: string; token: string } | null) {
   const t = await pickVia("judge", actor);
@@ -230,7 +325,7 @@ export async function chat(actor: Actor, ctx: string, history: ChatTurn[], tools
     const prompt = turns.map((x) => `${x.role === "user" ? "사용자" : "도우미"}: ${x.text}`).join("\n\n") + "\n\n도우미:";
     if (t.via === "claude-code") {
       const cfg = JSON.stringify({ mcpServers: { "card-studio": { type: "http", url: mcp.url, headers: { Authorization: `Bearer ${mcp.token}`, "X-Studio-Via": "ai" } } } });
-      const text = await askClaudeCode(t, { system, prompt }, ["--mcp-config", cfg, "--strict-mcp-config", "--allowedTools", "mcp__card-studio", "--max-turns", "16"], 600_000);
+      const text = await askClaudeCode(t, { system, prompt }, ["--mcp-config", cfg, "--strict-mcp-config", "--allowedTools", "mcp__card-studio", "--max-turns", "40"], 900_000);
       return { text, via: t.via, model: t.model };
     }
     const text = await askCodex(t, { system, prompt }, ["-c", `mcp_servers.card-studio.url="${mcp.url}"`, "-c", `mcp_servers.card-studio.http_headers={ Authorization = "Bearer ${mcp.token}", "X-Studio-Via" = "ai" }`], 600_000);

@@ -2,9 +2,9 @@ import "server-only";
 import { templateOf, TEMPLATES } from "./templates";
 import { validatePost, type Field } from "./fields";
 import { OpError } from "./ops";
-import { ask, aiReady } from "./llm";
+import { ask, askStream, aiReady, pickVia } from "./llm";
 import type { Actor } from "./auth";
-import type { PostData, Workspace } from "./types";
+import type { PostData, SlideData, Workspace } from "./types";
 
 // 화면 안 AI (선택): 설정 · AI 에서 연결한 것(이 Mac 의 Claude Code·Codex, API 키)으로 작업 등급마다 부른다(llm.ts).
 // 연결이 없으면 MCP(내 Claude·ChatGPT)로 같은 일을 한다. 돈이 드는 호출이라 사람이 버튼을 누를 때만. 결과는 늘 사람이 고친 뒤 저장·승인한다.
@@ -77,17 +77,31 @@ function schemaText(fields: Field[], pad = "  "): string {
     : `${pad}${f.key}: 배열 ${f.min}~${f.max}개, 각 항목:\n${schemaText(f.item, pad + "  ")}`).join("\n");
 }
 
-/** 기획(제목·메모·자료)으로 장 글·캡션 초안. 템플릿 검사를 통과할 때까지 한 번 더 고친다 */
-export async function draftPostData(w: Workspace, p: { template: string; title: string; category: string; note: string; current: PostData | null }, extra: string, actor: Actor | null): Promise<PostData> {
+type DraftInput = { template: string; title: string; category: string; note: string; current: PostData | null };
+
+/** 초안 요청 글의 공통 부분 (브리프 · 기획 · 템플릿 칸) */
+function draftBase(w: Workspace, p: DraftInput, extra: string) {
   const t = templateOf(p.template);
   const kinds = t.kinds.map((k) => `- kind "${k.kind}" (${k.label}${k.fixed ? ", 첫 장 고정" : ""}):\n${schemaText(k.fields)}`).join("\n");
-  let prompt = `${briefText(w)}\n\n기획 제목: ${p.title}\n카테고리: ${p.category}\n메모·자료:\n${p.note || "없음"}\n${extra ? `추가 요청: ${extra}\n` : ""}\n템플릿 '${t.name}' (최대 ${t.maxSlides}장, 첫 장은 ${t.kinds[0].kind}). 장 종류와 칸:\n${kinds}\n\n이 틀에 맞춰 카드뉴스 장 글과 인스타 캡션을 써 줘. 글자 수 제한을 꼭 지킨다(넘치면 안 된다). 캡션은 브리프 말투로, 끝에 기본 해시태그(${w.brief?.hashtags.join(" ") || "없음"})를 포함해 해시태그 30개 이하. 답은 \`\`\`json 블록 하나: {"slides":[{"kind":"...", ...칸}], "caption":"..."}`;
+  return `${briefText(w)}\n\n기획 제목: ${p.title}\n카테고리: ${p.category}\n메모·자료:\n${p.note || "없음"}\n${extra ? `추가 요청: ${extra}\n` : ""}\n템플릿 '${t.name}' (최대 ${t.maxSlides}장, 첫 장은 ${t.kinds[0].kind}). 장 종류와 칸:\n${kinds}\n\n이 틀에 맞춰 카드뉴스 장 글과 인스타 캡션을 써 줘. 글자 수 제한을 꼭 지킨다(넘치면 안 된다). 캡션은 브리프 말투로, 끝에 기본 해시태그(${w.brief?.hashtags.join(" ") || "없음"})를 포함해 해시태그 30개 이하.`;
+}
+const DRAFT_SYSTEM = `너는 인스타그램 카드뉴스 카피라이터다. 짧고 또렷하게 쓴다.\n${RULES}`;
+
+/** 사진 칸은 지금 고른 사진을 그대로 (같은 순서·같은 종류의 장이면) */
+function keepPhotos(s: Record<string, unknown>, n: number, current: PostData | null) {
+  const old = current?.slides[n];
+  if (old && old.kind === s.kind) for (const k of Object.keys(old)) if (/^(photo|photoH|photoY|video)/.test(k)) s[k] = old[k];
+  return s;
+}
+
+/** 기획(제목·메모·자료)으로 장 글·캡션 초안. 템플릿 검사를 통과할 때까지 한 번 더 고친다 */
+export async function draftPostData(w: Workspace, p: DraftInput, extra: string, actor: Actor | null): Promise<PostData> {
+  const t = templateOf(p.template);
+  let prompt = `${draftBase(w, p, extra)} 답은 \`\`\`json 블록 하나: {"slides":[{"kind":"...", ...칸}], "caption":"..."}`;
   for (let i = 0; i < 2; i++) {
-    const { text: raw } = await ask("write", actor, { system: `너는 인스타그램 카드뉴스 카피라이터다. 짧고 또렷하게 쓴다.\n${RULES}`, prompt });
+    const { text: raw } = await ask("write", actor, { system: DRAFT_SYSTEM, prompt });
     const out = jsonOf<{ slides: Record<string, unknown>[]; caption: string }>(raw);
-    const data: PostData = { photos: p.current?.photos ?? [], caption: String(out.caption ?? ""), slides: (out.slides ?? []).map((s) => ({ ...s, kind: String(s.kind) })) };
-    // 사진 칸은 지금 고른 사진을 그대로 (같은 순서의 장이면)
-    data.slides.forEach((s, n) => { const old = p.current?.slides[n]; if (old && old.kind === s.kind) for (const k of Object.keys(old)) if (/^(photo|photoH|photoY|video)/.test(k)) s[k] = old[k]; });
+    const data: PostData = { photos: p.current?.photos ?? [], caption: String(out.caption ?? ""), slides: (out.slides ?? []).map((s, n) => keepPhotos({ ...s, kind: String(s.kind) }, n, p.current) as SlideData) };
     const err = validatePost(t, data);
     if (!err) return data;
     prompt += `\n\n앞선 답:\n${raw}\n\n검사에서 틀렸어: ${err}\n고친 JSON 전체를 다시 줘.`;
@@ -95,3 +109,127 @@ export async function draftPostData(w: Workspace, p: { template: string; title: 
   throw new OpError("AI 초안이 칸 제한을 맞추지 못했어요. 다시 해 주세요");
 }
 
+// ── 장마다 써지는 초안 (편집기: 흐린 칸 → 글이 써짐 → 그 장 미리보기) ──
+export type DraftEvent =
+  | { t: "start"; via: string; model: string }
+  | { t: "total"; n: number }
+  | { t: "partial"; i: number; slide: Record<string, unknown> }
+  | { t: "slide"; i: number; slide: SlideData }
+  | { t: "caption"; text: string; done: boolean }
+  | { t: "fixing"; reason: string }
+  | { t: "done"; data: PostData; note?: string }
+  | { t: "error"; message: string };
+
+/** 덜 온 JSON 한 줄을 읽을 수 있는 데까지 (열린 글·괄호를 닫아 본다) */
+export function parsePartial(src: string): Record<string, unknown> | null {
+  let s = src.trim();
+  if (!s.startsWith("{")) return null;
+  for (let tries = 0; tries < 12 && s.length > 1; tries++) {
+    let inStr = false, esc = false;
+    const stack: string[] = [];
+    for (const ch of s) {
+      if (inStr) { if (esc) esc = false; else if (ch === "\\") esc = true; else if (ch === '"') inStr = false; continue; }
+      if (ch === '"') inStr = true; else if (ch === "{" || ch === "[") stack.push(ch); else if (ch === "}" || ch === "]") stack.pop();
+    }
+    let c = s;
+    if (inStr) { if (esc) c = c.slice(0, -1); c += '"'; }
+    c = c.replace(/[\s,]+$/, "");
+    if (c.endsWith(":")) c += "null";
+    c += stack.reverse().map((x) => (x === "{" ? "}" : "]")).join("");
+    try { const v = JSON.parse(c); return v && typeof v === "object" && !Array.isArray(v) ? v : null; } catch {}
+    // 덜 쓴 이름·값을 버리고 앞 칸까지만 다시
+    let cut = -1; inStr = false; esc = false;
+    for (let i = 0; i < s.length; i++) {
+      const ch = s[i];
+      if (inStr) { if (esc) esc = false; else if (ch === "\\") esc = true; else if (ch === '"') inStr = false; continue; }
+      if (ch === '"') inStr = true; else if (ch === "," || ch === "{" || ch === "[") cut = i;
+    }
+    if (cut <= 0) return null;
+    s = s.slice(0, s[cut] === "," ? cut : cut + 1);
+  }
+  return null;
+}
+
+/** 다 쓴 장을 칸 정의에 맞춘다 (길면 자르고, 모자라면 기본값) — 미리보기가 멈추지 않게. 최종본은 검사·고침을 따로 거친다 */
+function fitValue(f: Field, v: unknown, blank: unknown): unknown {
+  if (f.type === "text") {
+    let s = typeof v === "string" ? v : typeof blank === "string" ? blank : "";
+    s = s.split("\n").slice(0, f.lines ?? 1).join("\n").slice(0, f.max);
+    return !f.optional && !s.trim() ? (typeof blank === "string" && blank.trim() ? blank.slice(0, f.max) : "…") : s;
+  }
+  if (f.type === "photo") return undefined;
+  if (f.type === "toggle") return typeof v === "boolean" ? v : blank;
+  if (f.type === "choice") return typeof v === "string" && f.options.some((o) => o.v === v) ? v : undefined;
+  if (f.type === "number") return typeof v === "number" && Number.isFinite(v) ? Math.min(f.max, Math.max(f.min, v)) : undefined;
+  const arr = (Array.isArray(v) ? v : []).slice(0, f.max) as Record<string, unknown>[];
+  const bl = (Array.isArray(blank) ? blank : []) as Record<string, unknown>[];
+  while (arr.length < f.min) arr.push(bl[arr.length] ?? {});
+  return arr.map((it, i) => Object.fromEntries(f.item.map((sub) => [sub.key, fitValue(sub, it?.[sub.key], bl[i]?.[sub.key])]).filter(([, x]) => x !== undefined)));
+}
+function fitSlide(t: ReturnType<typeof templateOf>, raw: Record<string, unknown>, n: number): SlideData | null {
+  const k = t.kinds.find((x) => x.kind === raw.kind && (!x.fixed || n === 0)) ?? (n === 0 ? t.kinds[0] : null);
+  if (!k) return null;
+  const blank = k.blank() as Record<string, unknown>;
+  const out: Record<string, unknown> = { kind: k.kind };
+  for (const f of k.fields) { const v = fitValue(f, raw[f.key], blank[f.key]); if (v !== undefined) out[f.key] = v; }
+  return out as SlideData;
+}
+
+/** 초안을 줄마다(장 하나 = JSON 한 줄) 흘려 받으며 이벤트로 알린다. 저장은 하지 않는다(편집기에서 사람이) */
+export async function draftPostStream(w: Workspace, p: DraftInput, extra: string, actor: Actor | null, emit: (e: DraftEvent) => void, signal?: AbortSignal) {
+  const t = templateOf(p.template);
+  const via = await pickVia("write", actor);
+  if (!via) throw new OpError("AI 연결이 없어요. 설정 · AI 에서 연결해 주세요");
+  emit({ t: "start", via: via.via, model: via.model });
+  const prompt = `${draftBase(w, p, extra)}\n\n답 형식(꼭 지킨다): 코드 블록 없이 JSON 을 한 줄에 하나씩.\n1줄: {"total": 장 수(1~${t.maxSlides})}\n그다음 장마다 한 줄: {"kind":"...", ...칸} (첫 장은 "${t.kinds[0].kind}", 장 순서대로)\n마지막 줄: {"caption":"..."}\n글 안의 줄바꿈은 \\n 으로 쓴다. 다른 말은 쓰지 않는다.`;
+  const raws: Record<string, unknown>[] = [];
+  let caption = "", buf = "", lastPartial = 0, lastSent = "";
+  const line = (l: string) => {
+    const s = l.trim().replace(/^```(json)?/, "").trim();
+    if (!s.startsWith("{")) return;
+    let o: Record<string, unknown>;
+    try { o = JSON.parse(s); } catch { return; }
+    if (typeof o.total === "number") emit({ t: "total", n: Math.min(t.maxSlides, Math.max(1, Math.round(o.total))) });
+    else if (typeof o.caption === "string" && !o.kind) { caption = o.caption; emit({ t: "caption", text: caption, done: true }); }
+    else if (typeof o.kind === "string") {
+      const n = raws.length;
+      raws.push(o);
+      const fit = fitSlide(t, o, n);
+      if (fit) emit({ t: "slide", i: n, slide: keepPhotos(fit, n, p.current) as SlideData });
+    }
+  };
+  const { text } = await askStream("write", actor, { system: DRAFT_SYSTEM, prompt }, (chunk) => {
+    buf += chunk;
+    let i;
+    while ((i = buf.indexOf("\n")) >= 0) { line(buf.slice(0, i)); buf = buf.slice(i + 1); lastSent = ""; }
+    const now = Date.now();
+    if (now - lastPartial < 70) return;
+    const part = parsePartial(buf);
+    if (!part) return;
+    const key = JSON.stringify(part);
+    if (key === lastSent) return;
+    lastPartial = now; lastSent = key;
+    if (typeof part.kind === "string") emit({ t: "partial", i: raws.length, slide: part });
+    else if (typeof part.caption === "string") emit({ t: "caption", text: part.caption, done: false });
+  }, signal);
+  if (buf.trim()) line(buf);
+  if (!raws.length) {
+    // 줄 형식을 안 지켰으면 (```json 한 덩어리 등) 통째로 읽어 본다
+    try { const o = jsonOf<{ slides?: Record<string, unknown>[]; caption?: string }>(text); (o.slides ?? []).forEach((x) => raws.push(x)); caption = String(o.caption ?? caption); } catch {}
+  }
+  const data: PostData = { photos: p.current?.photos ?? [], caption, slides: raws.map((s, n) => keepPhotos({ ...s, kind: String(s.kind) }, n, p.current) as SlideData) };
+  let err = validatePost(t, data);
+  if (!err) return emit({ t: "done", data });
+  // 칸 검사에서 틀렸으면: 한 번 고쳐 달라고 (조각 없이), 그래도 틀리면 칸에 맞춰 자른 것으로
+  emit({ t: "fixing", reason: err });
+  try {
+    const { text: raw } = await ask("write", actor, { system: DRAFT_SYSTEM, prompt: `${draftBase(w, p, extra)}\n\n앞선 답:\n${text}\n\n검사에서 틀렸어: ${err}\n고친 전체를 \`\`\`json 블록 하나로: {"slides":[{"kind":"...", ...칸}], "caption":"..."}` });
+    const o = jsonOf<{ slides: Record<string, unknown>[]; caption: string }>(raw);
+    const fixed: PostData = { photos: data.photos, caption: String(o.caption ?? caption), slides: (o.slides ?? []).map((s, n) => keepPhotos({ ...s, kind: String(s.kind) }, n, p.current) as SlideData) };
+    err = validatePost(t, fixed);
+    if (!err) return emit({ t: "done", data: fixed });
+  } catch (e) { if (signal?.aborted) throw e; }
+  const fitted: PostData = { photos: data.photos, caption: caption.slice(0, 2200), slides: raws.map((s, n) => fitSlide(t, s, n)).filter((x): x is SlideData => !!x).slice(0, t.maxSlides).map((s, n) => keepPhotos(s, n, p.current) as SlideData) };
+  if (!validatePost(t, fitted)) return emit({ t: "done", data: fitted, note: "칸보다 긴 글을 칸 길이에 맞춰 잘랐어요. 잘린 곳을 확인해 주세요" });
+  throw new OpError("AI 초안이 칸 제한을 맞추지 못했어요. 다시 해 주세요");
+}

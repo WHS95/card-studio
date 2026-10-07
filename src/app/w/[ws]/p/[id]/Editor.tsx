@@ -6,7 +6,7 @@ import { PHOTO_H, formatOf, slideVideo, validatePost, type Field, type SlideKind
 import { TEMPLATES, templateOf } from "@/lib/templates";
 import { NEXT_STATUS, STATUS_LABEL, type ContentRules, type Photo, type Post, type PostData, type SlideData } from "@/lib/types";
 import { ruleWarnings } from "@/lib/rules";
-import { aiDraftAction, savePostAction, setStatusAction, type SaveState } from "../../../../actions";
+import { savePostAction, setStatusAction, type SaveState } from "../../../../actions";
 import { FieldInput, Media, VideoTune } from "./Parts";
 import { LayerToggles, Modal, Overlay, type Check, type Layers } from "./Preview";
 import AskAi from "../../../../AskAi";
@@ -14,6 +14,7 @@ import { copyText } from "@/lib/client/copy";
 import Icon from "../../../../ui/Icon";
 import Manage from "./Manage";
 import MetricsForm from "./MetricsForm";
+import { Bar, DraftBar, DraftToast, SkelSlide, TypingCard, draftTotal, type DraftNote, type Drafting } from "./Drafting";
 
 type Ws = { id: string; handle: string; categories: string[]; slots: string[]; startDate: string | null; hashtags: string[]; cta: string; ai: boolean; veo: boolean; canEdit: boolean; canApprove: boolean; rules?: ContentRules; defaultTemplate: string };
 type Rec = Record<string, unknown>;
@@ -66,6 +67,12 @@ export default function Editor({ ws, post, empty }: { ws: Ws; post: Post; empty:
     return r;
   }, undefined);
 
+  // AI 초안 쓰는 중 (흐린 칸 → 글이 써짐 → 그 장 미리보기). 멈추면 원래 글로
+  const [drafting, setDrafting] = useState<Drafting | null>(null);
+  const [draftNote, setDraftNote] = useState<DraftNote | null>(null);
+  const draftCtl = useRef<AbortController | null>(null);
+  const lastExtra = useRef("");
+
   /** 고치기 + 되돌리기 기록 (같은 칸을 연달아 칠 때는 0.8초 안이면 한 번으로) */
   const edit = (fn: (d: PostData) => PostData) => {
     if (!ws.canEdit) return; // 검수자는 보기만
@@ -78,17 +85,73 @@ export default function Editor({ ws, post, empty }: { ws: Ws; post: Post; empty:
   };
   const isDirty = (d: PostData) => [template, title, category, JSON.stringify(d)].join("\n") !== savedSnap.current;
   const undo = () => {
-    if (!hist.past.length) return;
+    if (drafting || !hist.past.length) return;
     setHist({ past: hist.past.slice(0, -1), future: [data, ...hist.future] });
     const d = hist.past[hist.past.length - 1];
     setData(d); setDirty(isDirty(d)); lastPush.current = 0;
   };
   const redo = () => {
-    if (!hist.future.length) return;
+    if (drafting || !hist.future.length) return;
     setHist({ past: [...hist.past, data], future: hist.future.slice(1) });
     setData(hist.future[0]); setDirty(isDirty(hist.future[0])); lastPush.current = 0;
   };
   const setSlide = (i: number, patch: Rec) => edit((d) => { d.slides[i] = { ...d.slides[i], ...patch }; return d; });
+
+  /** AI 초안: 장마다 흘려 받아 흐린 칸을 채운다 (/api/ai/draft, NDJSON). 끝나면 '저장 안 됨'으로 남고 ⌘Z 한 번이면 원래 글 */
+  const runDraft = async (extra: string) => {
+    if (drafting || !ws.canEdit) return;
+    lastExtra.current = extra;
+    const before = { data, dirty };
+    const ctl = new AbortController();
+    draftCtl.current = ctl;
+    setHist((h) => ({ past: [...h.past.slice(-49), data], future: [] }));
+    lastPush.current = 0;
+    setDraftNote(null);
+    setDirty(true);
+    setImgs({}); // 이전 글의 그림이 남아 헷갈리지 않게 (되돌리면 캐시에서 바로 다시 그린다)
+    let d: Drafting = { total: 0, slides: [], partial: null, caption: "", phase: "start", via: "", before };
+    setDrafting(d);
+    const put = (next: Partial<Drafting>) => { d = { ...d, ...next }; setDrafting(d); };
+    const restore = () => { setData(before.data); setDirty(before.dirty); setHist((h) => ({ past: h.past.slice(0, -1), future: [] })); setSel(0); };
+    try {
+      const r = await fetch("/api/ai/draft", { method: "POST", signal: ctl.signal, headers: { "content-type": "application/json" }, body: JSON.stringify({ post: post.id, template, title, category, current: before.data, extra }) });
+      if (!r.ok || !r.body) throw new Error((await r.text().catch(() => "")) || "AI 초안을 쓰지 못했어요");
+      const reader = r.body.getReader(), dec = new TextDecoder();
+      let buf = "", final: PostData | null = null, note = "";
+      const handle = (e: { t: string } & Rec) => {
+        if (e.t === "start") put({ via: String(e.via ?? "") });
+        else if (e.t === "total") put({ total: Number(e.n) || 0, phase: "write" });
+        else if (e.t === "partial") put({ partial: e.slide as Rec, phase: "write" });
+        else if (e.t === "slide") {
+          const slides = [...d.slides]; slides[Number(e.i)] = e.slide as SlideData;
+          put({ slides, partial: null, phase: "write" });
+          setData({ photos: before.data.photos, caption: before.data.caption, slides: slides.filter(Boolean) });
+          setSel(slides.length - 1);
+        } else if (e.t === "caption") put({ caption: String(e.text ?? ""), phase: "caption", partial: null });
+        else if (e.t === "fixing") put({ phase: "fixing" });
+        else if (e.t === "done") { final = e.data as PostData; note = String(e.note ?? ""); }
+        else if (e.t === "error") throw new Error(String(e.message ?? "AI 초안을 쓰지 못했어요"));
+      };
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf += dec.decode(value, { stream: true });
+        let i;
+        while ((i = buf.indexOf("\n")) >= 0) { const l = buf.slice(0, i); buf = buf.slice(i + 1); if (l.trim()) handle(JSON.parse(l)); }
+      }
+      if (buf.trim()) handle(JSON.parse(buf));
+      if (!final) throw new Error("AI 답이 끊겼어요. 다시 해 주세요");
+      const fin: PostData = final;
+      setData(fin); setSel(0); setDrafting(null);
+      setDraftNote({ kind: "ok", text: `초안 ${fin.slides.length}장을 넣었어요`, sub: note || "사실·숫자를 확인하고 저장해 주세요" });
+    } catch (e) {
+      restore(); setDrafting(null);
+      setDraftNote(ctl.signal.aborted ? { kind: "stop", text: "멈췄어요 · 원래 글로 돌려놨어요" } : { kind: "err", text: e instanceof Error ? e.message : "AI 초안을 쓰지 못했어요", sub: "원래 글로 돌려놨어요" });
+    } finally { draftCtl.current = null; }
+  };
+  const stopDraft = () => draftCtl.current?.abort();
+  useEffect(() => () => draftCtl.current?.abort(), []); // 화면을 나가면 멈춘다
+  useEffect(() => { if (draftNote?.kind !== "ok") return; const t = setTimeout(() => setDraftNote(null), 12000); return () => clearTimeout(t); }, [draftNote]);
 
   // ⌘S 저장 · ⌘Z 되돌리기 · ⇧⌘Z 다시 · 저장 안 하고 나가면 묻기
   const keys = useRef({ undo, redo, save: () => {} });
@@ -221,13 +284,18 @@ export default function Editor({ ws, post, empty }: { ws: Ws; post: Post; empty:
         <Link href={`/w/${ws.id}`} className="ed-back">← 달력</Link>
         <b className="ed-title">D{post.day} {post.slot} · {title || "제목 없음"}</b>
         <span className="ed-pill">{STATUS_LABEL[post.status]}</span>
-        <span className="ed-meta">{dirty ? <b>저장 안 됨</b> : "저장됨"} · {t.name} · {category}</span>
+        <span className="ed-meta">{drafting ? <b>AI 초안 쓰는 중</b> : dirty ? <b>저장 안 됨</b> : "저장됨"} · {t.name} · {category}</span>
         <div className="ed-actions">
-          <span className="ed-state">{dirty ? "저장 안 됨" : "저장됨"}</span>
-          <button type="button" className="btn ed-undo" onClick={undo} disabled={!hist.past.length} title="⌘Z">되돌리기</button>
-          <button type="button" className="btn ed-redo" onClick={redo} disabled={!hist.future.length} title="⇧⌘Z">다시</button>
-          {saveBtn("btn ed-save")}
-          <StatusBar post={post} dirty={dirty} canEdit={ws.canEdit} canApprove={ws.canApprove} wsId={ws.id} />
+          <span className="ed-state">{drafting ? "쓰는 중" : dirty ? "저장 안 됨" : "저장됨"}</span>
+          <button type="button" className="btn ed-undo" onClick={undo} disabled={!!drafting || !hist.past.length} title="⌘Z">되돌리기</button>
+          <button type="button" className="btn ed-redo" onClick={redo} disabled={!!drafting || !hist.future.length} title="⇧⌘Z">다시</button>
+          {drafting ? <>
+            <button type="button" className="btn ed-save" disabled>저장<span className="ed-kbd"> ⌘S</span></button>
+            <button type="button" className="btn primary" onClick={stopDraft} disabled={drafting.phase === "fixing"}>멈추기</button>
+          </> : <>
+            {saveBtn("btn ed-save")}
+            <StatusBar post={post} dirty={dirty} canEdit={ws.canEdit} canApprove={ws.canApprove} wsId={ws.id} />
+          </>}
         </div>
       </div>
       {(err || state?.error || (state?.ok && !dirty) || !ws.canEdit) && (
@@ -238,7 +306,8 @@ export default function Editor({ ws, post, empty }: { ws: Ws; post: Post; empty:
       )}
 
       <div className="ed-grid">
-        {warns.length > 0 && (
+        {drafting && <DraftBar d={drafting} />}
+        {!drafting && warns.length > 0 && (
           <div className="ed-warn" role="status">
             <Icon name="warn" size={16} />
             <b>규칙 경고 {warns.length}</b>
@@ -248,7 +317,7 @@ export default function Editor({ ws, post, empty }: { ws: Ws; post: Post; empty:
         )}
 
         <nav className="ed-list" aria-label="장 목록">
-          {data.slides.map((sl, n) => {
+          {(drafting ? drafting.slides : data.slides).map((sl, n) => {
             const kk = kindOf(sl.kind);
             const c = checks?.[n];
             const why = [...reasons(n), ...(c && !err && !c.ok ? [`밖 ${c.outside}`] : [])];
@@ -257,12 +326,17 @@ export default function Editor({ ws, post, empty }: { ws: Ws; post: Post; empty:
                 <span className="ed-sthumb" data-fmt={fmt}>{imgs[n] ? <img src={imgs[n]} alt="" /> : null}{videoAt(n) && <i className="play">▶</i>}</span>
                 <span className="ed-sinfo">
                   <b>{n + 1} {kk?.label ?? "없는 종류"}</b>
-                  <span>{why.length ? `⚠ ${why.join(" · ")}` : c && !err ? "✓" : ""}</span>
+                  <span>{drafting ? "✓ 다 씀" : why.length ? `⚠ ${why.join(" · ")}` : c && !err ? "✓" : ""}</span>
                 </span>
               </button>
             );
           })}
-          {ws.canEdit && (
+          {drafting && Array.from({ length: draftTotal(drafting) - drafting.slides.length }, (_, i) => {
+            const n = drafting.slides.length + i;
+            return <SkelSlide key={`w${n}`} n={n} cur={i === 0 && drafting.phase === "write"} fmt={fmt} />;
+          })}
+          {drafting && <span className="ed-count">AI가 장 수를 먼저 정하고 차례로 채워요</span>}
+          {ws.canEdit && !drafting && (
             <details className="ed-add" ref={addRef}>
               <summary className="btn">+ 장 더하기</summary>
               <div className="ed-add-menu">
@@ -272,11 +346,11 @@ export default function Editor({ ws, post, empty }: { ws: Ws; post: Post; empty:
               </div>
             </details>
           )}
-          <span className="ed-count">{data.slides.length}/{t.maxSlides}장</span>
+          {!drafting && <span className="ed-count">{data.slides.length}/{t.maxSlides}장</span>}
         </nav>
 
-        <fieldset className="ed-mid" disabled={!ws.canEdit}>
-          {!k ? <section className="ed-card ed-fields"><p className="err">{cur + 1}번째 장: 이 템플릿에 없는 종류예요</p></section> : (
+        <fieldset className="ed-mid" disabled={!ws.canEdit || !!drafting}>
+          {drafting ? <TypingCard d={drafting} kindOf={kindOf} /> : !k ? <section className="ed-card ed-fields"><p className="err">{cur + 1}번째 장: 이 템플릿에 없는 종류예요</p></section> : (
             <section className="ed-card ed-fields" aria-label={`${cur + 1}장 칸`}>
               <h2>{cur + 1}장 · {k.label}{vid && <span className="badge">영상</span>}</h2>
               {k.fields.map((f) => <FieldInput key={`${cur}-${f.key}`} f={f} v={s[f.key]} photos={data.photos} onChange={(v) => setSlide(cur, { [f.key]: v })} />)}
@@ -318,11 +392,7 @@ export default function Editor({ ws, post, empty }: { ws: Ws; post: Post; empty:
                 <select className="input" value={template} onChange={(e) => switchTemplate(e.target.value)}>{TEMPLATES.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select>
               </label>
             </div>
-            <AiDraft ws={ws} postId={post.id} onDraft={async (extra) => {
-              const r = await aiDraftAction({ post: post.id, template, title, category, current: data, extra });
-              if (r?.ok) { const d = r.ok; edit(() => d); }
-              return r?.error ?? null;
-            }} />
+            <AiDraft ws={ws} postId={post.id} busy={!!drafting} onDraft={runDraft} />
           </details>
         </fieldset>
 
@@ -330,16 +400,24 @@ export default function Editor({ ws, post, empty }: { ws: Ws; post: Post; empty:
           <section className="ed-card ed-prev">
             <h2>미리보기 · {cur + 1}장<span className="ed-sub">{fmt === "reel" ? "1080×1920 릴스" : "1080×1350"}</span></h2>
             <button type="button" className="frame ed-bigframe" data-fmt={fmt} onClick={() => setOpen(cur)} aria-label={`${cur + 1}번째 장 크게 보기`}>
-              {imgs[cur] ? <img src={imgs[cur]} alt="" /> : <div className="wait">그리는 중</div>}
+              {drafting && !drafting.slides.length ? <div className="wait ed-skel">다 쓰면 그려져요</div> : imgs[cur] ? <img src={imgs[cur]} alt="" /> : <div className="wait">그리는 중</div>}
               <Overlay n={cur} total={data.slides.length} layers={layers} video={!!vid} fmt={fmt} />
               {vid && <i className="play">▶ 영상</i>}
             </button>
+            {drafting && (
+              <div className="ed-mini" aria-label="장마다 미리보기">
+                {Array.from({ length: draftTotal(drafting) }, (_, n) => n < drafting.slides.length && imgs[n]
+                  ? <button key={n} type="button" className="ed-sthumb" data-fmt={fmt} aria-label={`${n + 1}장`} onClick={() => setSel(n)}><img src={imgs[n]} alt="" /></button>
+                  : <span key={n} className="ed-sthumb ed-skel" data-fmt={fmt} />)}
+              </div>
+            )}
             <div className="ed-row">
               <LayerToggles layers={layers} onChange={setLayers} />
               <button type="button" className="btn" onClick={() => setOpen(cur)}>크게 보기</button>
             </div>
             <p className="ed-margin">
-              {err ? <span className="err">미리보기를 멈췄어요: {err}</span>
+              {drafting ? (drafting.slides.length < draftTotal(drafting) ? `${drafting.slides.length + 1}장은 글이 다 써지면 그려져요 · 다 쓴 장을 누르면 그 장을 크게` : "장을 다 썼어요 · 캡션을 쓰는 중")
+                : err ? <span className="err">미리보기를 멈췄어요: {err}</span>
                 : !checks ? "인스타 마진: 계산 중"
                 : <>인스타 마진: {checks.map((c, i) => <span key={i} className={c.ok ? undefined : "ed-bad"}>{i > 0 ? " · " : ""}{c.n} {c.ok ? "✓" : `밖 ${c.outside}`}</span>)}</>}
             </p>
@@ -347,7 +425,10 @@ export default function Editor({ ws, post, empty }: { ws: Ws; post: Post; empty:
 
           <section className="ed-card ed-cap">
             <h2>캡션<button type="button" className="btn ed-hbtn" onClick={copy}>{copied ? "복사했어요" : "캡션 복사"}</button></h2>
-            <textarea className="input" aria-label="캡션" rows={8} readOnly={!ws.canEdit} value={data.caption} maxLength={2200} onChange={(e) => edit((d) => { d.caption = e.target.value; return d; })} />
+            {drafting ? (drafting.caption
+              ? <div className="ed-ro ed-ro-area ed-cap-typing">{drafting.caption}{drafting.phase === "caption" && <i className="ed-caret" />}</div>
+              : <div className="ed-ro ed-ro-wait"><Bar w="80%" /><Bar w="55%" /><Bar w="68%" /><span className="ed-note">캡션은 장을 다 쓴 뒤 마지막에 써요</span></div>)
+              : <textarea className="input" aria-label="캡션" rows={8} readOnly={!ws.canEdit} value={data.caption} maxLength={2200} onChange={(e) => edit((d) => { d.caption = e.target.value; return d; })} />}
             <p className="ed-note">
               {data.caption.length}/2200 · 해시태그 <b className={tagCount > HASHTAG_MAX ? "ed-bad" : undefined}>{tagCount}/{HASHTAG_MAX}</b>
               {firstPart && <> · &apos;더 보기&apos; 전: {firstPart.slice(0, 125)}{moreCut ? "…" : ""}</>} · 사진 출처는 끝에 자동
@@ -385,6 +466,7 @@ export default function Editor({ ws, post, empty }: { ws: Ws; post: Post; empty:
         <Modal handle={ws.handle} imgs={imgs} n={open} total={data.slides.length} caption={fullCaption} layers={layers} setLayers={setLayers}
           isVideo={(n) => !!videoAt(n)} renderVideo={renderVideo} onClose={() => setOpen(null)} onMove={setOpen} fmt={fmt} />
       )}
+      <DraftToast d={drafting} note={draftNote} onStop={stopDraft} onUndo={() => { setDraftNote(null); undo(); }} onRetry={() => runDraft(lastExtra.current)} onClose={() => setDraftNote(null)} />
     </div>
   );
 }
@@ -416,32 +498,27 @@ function StatusBar({ post, dirty, canEdit, canApprove, wsId }: { post: Post; dir
   );
 }
 
-/** AI 초안: 기획 제목·메모·자료로 장 글과 캡션을 채운다 (⌘Z 로 되돌릴 수 있고, 저장은 사람이) */
-function AiDraft({ ws, postId, onDraft }: { ws: Ws; postId: string; onDraft: (extra: string) => Promise<string | null> }) {
+/** AI 초안: 기획 제목·메모·자료로 장 글과 캡션을 채운다 — 장마다 써지는 모습이 보이고(⌘Z 로 되돌릴 수 있고), 저장은 사람이 */
+function AiDraft({ ws, postId, busy, onDraft }: { ws: Ws; postId: string; busy: boolean; onDraft: (extra: string) => void }) {
   const [extra, setExtra] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [msg, setMsg] = useState("");
-  // 스튜디오에 Claude 키가 없으면: 내 Claude·ChatGPT 구독(커넥터)에서 초안을 쓰게
+  // 스튜디오에 AI 연결이 없으면: 내 Claude·ChatGPT 구독(커넥터)에서 초안을 쓰게
   if (!ws.ai) return ws.canEdit ? (
     <div className="block">
       <div className="bh"><strong>AI 초안</strong><span className="small muted">다 되면 이 화면을 새로 고침하세요</span></div>
       <AskAi label="내 Claude·ChatGPT 구독으로 초안 쓰기" prompt={`카드뉴스 스튜디오 게시물 ${postId} 를 get_post 로 읽고, 그 서비스 브리프(get_brief)와 메모·자료에 맞춰 템플릿 칸 정의(list_templates)대로 장 글과 캡션을 써서 update_post 로 넣어 줘. 글자 수 제한을 지키고, 사진 칸은 그대로 두고, 넣은 뒤 check_safe_zone 으로 확인해 줘.`} />
     </div>
   ) : null;
-  const go = async () => {
-    if (!confirm("AI가 장 글과 캡션을 새로 써요. 지금 글은 바뀌지만 ⌘Z로 되돌릴 수 있어요. 할까요?")) return;
-    setBusy(true); setMsg("");
-    const e = await onDraft(extra);
-    setBusy(false); setMsg(e ?? "초안을 넣었어요. 사실·숫자를 확인한 뒤 저장해 주세요.");
+  const go = () => {
+    if (!confirm("AI가 장 글과 캡션을 새로 써요. 장마다 써지는 모습이 보이고, 다 쓰면 ⌘Z 로 원래 글로 되돌릴 수 있어요. 할까요?")) return;
+    onDraft(extra);
   };
   return (
     <div className="block">
-      <div className="bh"><strong>AI 초안</strong><span className="small muted">브리프 · 기획 제목 · 메모(자료 출처)를 바탕으로</span></div>
+      <div className="bh"><strong>AI 초안</strong><span className="small muted">브리프 · 기획 제목 · 메모(자료 출처)를 바탕으로 장마다 써요</span></div>
       <div className="row">
         <input className="input" style={{ flex: 1, minWidth: 200 }} value={extra} maxLength={500} onChange={(e) => setExtra(e.target.value)} placeholder="덧붙일 요청 (예: 5장으로, 숫자 위주로)" />
-        <button type="button" className="btn" onClick={go} disabled={busy}>{busy ? "쓰는 중 (30초쯤)" : "AI로 채우기"}</button>
+        <button type="button" className="btn" onClick={go} disabled={busy}>{busy ? "쓰는 중" : "AI로 채우기"}</button>
       </div>
-      {msg && <p className={/넣었어요/.test(msg) ? "ok" : "err"}>{msg}</p>}
     </div>
   );
 }
