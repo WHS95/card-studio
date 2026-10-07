@@ -142,7 +142,7 @@ export default function Editor({ ws, post, empty }: { ws: Ws; post: Post; empty:
       if (buf.trim()) handle(JSON.parse(buf));
       if (!final) throw new Error("AI 답이 끊겼어요. 다시 해 주세요");
       const fin: PostData = final;
-      setData(fin); setSel(0); setDrafting(null);
+      setData(fin); setSel(0); setDrafting(null); setDirty(true);
       setDraftNote({ kind: "ok", text: `초안 ${fin.slides.length}장을 넣었어요`, sub: note || "사실·숫자를 확인하고 저장해 주세요" });
     } catch (e) {
       restore(); setDrafting(null);
@@ -155,7 +155,7 @@ export default function Editor({ ws, post, empty }: { ws: Ws; post: Post; empty:
 
   // ⌘S 저장 · ⌘Z 되돌리기 · ⇧⌘Z 다시 · 저장 안 하고 나가면 묻기
   const keys = useRef({ undo, redo, save: () => {} });
-  useEffect(() => { keys.current = { undo, redo, save: () => { if (!err && !saving) formRef.current?.requestSubmit(); } }; });
+  useEffect(() => { keys.current = { undo, redo, save: () => { if (!err && !saving && !drafting) formRef.current?.requestSubmit(); } }; }); // AI 가 쓰는 중엔 저장 안 함
   useEffect(() => {
     const k = (e: KeyboardEvent) => {
       if (!(e.metaKey || e.ctrlKey)) return;
@@ -291,7 +291,7 @@ export default function Editor({ ws, post, empty }: { ws: Ws; post: Post; empty:
           <button type="button" className="btn ed-redo" onClick={redo} disabled={!!drafting || !hist.future.length} title="⇧⌘Z">다시</button>
           {drafting ? <>
             <button type="button" className="btn ed-save" disabled>저장<span className="ed-kbd"> ⌘S</span></button>
-            <button type="button" className="btn primary" onClick={stopDraft} disabled={drafting.phase === "fixing"}>멈추기</button>
+            <button type="button" className="btn primary" onClick={stopDraft}>멈추기</button>
           </> : <>
             {saveBtn("btn ed-save")}
             <StatusBar post={post} dirty={dirty} canEdit={ws.canEdit} canApprove={ws.canApprove} wsId={ws.id} />

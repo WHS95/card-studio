@@ -109,7 +109,7 @@ export function DraftToast({ d, note, onStop, onUndo, onRetry, onClose }: { d: D
     return (
       <div className="ed-toast" role="status" aria-live="polite">
         <span className="ed-spin" aria-hidden /><b>{text}</b>{sub && <span className="ed-toast-sub">{sub}{d.via ? ` · ${viaName(d.via)}` : ""}</span>}
-        {d.phase !== "fixing" && <button type="button" onClick={onStop}>멈추기</button>}
+        <button type="button" onClick={onStop}>멈추기</button>
       </div>
     );
   }
