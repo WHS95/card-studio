@@ -57,7 +57,7 @@ export default function WsSettings({ w, admin }: { w: W; admin: boolean }) {
         <section className="sect"><h2>요금제 · 운영자만</h2>
           <div className="set-inline">
             <select name="plan" className="input" style={{ width: "auto", minWidth: 90 }} defaultValue={w.plan} disabled={!admin} aria-label="요금제"><option value="free">무료</option><option value="pro">프로</option><option value="agency">에이전시</option></select>
-            <span className="small muted">{admin ? "결제 연결 전이라 운영자가 바꿔요" : "요금제는 운영자에게 말하면 바꿀 수 있어요"}</span>
+            <span className="small muted">{admin ? "결제를 연결하기 전이라 여기서 바꿔요" : "바꾸려면 운영자에게 말해 주세요"}</span>
           </div>
         </section>
         <button type="submit" className="sr" tabIndex={-1}>저장</button>

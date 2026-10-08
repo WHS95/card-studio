@@ -34,7 +34,7 @@ export default async function ResearchPage({ params, searchParams }: PageProps<"
   return (
     <ServiceShell ws={w} step="research" ctx="2단계 자료 조사">
         <div className="stg-head">
-          <div className="col stg-head-t"><h1>자료 조사</h1><span className="small muted">숫자·사실은 출처와 함께 적어요. 높음 = 공식·학술 원문을 확인함 · 보통 = 2차 요약·블로그 · 확인 필요 = 아직 원문과 맞춰 보지 않음 (승인 전 확인에 보여요)</span></div>
+          <div className="col stg-head-t"><h1>자료 조사</h1><span className="small muted">숫자·사실은 출처와 함께 적어요. 신뢰도: 높음 = 공식·학술 원문 확인 · 보통 = 2차 요약·블로그 · 확인 필요 = 원문 확인 전. &apos;확인 필요&apos; 자료는 검수 창에 떠요.</span></div>
           {canEdit && <details className="stg-new" open={!all.length || undefined}>
             <summary className="btn primary">+ 자료 더하기</summary>
             <div className="cols2 stg-new-body">
@@ -54,7 +54,7 @@ export default async function ResearchPage({ params, searchParams }: PageProps<"
               <div className="sect">
                 <h2>AI 자료 조사 <span className="sp small muted">웹 검색</span></h2>
                 <AiResearch ws={w.id} enabled={await aiEnabled(actor)} />
-                <p className="small muted" style={{ margin: 0 }}>AI 가 찾은 자료는 &apos;보통&apos;으로 들어가요. 원문을 직접 확인하면 &apos;높음&apos;으로 바꿔 주세요.</p>
+                <p className="small muted" style={{ margin: 0 }}>AI가 찾은 자료는 틀릴 수 있어서 &apos;보통&apos;으로 들어가요. 원문을 직접 확인하면 &apos;높음&apos;으로 바꿔 주세요.</p>
                 <AskAi prompt={`카드뉴스 스튜디오의 '${w.name}'(${w.id}) 서비스 브리프를 읽고(get_brief), 다음 주제를 웹에서 조사해 믿을 만한 출처 3~6개를 add_research 로 넣어 줘(제목·주소·카드에 쓸 핵심 사실 요약). 주제: `} />
               </div>
             </div>
@@ -68,7 +68,7 @@ export default async function ResearchPage({ params, searchParams }: PageProps<"
             <a className={`chip${conf ? "" : " on"}`} href={qs({ c: null })}>전체 {all.length}</a>
             {CONFIDENCE.map((c) => <a key={c} className={`chip${conf === c ? " on" : ""}`} href={qs({ c })}>{CONF_LABEL[c]} {all.filter((r) => (r.confidence ?? "medium") === c).length}</a>)}
             <form className="stg-search" action={`/w/${w.id}/research`} role="search">
-              <input name="q" className="input" aria-label="자료 찾기" placeholder="찾기 (제목·요약·메모·주소)" defaultValue={term} />
+              <input name="q" className="input" aria-label="자료 찾기" placeholder="제목·요약·메모·주소에서 찾기" defaultValue={term} />
               {tag && <input type="hidden" name="tag" value={tag} />}
               {conf && <input type="hidden" name="c" value={conf} />}
             </form>
@@ -106,7 +106,7 @@ export default async function ResearchPage({ params, searchParams }: PageProps<"
                   </form>
                   {canEdit && <form action={updateResearchAction}>
                     <input type="hidden" name="ws" value={w.id} /><input type="hidden" name="id" value={r.id} />
-                    <ConfirmButton name="op" value="remove" ask={`'${r.title.slice(0, 30)}' 자료를 지울까요? 이 자료를 연결한 주제에서도 빠지고, 되돌릴 수 없어요.`}>지우기</ConfirmButton>
+                    <ConfirmButton name="op" value="remove" ask={`'${r.title.slice(0, 30)}' 자료를 지울까요? 연결한 주제에서도 빠져요. 지우면 되돌릴 수 없어요.`}>지우기</ConfirmButton>
                   </form>}
                   {canEdit && <details className="stg-edit"><summary className="btn">고치기</summary>
                     <form action={updateResearchAction} className="panel stg-edit-body">
@@ -127,11 +127,11 @@ export default async function ResearchPage({ params, searchParams }: PageProps<"
               </article>
             );
           })}
-          {!list.length && <p className="hint">{all.length ? "조건에 맞는 자료가 없어요. 거르기를 바꿔 보세요." : "'+ 자료 더하기'에서 직접 더하거나 AI·MCP로 조사해 보세요."}</p>}
+          {!list.length && <p className="hint">{all.length ? "고른 조건에 맞는 자료가 없어요. 신뢰도·태그·찾는 말을 바꿔 보세요." : "아직 자료가 없어요. '+ 자료 더하기'에서 직접 더하거나 AI로 조사해 보세요."}</p>}
         </div>
         {canEdit && list.length > 0 && <BulkBar group="research" action={bulkResearchAction} hidden={{ ws: w.id, back: qs({}) }} ops={[
           ...CONFIDENCE.map((c) => ({ op: `conf:${c}`, label: `신뢰도 ${CONF_LABEL[c]}` })),
-          { op: "remove", label: "지우기", ask: "고른 자료 {n}개를 지울까요? 연결한 주제에서도 빠지고, 되돌릴 수 없어요." },
+          { op: "remove", label: "지우기", ask: "고른 자료 {n}개를 지울까요? 연결한 주제에서도 빠져요. 지우면 되돌릴 수 없어요." },
         ]} />}
     </ServiceShell>
   );

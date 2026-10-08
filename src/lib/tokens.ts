@@ -17,7 +17,7 @@ const PAT_MAX = 10;
 export async function createPat(userId: string, name: string) {
   const token = fresh("cs_pat");
   await mutate((db) => {
-    if (db.tokens.filter((t) => t.userId === userId && t.kind === "pat").length >= PAT_MAX) throw new OpError(`개인 토큰은 ${PAT_MAX}개까지 만들 수 있어요. 안 쓰는 토큰을 끊고 다시 만들어 주세요`);
+    if (db.tokens.filter((t) => t.userId === userId && t.kind === "pat").length >= PAT_MAX) throw new OpError(`개인 토큰은 ${PAT_MAX}개까지 만들 수 있어요. 안 쓰는 토큰의 연결을 끊은 뒤 다시 만들어 주세요`);
     db.tokens.push({ id: newId(), userId, name: name.trim().slice(0, 40) || "개인 토큰", hash: sha(token), kind: "pat", createdAt: new Date().toISOString() });
   });
   return token;
@@ -31,7 +31,7 @@ export async function listTokens(userId: string) {
 export async function revokeToken(userId: string, id: string) {
   return mutate((db) => {
     const t = db.tokens.find((x) => x.id === id && x.userId === userId);
-    if (!t) throw new OpError("연결을 찾지 못했어요");
+    if (!t) throw new OpError("연결을 찾지 못했어요. 화면을 새로 고쳐 주세요");
     db.tokens = db.tokens.filter((x) => x !== t);
   });
 }
@@ -58,7 +58,7 @@ export async function actorFromBearer(bearer: string): Promise<Actor | null> {
 
 export async function registerClient(input: { client_name?: unknown; redirect_uris?: unknown }): Promise<OAuthClient> {
   const uris = Array.isArray(input.redirect_uris) ? input.redirect_uris.map(String).filter((u) => /^https:\/\//.test(u) || /^http:\/\/(127\.0\.0\.1|localhost)(:\d+)?\//.test(u)).slice(0, 10) : [];
-  if (!uris.length) throw new OpError("redirect_uris 가 필요해요 (https)");
+  if (!uris.length) throw new OpError("https 로 시작하는 redirect_uris 를 보내 주세요");
   const c: OAuthClient = { id: `csc_${randomBytes(12).toString("base64url")}`, name: String(input.client_name ?? "AI 앱").slice(0, 60), redirectUris: uris, createdAt: new Date().toISOString() };
   await mutate((db) => { if (db.oauthClients.length > 500) db.oauthClients.shift(); db.oauthClients.push(c); });
   return c;

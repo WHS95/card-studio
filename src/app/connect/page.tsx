@@ -14,7 +14,7 @@ export default async function Connect() {
     <WideShell active="connect">
       <div className="w-pagehead w-1100">
         <h1>AI 앱 연결</h1>
-        <p className="small muted">내 Claude·ChatGPT·Claude Code 에 이 스튜디오를 붙여(MCP) 내 구독으로 작업해요. AI 비용은 그 구독에서 나가요. 내 역할 안에서만 일해요.</p>
+        <p className="small muted">내 Claude·ChatGPT·Claude Code 에 이 스튜디오를 붙여(MCP) 내 구독으로 작업해요. AI 비용은 그 구독에서 나가고, 연결한 앱은 내 역할 안에서만 일해요.</p>
       </div>
       <ConnectApps mcpUrl={`${base}/api/mcp`} local={/^http:\/\/(127\.0\.0\.1|localhost)/.test(base)} rows={rows} />
     </WideShell>

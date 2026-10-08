@@ -50,17 +50,17 @@ export default async function Home({ searchParams }: PageProps<"/">) {
                   <Link href={`/w/${w.id}/go`} className="w-hero-link" aria-hidden tabIndex={-1}>{(w.name.trim()[0] ?? "?").toUpperCase()}</Link>
                   <span className="w-hero-tools">
                     <form action={favoriteAction}><input type="hidden" name="ws" value={w.id} />
-                      <button className="tool" aria-pressed={on} aria-label={on ? `${w.name} 즐겨찾기에서 빼기` : `${w.name} 즐겨찾기`} title={on ? "즐겨찾기에서 빼기" : "즐겨찾기"}><Icon name="star" /></button></form>
+                      <button className="tool" aria-pressed={on} aria-label={on ? `${w.name} 즐겨찾기에서 빼기` : `${w.name} 즐겨찾기에 넣기`} title={on ? "즐겨찾기에서 빼기" : "즐겨찾기에 넣기"}><Icon name="star" /></button></form>
                     <details className="w-more">
                       <summary className="tool" aria-label={`${w.name} 더 보기`} title="더 보기">
                         <svg width="18" height="18" viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth={1.6}><circle cx="5" cy="10" r="1.2" /><circle cx="10" cy="10" r="1.2" /><circle cx="15" cy="10" r="1.2" /></svg>
                       </summary>
                       <div className="w-menu">
                         <Link href={`/w/${w.id}/go`}>할 일 단계로 열기</Link>
-                        <Link href={`/w/${w.id}`}>제작 · 목록</Link>
+                        <Link href={`/w/${w.id}`}>제작 목록</Link>
                         {manage && <Link href={`/w/${w.id}/settings`}>서비스 설정</Link>}
                         {manage && <Link href={`/w/${w.id}/members`}>함께 쓰기</Link>}
-                        {manage && <a href={`/api/ws/${w.id}/export`}>내보내기 (JSON)</a>}
+                        {manage && <a href={`/api/ws/${w.id}/export`}>JSON으로 내려받기</a>}
                       </div>
                     </details>
                   </span>
@@ -76,7 +76,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
         </div>
       )}
       {!list.length && <p className="hint">{fav ? "서비스 카드의 별을 누르면 여기 모여요." : "'새 서비스'를 눌러 첫 서비스를 만들어 보세요."}</p>}
-      <p className="small muted w-m0">{fav ? "별을 누른 서비스만 모여요." : "카드를 누르면 '할 일'이 있는 단계로 열려요. 진행 띠는 5단계(목적·자료 조사·주제·템플릿·제작)이고, 진한 칸은 마친 단계예요."}</p>
+      <p className="small muted w-m0">{fav ? "별을 누른 서비스만 모여요." : "카드를 누르면 할 일이 있는 단계로 열려요. 띠는 목적부터 제작까지 5단계이고, 진하게 칠한 곳이 마친 단계예요."}</p>
     </WideShell>
   );
 }

@@ -5,7 +5,7 @@ import { readDb } from "@/lib/store";
 export async function GET(_req: Request, ctx: RouteContext<"/api/ws/[ws]/export">) {
   if (!(await isAuthed())) return new Response("로그인한 뒤 다시 해 주세요", { status: 401 });
   const { ws } = await ctx.params;
-  if (!(await wsAccess(ws, "manage"))) return new Response("소유자만 내보낼 수 있어요", { status: 403 });
+  if (!(await wsAccess(ws, "manage"))) return new Response("서비스 소유자만 JSON으로 내려받을 수 있어요", { status: 403 });
   const db = await readDb();
   const workspace = db.workspaces.find((w) => w.id === ws);
   if (!workspace) return new Response("서비스를 찾지 못했어요", { status: 404 });

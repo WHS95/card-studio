@@ -6,7 +6,7 @@ import { hashPassword, tempPassword, verifyPassword } from "./auth";
 import { templateOf } from "./templates";
 import { validatePost } from "./fields";
 import { ruleWarnings, ruleLine } from "./rules";
-import { CHECKS_MAX, CONFIDENCE, DEFAULT_CHECKS, IDEA_STATUS, NEXT_STATUS, NO_RULES, POST_STATUS, type Activity, type AiReview, type Brief, type Confidence, type ContentRules, type Idea, type IdeaStatus, type Metrics, type Role, type User, ROLES, type PlanId, type Pillar, type Post, type PostData, type PostStatus, type Research, type Theme, type Workspace } from "./types";
+import { CHECKS_MAX, CONFIDENCE, DEFAULT_CHECKS, IDEA_STATUS, NEXT_STATUS, NO_RULES, POST_STATUS, type Activity, type AiReview, type Brief, type Confidence, type ContentRules, type Idea, type IdeaStatus, type Metrics, type Role, type User, ROLES, type PlanId, type Pillar, type Post, type PostData, type PostStatus, type Research, STATUS_LABEL, type Theme, type Workspace } from "./types";
 
 // 화면(server action)과 MCP 가 같이 쓰는 규칙 한 곳. 틀리면 OpError(사용자에게 보여 줄 문구).
 
@@ -105,7 +105,7 @@ export async function createPostIn(wsId: string, p: { day: number; slot: string;
 /** 게시물 고치기. data 는 템플릿 기준으로 검사. 게시된 것은 글을 고칠 수 없다(게시 취소 후) */
 export async function savePost(id: string, p: { template?: string; title?: string; category?: string; note?: string; data?: unknown }) {
   const cur = (await getPost(id)) ?? fail("게시물을 찾지 못했어요");
-  if (cur.status === "posted" && p.data !== undefined) fail("게시된 게시물은 게시 취소 후 고칠 수 있어요");
+  if (cur.status === "posted" && p.data !== undefined) fail("게시한 게시물은 게시를 취소한 뒤에 고칠 수 있어요");
   const template = templateOf(p.template ?? cur.template).id;
   const patch: Partial<Post> = { template };
   if (p.title !== undefined) patch.title = s(p.title, 80);
@@ -118,7 +118,7 @@ export async function savePost(id: string, p: { template?: string; title?: strin
     // 승인된 뒤 글을 고치면 다시 검수 받도록 초안으로 (체크 기록도 지운다)
     patch.status = cur.status === "plan" || cur.status === "approved" ? "draft" : cur.status;
     if (cur.status === "approved") patch.review = undefined;
-  } else if (template !== cur.template && cur.data) fail("템플릿을 바꿀 때는 새 틀에 맞는 data 도 같이 보내 주세요");
+  } else if (template !== cur.template && cur.data) fail("템플릿을 바꿀 때는 새 템플릿에 맞는 내용(data)도 함께 보내 주세요");
   return (await updatePost(id, patch))!;
 }
 
@@ -128,8 +128,8 @@ export const requiredChecks = (w: Workspace) => [...DEFAULT_CHECKS, ...(w.brief?
 /** 상태는 NEXT_STATUS 길로만. 승인은 저장된 내용 + 체크리스트를 모두 체크, 게시는 승인된 것 + 인스타 링크 */
 export async function setStatus(id: string, status: PostStatus, postedUrl?: string, opts: { checks?: string[]; by?: string } = {}) {
   const cur = (await getPost(id)) ?? fail("게시물을 찾지 못했어요");
-  if (!POST_STATUS.includes(status)) fail("상태 값이 맞지 않아요");
-  if (!NEXT_STATUS[cur.status].includes(status)) fail(NEXT_STATUS[cur.status].length ? `지금 상태(${cur.status})에서는 ${NEXT_STATUS[cur.status].join(", ")} 로만 바꿀 수 있어요` : `지금 상태(${cur.status})에서는 상태를 바꿀 수 없어요`);
+  if (!POST_STATUS.includes(status)) fail("없는 상태예요. 상태를 다시 골라 주세요");
+  if (!NEXT_STATUS[cur.status].includes(status)) fail(NEXT_STATUS[cur.status].length ? `'${STATUS_LABEL[cur.status]}' 상태에서는 ${NEXT_STATUS[cur.status].map((x) => `'${STATUS_LABEL[x]}'`).join("·")} 상태로만 바꿀 수 있어요` : `'${STATUS_LABEL[cur.status]}' 상태에서는 상태를 바꿀 수 없어요`);
   const to: PostStatus = cur.status === "skip" && !cur.data ? "plan" : status;
   if (to !== "skip" && to !== "plan" && !cur.data) fail("저장된 내용이 없어요. 글을 먼저 저장해 주세요");
   // '샘플로 시작'의 자리 표시 그림이 남아 있으면 승인·게시하지 않는다
@@ -142,7 +142,7 @@ export async function setStatus(id: string, status: PostStatus, postedUrl?: stri
     const w = (await getWorkspace(cur.workspace)) ?? fail("서비스를 찾지 못했어요");
     const got = new Set((opts.checks ?? []).map((x) => String(x).trim()));
     const miss = requiredChecks(w).filter((c) => !got.has(c));
-    if (miss.length) fail(`승인 전 체크리스트를 모두 체크해 주세요 (남은 것 ${miss.length}개: ${miss[0]}${miss.length > 1 ? " 외" : ""})`);
+    if (miss.length) fail(`승인하려면 체크리스트를 모두 체크해 주세요. 남은 것 ${miss.length}개: ${miss[0]}${miss.length > 1 ? " 외" : ""}`);
     patch.review = { by: s(opts.by, 30) || "?", at: new Date().toISOString(), checks: requiredChecks(w) };
   }
   if (to === "draft" || to === "skip") patch.review = undefined;
@@ -207,7 +207,7 @@ export async function updateBrief(id: string, p: Partial<Record<keyof Brief, unk
 /** 기둥을 통째로 바꾼다. 기둥 이름은 달력 카테고리에도 들어간다 (기둥 먼저, 나머지 카테고리는 뒤에) */
 export async function setPillars(id: string, input: unknown) {
   const w = (await getWorkspace(id)) ?? fail("서비스를 찾지 못했어요");
-  if (!Array.isArray(input)) fail("기둥 형식이 맞지 않아요");
+  if (!Array.isArray(input)) fail("기둥 정보 형식이 맞지 않아요. 기둥을 다시 저장해 주세요");
   const pillars: Pillar[] = [];
   for (const x of (input as Record<string, unknown>[]).slice(0, 8)) {
     const name = s(x?.name, 20);
@@ -232,12 +232,12 @@ const IDEAS_MAX = 500, RESEARCH_MAX = 1000;
 export async function createIdea(wsId: string, p: { title: unknown; pillar?: unknown; angle?: unknown; template?: unknown; research?: unknown; by?: Idea["by"] }) {
   const w = (await getWorkspace(wsId)) ?? fail("서비스를 찾지 못했어요");
   const title = s(p.title, 80);
-  if (!title) fail("아이디어 제목을 적어 주세요");
+  if (!title) fail("주제를 적어 주세요");
   const pillar = s(p.pillar, 20);
   const pl = w.pillars?.find((x) => x.name === pillar);
   const now = new Date().toISOString();
   return mutate((db) => {
-    if (db.ideas.filter((x) => x.workspace === w.id).length >= IDEAS_MAX) fail(`아이디어는 서비스마다 ${IDEAS_MAX}개까지예요`);
+    if (db.ideas.filter((x) => x.workspace === w.id).length >= IDEAS_MAX) fail(`주제는 서비스마다 ${IDEAS_MAX}개까지 둘 수 있어요. 안 쓰는 주제를 지운 뒤 더해 주세요`);
     const ids = new Set(db.research.filter((r) => r.workspace === w.id).map((r) => r.id));
     const idea: Idea = {
       id: newId(), workspace: w.id, title, pillar: pl ? pl.name : "", angle: s(p.angle, 1000),
@@ -251,7 +251,7 @@ export async function createIdea(wsId: string, p: { title: unknown; pillar?: unk
 
 /** status: review(검수 대기로 되돌리기) · approved(승인 — 부르는 쪽이 approve 권한을 확인) · dropped(보류). planned 는 달력에 넣기로만 */
 export async function updateIdea(id: string, p: { title?: unknown; pillar?: unknown; angle?: unknown; template?: unknown; status?: unknown; research?: unknown }, by = "") {
-  const cur = (await getIdea(id)) ?? fail("아이디어를 찾지 못했어요");
+  const cur = (await getIdea(id)) ?? fail("주제를 찾지 못했어요");
   const w = (await getWorkspace(cur.workspace)) ?? fail("서비스를 찾지 못했어요");
   return mutate((db) => {
     const it = db.ideas.find((x) => x.id === id)!;
@@ -260,8 +260,8 @@ export async function updateIdea(id: string, p: { title?: unknown; pillar?: unkn
     if (p.angle !== undefined) it.angle = s(p.angle, 1000);
     if (p.template !== undefined) it.template = templateOf(s(p.template, 30)).id;
     if (p.status !== undefined) {
-      if (!IDEA_STATUS.includes(p.status as IdeaStatus)) fail("상태 값이 맞지 않아요");
-      if (p.status === "planned") fail("제작에 넣으려면 '제작에 넣기'를 써 주세요");
+      if (!IDEA_STATUS.includes(p.status as IdeaStatus)) fail("없는 상태예요. 상태를 다시 골라 주세요");
+      if (p.status === "planned") fail("제작에 넣으려면 '제작에 넣기'를 눌러 주세요");
       if (it.status === "planned" && it.postId && db.posts.some((x) => x.id === it.postId && !x.archivedAt)) fail("이미 제작에 들어간 주제예요. 게시물을 보관함으로 뺀 뒤 바꿀 수 있어요");
       it.status = p.status as IdeaStatus;
       if (it.status === "approved") { it.approvedBy = s(by, 30) || "?"; it.approvedAt = new Date().toISOString(); }
@@ -288,9 +288,9 @@ export async function ensureSlot(wsId: string, fromDay = 1) {
   const got = await nextEmptySlot(wsId, fromDay);
   if (got) return got;
   const w = (await getWorkspace(wsId)) ?? fail("서비스를 찾지 못했어요");
-  if (w.days >= DAYS_MAX) fail(`자리가 꽉 찼어요 (${DAYS_MAX}일 × 시간대). 보관함으로 빼거나 시간대를 늘려 주세요`);
+  if (w.days >= DAYS_MAX) fail(`제작 목록이 꽉 찼어요(${DAYS_MAX}일 × 시간대). 게시물을 보관함으로 빼거나 시간대를 늘려 주세요`);
   await mutate((db) => { const x = db.workspaces.find((y) => y.id === w.id)!; x.days = Math.min(DAYS_MAX, Math.max(x.days + 1, Math.round(fromDay))); });
-  return (await nextEmptySlot(wsId, fromDay)) ?? fail("빈 자리를 만들지 못했어요");
+  return (await nextEmptySlot(wsId, fromDay)) ?? fail("빈자리를 만들지 못했어요. 서비스 설정에서 일수나 시간대를 늘려 주세요");
 }
 
 /** 제작 목록 끝 다음 일차 (보관함 제외 게시물 중 가장 늦은 일차 + 1) — 화면에서 새로 넣는 것은 목록 끝에 붙는다 */
@@ -301,7 +301,7 @@ export async function tailDay(wsId: string) {
 
 /** 아이디어 → 달력 칸 (기획 게시물). 칸을 안 주면 비어 있는 첫 칸. 자료는 게시물 메모에 출처로 붙는다 */
 export async function scheduleIdea(id: string, at?: { day?: unknown; slot?: unknown }) {
-  const it = (await getIdea(id)) ?? fail("아이디어를 찾지 못했어요");
+  const it = (await getIdea(id)) ?? fail("주제를 찾지 못했어요");
   if (it.postId && (await getPost(it.postId))) fail("이미 제작에 들어간 주제예요");
   if (it.status !== "approved") fail("승인한 주제만 제작에 넣을 수 있어요");
   const spot = at?.day !== undefined && at?.slot !== undefined ? { day: Number(at.day), slot: String(at.slot) } : await ensureSlot(it.workspace);
@@ -309,7 +309,7 @@ export async function scheduleIdea(id: string, at?: { day?: unknown; slot?: unkn
   const refs = it.research.map((rid) => db.research.find((r) => r.id === rid)).filter((r): r is Research => !!r);
   const note = [it.angle, refs.length ? `자료: ${refs.map((r) => `${r.title}${r.url ? ` ${r.url}` : ""}`).join(" / ")}` : ""].filter(Boolean).join("\n").slice(0, 500);
   const r = await createPostIn(it.workspace, { day: spot!.day, slot: spot!.slot, template: it.template, title: it.title, category: it.pillar, note });
-  if (!r.created) fail(`D${spot!.day} ${spot!.slot} 칸에는 이미 게시물이 있어요. 다른 칸을 골라 주세요`);
+  if (!r.created) fail(`D${spot!.day} ${spot!.slot} 자리에는 이미 게시물이 있어요. 다른 자리를 골라 주세요`);
   await mutate((d) => { const x = d.ideas.find((y) => y.id === id)!; x.status = "planned"; x.postId = r.post.id; x.updatedAt = new Date().toISOString(); });
   return r.post;
 }
@@ -319,7 +319,7 @@ export async function scheduleIdeas(ids: string[], from?: number) {
   const out: Post[] = [];
   let day = Math.max(1, Math.round(Number(from)) || 1);
   for (const id of ids.slice(0, 30)) {
-    const it = (await getIdea(id)) ?? fail("아이디어를 찾지 못했어요");
+    const it = (await getIdea(id)) ?? fail("주제를 찾지 못했어요");
     if (it.status !== "approved") fail(`'${it.title}' 주제는 아직 승인 전이에요. 승인한 주제만 제작에 넣을 수 있어요`);
     const spot = await ensureSlot(it.workspace, day);
     out.push(await scheduleIdea(id, spot));
@@ -338,7 +338,7 @@ export async function addResearch(wsId: string, p: { title: unknown; url?: unkno
   if (!title) fail("자료 제목을 적어 주세요");
   if (url && !/^https:\/\/[^\s"'<>]+$/.test(url)) fail("출처 주소는 https:// 로 시작하게 적어 주세요");
   return mutate((db) => {
-    if (db.research.filter((x) => x.workspace === w.id).length >= RESEARCH_MAX) fail(`자료는 서비스마다 ${RESEARCH_MAX}개까지예요`);
+    if (db.research.filter((x) => x.workspace === w.id).length >= RESEARCH_MAX) fail(`자료는 서비스마다 ${RESEARCH_MAX}개까지 둘 수 있어요. 안 쓰는 자료를 지운 뒤 더해 주세요`);
     const r: Research = { id: newId(), workspace: w.id, title, url, summary: s(p.summary, 2000), memo: s(p.memo, 500), tags: list(p.tags, 10, 20), confidence: confOf(p.confidence), by: p.by ?? "user", createdAt: new Date().toISOString() };
     db.research.push(r);
     return r;
@@ -381,7 +381,7 @@ export function removeIdea(id: string) {
 export function removePost(id: string) {
   return mutate((db) => {
     const p = db.posts.find((x) => x.id === id) ?? fail("게시물을 찾지 못했어요");
-    if (p.status === "posted") fail("게시한 게시물은 기록으로 남겨 둬요. 게시 취소 뒤에 지울 수 있어요");
+    if (p.status === "posted") fail("게시한 게시물은 기록으로 남겨 둬요. 게시를 취소한 뒤에 지울 수 있어요");
     db.posts = db.posts.filter((x) => x.id !== id);
     const now = new Date().toISOString();
     for (const it of db.ideas) if (it.postId === id) { it.postId = undefined; it.status = "approved"; it.updatedAt = now; }
@@ -393,18 +393,18 @@ export function removePost(id: string) {
 
 async function emptySpot(wsId: string, day: unknown, slot: unknown) {
   const w = (await getWorkspace(wsId)) ?? fail("서비스를 찾지 못했어요");
-  if (day === undefined || slot === undefined || day === "" || slot === "") return (await nextEmptySlot(wsId)) ?? fail("빈 칸이 없어요. 설정에서 일수를 늘려 주세요");
+  if (day === undefined || slot === undefined || day === "" || slot === "") return (await nextEmptySlot(wsId)) ?? fail("넣을 빈자리가 없어요. 서비스 설정에서 일수를 늘려 주세요");
   const d = Math.round(Number(day)), sl = String(slot);
   if (!(d >= 1 && d <= w.days)) fail(`일차는 1~${w.days} 사이로 골라 주세요`);
   if (!w.slots.includes(sl)) fail(`시간대는 ${w.slots.join(", ")} 중에서 골라 주세요`);
-  if ((await listPosts(wsId)).some((p) => p.day === d && p.slot === sl)) fail(`D${d} ${sl} 칸에는 이미 게시물이 있어요. 다른 칸을 골라 주세요`);
+  if ((await listPosts(wsId)).some((p) => p.day === d && p.slot === sl)) fail(`D${d} ${sl} 자리에는 이미 게시물이 있어요. 다른 자리를 골라 주세요`);
   return { day: d, slot: sl };
 }
 
 /** 빈 칸으로 옮기기 (게시된 것도 옮길 수 있다 — 기록 정리용) */
 export async function movePost(id: string, to: { day?: unknown; slot?: unknown }) {
   const p = (await getPost(id)) ?? fail("게시물을 찾지 못했어요");
-  if (p.archivedAt) fail("보관함에 있는 게시물이에요. 되살리기로 칸에 넣어 주세요");
+  if (p.archivedAt) fail("보관함에 있는 게시물이에요. 먼저 되살려 주세요");
   const spot = await emptySpot(p.workspace, to.day, to.slot);
   return (await updatePost(id, spot))!;
 }
@@ -420,7 +420,7 @@ export async function duplicatePost(id: string, to: { day?: unknown; slot?: unkn
 /** 보관함으로 빼기 (칸이 빈다). 게시된 것은 기록이라 빼지 않는다 */
 export async function archivePost(id: string) {
   const p = (await getPost(id)) ?? fail("게시물을 찾지 못했어요");
-  if (p.status === "posted") fail("게시된 게시물은 기록으로 남겨 둬요. 게시 취소 뒤에 뺄 수 있어요");
+  if (p.status === "posted") fail("게시한 게시물은 기록으로 남겨 둬요. 게시를 취소한 뒤에 보관함으로 뺄 수 있어요");
   return (await updatePost(id, { archivedAt: new Date().toISOString() }))!;
 }
 
@@ -574,7 +574,7 @@ export async function addMember(wsId: string, p: { email: unknown; name?: unknow
     const plan = planOf(w.plan);
     let u = db.users.find((x) => x.email === email);
     if (u && w.members?.some((m) => m.userId === u!.id)) fail("이미 함께 쓰는 사람이에요");
-    if ((w.members?.length ?? 0) >= plan.members) fail(`${plan.name} 요금제는 ${plan.members}명까지 함께 써요`);
+    if ((w.members?.length ?? 0) >= plan.members) fail(`${plan.name} 요금제는 ${plan.members}명까지 함께 쓸 수 있어요`);
     if (!u) {
       temp = tempPassword();
       u = { id: newId(), email, name: name || email.split("@")[0], pass: hashPassword(temp), createdAt: new Date().toISOString() } satisfies User;
@@ -591,7 +591,7 @@ export async function setMemberRole(wsId: string, userId: string, role: unknown)
   return mutate((db) => {
     const w = db.workspaces.find((x) => x.id === wsId) ?? fail("서비스를 찾지 못했어요");
     const m = w.members?.find((x) => x.userId === userId) ?? fail("함께 쓰는 사람이 아니에요");
-    if (m.role === "owner" && role !== "owner" && w.members!.filter((x) => x.role === "owner").length === 1) fail("소유자는 한 명 이상 있어야 해요. 다른 사람을 먼저 소유자로 바꿔 주세요");
+    if (m.role === "owner" && role !== "owner" && w.members!.filter((x) => x.role === "owner").length === 1) fail("소유자가 한 명은 있어야 해요. 다른 사람을 먼저 소유자로 바꿔 주세요");
     m.role = role as Role;
     return m;
   });

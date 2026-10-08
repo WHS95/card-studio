@@ -27,7 +27,7 @@ export default function AiSettings({ cfg, status, models, cli }: { cfg: AiConfig
   const [tiers, setTiers] = useState(cfg.tiers);
   const [st, act, pending] = useActionState(aiConfigAction, undefined);
   const [last, setLast] = useState<"save" | AiVia>("save"); // 결과를 어디에 보여 줄지 (누른 버튼 옆)
-  const msg = (where: "save" | AiVia) => (last !== where ? null : pending ? <p className="small muted" style={{ margin: 0 }}>{where === "save" ? "저장하는 중" : "확인하는 중… (몇 초 걸려요)"}</p> : st?.error ? <p className="err">{st.error}</p> : st?.ok ? <p className="ok">{st.ok}</p> : null);
+  const msg = (where: "save" | AiVia) => (last !== where ? null : pending ? <p className="small muted" style={{ margin: 0 }}>{where === "save" ? "저장하고 있어요…" : "확인하고 있어요. 몇 초 걸려요…"}</p> : st?.error ? <p className="err">{st.error}</p> : st?.ok ? <p className="ok">{st.ok}</p> : null);
   const setT = (k: AiTier, p: Partial<TierSetting>) => setTiers((t) => ({ ...t, [k]: { ...t[k], ...p } }));
   const planOf = (kind: PresetKind): AiConfig["tiers"] => {
     const via = tiers.judge.via;
@@ -61,7 +61,7 @@ export default function AiSettings({ cfg, status, models, cli }: { cfg: AiConfig
         <div className="row">
           <button type="button" className="btn" onClick={() => router.refresh()}>
             <svg width="16" height="16" viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round"><path d="M16 10 a6 6 0 1 1 -1.8 -4.3 M16 3.5 V6 H13.5" /></svg> 연결 다시 확인</button>
-          <span className="small muted">모델 목록은 연결마다 불러와요 (Claude Code·Codex 가 알려 준 목록, API 는 키로 찾아와요)</span>
+          <span className="small muted">모델 목록은 연결마다 따로 불러와요. Claude Code·Codex 는 앱이 알려 준 목록을, API 는 키로 찾은 목록을 보여 줘요.</span>
         </div>
         <p className="w-note">구독 연결(Claude Code·Codex)은 운영자 본인이 이 Mac 에서 쓸 때만 켜져요. 스튜디오는 로그인 토큰을 받지 않고 프로그램만 실행해요. 함께 쓰는 계정과 MCP 로 들어온 요청은 API 키 연결이나 각자의 AI 구독을 써요. 배포한 서버에는 구독 연결이 보이지 않아요. 구독으로 쓴 AI 는 요금제 횟수에 세지 않아요.</p>
       </section>
@@ -84,7 +84,7 @@ export default function AiSettings({ cfg, status, models, cli }: { cfg: AiConfig
               </div>
               <label className="fld">연결<select name={`${k}.via`} className="input" value={t.via} onChange={(e) => setT(k, { via: e.target.value as AiVia, model: models[e.target.value as AiVia][1]?.id ?? models[e.target.value as AiVia][0]?.id ?? "" })}>
                 {AI_VIA.map((v) => <option key={v} value={v} disabled={!on.includes(v)}>{VIA_LABEL[v]}{on.includes(v) ? "" : " (꺼짐)"}</option>)}</select></label>
-              <label className="fld"><span>모델 {!list.length && <em>{t.via === "codex" ? "비우면 Codex 기본 모델" : "연결하면 목록을 불러와요"}</em>}</span>
+              <label className="fld"><span>모델 {!list.length && <em>{t.via === "codex" ? "비우면 Codex 기본 모델을 써요" : "연결하면 목록을 불러와요"}</em>}</span>
                 {list.length ? <select name={`${k}.model`} className="input" value={t.model} onChange={(e) => setT(k, { model: e.target.value })}>{!list.some((m) => m.id === t.model) && t.model && <option value={t.model}>{t.model}</option>}{list.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}</select>
                   : <input name={`${k}.model`} className="input" value={t.model} onChange={(e) => setT(k, { model: e.target.value })} placeholder="모델 이름" />}</label>
               <label className="fld">노력<select name={`${k}.effort`} className="input" value={t.effort} onChange={(e) => setT(k, { effort: e.target.value as TierSetting["effort"] })}><option value="high">높음</option><option value="medium">보통</option><option value="low">낮음</option></select></label>

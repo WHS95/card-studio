@@ -116,7 +116,7 @@ export function Modal({ handle, imgs, n, total, caption, layers, setLayers, isVi
           <button type="button" className="btn ed-mnav" aria-label="다음 장" disabled={n >= total - 1} onClick={() => onMove(n + 1)}>→</button>
         </div>
         {isVideo(n) && <div className="ed-row ed-mplay"><button type="button" className="btn" onClick={play} disabled={busy}>{busy ? "영상 만드는 중 (수십 초)" : showVid ? "영상 다시 만들기" : "▶ 영상으로 보기"}</button><span>글 + 영상을 합친 실제 MP4예요</span></div>}
-        <p className="ed-mfoot">영상 장이면 여기서 재생돼요 · ←/→ 로 장 넘기기 · &apos;더 보기&apos; 위치는 기기마다 조금 달라요 (약 125자·2줄)</p>
+        <p className="ed-mfoot">←/→로 장을 넘겨요 · 영상 장은 여기서 재생돼요 · &apos;더 보기&apos; 위치(약 125자·2줄)는 기기마다 조금 달라요</p>
       </div>
     </div>
   );

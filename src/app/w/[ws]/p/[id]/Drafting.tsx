@@ -32,7 +32,7 @@ export function Bar({ w = "100%" }: { w?: string }) {
 /** 위 진행 줄: AI 초안 쓰는 중 · 생성됨 n · 전체 N + 칸 막대 */
 export function DraftBar({ d }: { d: Drafting }) {
   const total = draftTotal(d), done = d.slides.length;
-  const label = d.phase === "start" ? "AI가 장 수를 정하고 있어요" : d.phase === "caption" ? "캡션을 쓰고 있어요" : d.phase === "fixing" ? "글자 수를 맞추고 있어요" : d.phase === "polish" ? "문구를 다듬고 있어요" : "AI 초안 쓰는 중";
+  const label = d.phase === "start" ? "AI가 장 수를 정하고 있어요" : d.phase === "caption" ? "캡션을 쓰고 있어요" : d.phase === "fixing" ? "글자 수를 맞추고 있어요" : d.phase === "polish" ? "문구를 다듬고 있어요" : "AI가 초안을 쓰고 있어요";
   return (
     <div className="ed-draftbar" role="status" aria-live="polite">
       <Icon name="spark" size={16} />
@@ -41,7 +41,7 @@ export function DraftBar({ d }: { d: Drafting }) {
       <span className="ed-segs" aria-hidden>
         {Array.from({ length: Math.max(total, 1) }, (_, i) => <i key={i} data-s={i < done ? "done" : i === done && d.phase === "write" ? "cur" : "wait"} />)}
       </span>
-      <span className="ed-note ed-draftbar-r">다 쓴 장부터 미리보기가 그려져요 · 저장은 다 끝난 뒤 직접 해요</span>
+      <span className="ed-note ed-draftbar-r">다 쓴 장부터 미리보기를 그려요 · 저장은 다 쓴 뒤에 직접 해요</span>
     </div>
   );
 }
@@ -69,7 +69,7 @@ export function TypingCard({ d, kindOf }: { d: Drafting; kindOf: (k: string) => 
       <h2>{d.phase === "caption" ? "캡션 · 쓰는 중" : d.phase === "polish" ? "문구 다듬는 중" : "글자 수 맞추는 중"}</h2>
       {d.phase === "caption"
         ? <div className="ed-ro ed-ro-area">{d.caption ? <>{d.caption}<i className="ed-caret" /></> : <><Bar w="80%" /><Bar w="55%" /></>}</div>
-        : <p className="ed-note">{d.phase === "polish" ? "문구 규칙(해요체·쉬운 말·강요·과장 없이)에서 고칠 곳이 있었어요. AI가 그 부분만 다듬고 있어요." : "검사에서 칸보다 긴 글이 있었어요. AI가 한 번 더 고치고 있어요."}</p>}
+        : <p className="ed-note">{d.phase === "polish" ? "문구 규칙(해요체·쉬운 말·강요·과장 없이)에서 고칠 곳이 있었어요. AI가 그 부분만 다듬고 있어요." : "칸보다 긴 글이 있었어요. AI가 칸에 맞게 한 번 더 고치고 있어요."}</p>}
     </section>
   );
   const keys = p ? Object.keys(p) : [];

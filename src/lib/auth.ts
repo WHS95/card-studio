@@ -15,7 +15,7 @@ const USER_COOKIE = "cs_user";
 const digest = (id: string, pw: string) => createHash("sha256").update(`card-studio:${id}:${pw}`).digest("hex");
 function token() {
   const id = process.env.STUDIO_ID, pw = process.env.STUDIO_PASSWORD;
-  if (!id || !pw) throw new Error("STUDIO_ID·STUDIO_PASSWORD 가 없어요 (.env.local)");
+  if (!id || !pw) throw new Error("STUDIO_ID·STUDIO_PASSWORD 가 없어요. .env.local 에 적어 주세요");
   return digest(id, pw);
 }
 export function checkLogin(id: string, pw: string) {

@@ -44,7 +44,7 @@ export default function ReviewPanel({ postId, title, status, ai, canEdit, canApp
       <p className="small muted" style={{ margin: 0 }}>저장한 버전을 확인해요. 고칠 곳을 누르면 그 장으로 가요.</p>
 
       <b className="mk-sub">스튜디오가 확인한 것{auto ? ` · 확인할 것 ${bad}개` : ""}</b>
-      {!auto && !err && <p className="small muted ed-rv-wait">장마다 그려 보며 확인하는 중</p>}
+      {!auto && !err && <p className="small muted ed-rv-wait">장마다 그려 보며 확인하고 있어요</p>}
       {auto?.items.map((a, i) => (
         <div key={i} className="mk-auto"><Icon name={a.ok ? "check" : "warn"} size={16} /><span>{a.text}{a.href && <> · <Link href={a.href}>자료 열기</Link></>}</span></div>
       ))}
@@ -60,10 +60,10 @@ export default function ReviewPanel({ postId, title, status, ai, canEdit, canApp
               <span><b>{f.what}</b><span className="small">{f.how}</span></span>
             </button>
           ))}
-          <p className="small muted" style={{ margin: 0 }}>{fb.by} · {when(fb.at)}에 받았어요 · AI 의견이니 판단은 사람이 해요</p>
+          <p className="small muted" style={{ margin: 0 }}>{fb.by} · {when(fb.at)}에 받았어요 · AI 의견이에요. 고칠지는 사람이 정해요</p>
         </div>
       ) : (
-        <p className="small muted" style={{ margin: 0 }}>{old ? `글을 고치기 전에 받은 피드백이 있어요(${when(old.at)}). 지금 버전으로 다시 받아 보세요. ` : ""}표지·장 흐름·말투·근거 없는 사실·캡션을 한 번에 봐 줘요.</p>
+        <p className="small muted" style={{ margin: 0 }}>{old ? `글을 고치기 전에 받은 피드백이 있어요(${when(old.at)}). 지금 버전으로 다시 받을 수 있어요. ` : ""}표지·장 흐름·말투·근거 없는 사실·캡션을 한 번에 봐 줘요.</p>
       )}
       {(canEdit || canApprove) && (ai
         ? <div className="row"><button type="button" className={fb ? "btn" : "btn primary"} onClick={askAi} disabled={asking || !auto}>{asking ? "AI가 읽는 중" : fb ? "AI 피드백 다시 받기" : "AI 피드백 받기"}</button><span className="small muted">누를 때만 AI를 불러요 · 1~2분 걸려요</span></div>
@@ -72,7 +72,7 @@ export default function ReviewPanel({ postId, title, status, ai, canEdit, canApp
 
       {opened === "draft" && auto && (canApprove
         ? <ApproveForm id={postId} required={auto.required} added={auto.added} />
-        : <p className="small muted" style={{ margin: "8px 0 0" }}>승인은 소유자·검수자가 해요. 고친 뒤 저장하면 검수자가 이 창에서 승인해요.</p>)}
+        : <p className="small muted" style={{ margin: "8px 0 0" }}>승인은 소유자·검수자가 해요. 저장하면 검수자가 이 창에서 승인할 수 있어요.</p>)}
       {opened === "approved" && auto?.review && <p className="small muted" style={{ margin: "8px 0 0" }}>{auto.review.by} · {when(auto.review.at)} 승인 · 체크 {auto.review.checks.length}개. 글을 고치면 다시 초안이 돼요.</p>}
     </dialog>
   );

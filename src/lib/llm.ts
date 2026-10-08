@@ -202,7 +202,7 @@ function streamClaudeCode(t: TierSetting, q: Ask, onText: OnText, signal?: Abort
   return new Promise<string>((resolve, reject) => {
     let p;
     try { p = spawn(/*turbopackIgnore: true*/ BIN["claude-code"], args, { env: cliEnv(), stdio: ["pipe", "pipe", "pipe"] }); }
-    catch { return reject(new OpError("Claude Code 를 실행하지 못했어요")); }
+    catch { return reject(new OpError("Claude Code 를 실행하지 못했어요. 이 Mac 에 설치돼 있는지 확인해 주세요")); }
     let buf = "", err = "", sent = "", result: { subtype?: string; is_error?: boolean; result?: string } | null = null;
     const stop = () => p.kill("SIGTERM");
     const timer = setTimeout(stop, timeout);
@@ -219,7 +219,7 @@ function streamClaudeCode(t: TierSetting, q: Ask, onText: OnText, signal?: Abort
       }
     });
     p.stderr.on("data", (d: Buffer) => (err += d));
-    p.on("error", () => { clearTimeout(timer); reject(new OpError("Claude Code 를 이 Mac 에서 찾지 못했어요")); });
+    p.on("error", () => { clearTimeout(timer); reject(new OpError("Claude Code 를 이 Mac 에서 찾지 못했어요. 설치돼 있는지 확인해 주세요")); });
     p.on("close", (code: number | null) => {
       clearTimeout(timer);
       if (signal?.aborted) return reject(new OpError("멈췄어요"));
@@ -257,7 +257,7 @@ async function streamOpenAI(t: TierSetting, q: Ask, onText: OnText, signal?: Abo
   const reader = r.body.getReader(), dec = new TextDecoder();
   let buf = "", text = "";
   for (;;) {
-    const { done, value } = await reader.read().catch(() => { throw new OpError(signal?.aborted ? "멈췄어요" : "OpenAI 응답이 끊겼어요"); });
+    const { done, value } = await reader.read().catch(() => { throw new OpError(signal?.aborted ? "멈췄어요" : "OpenAI 응답이 끊겼어요. 다시 해 주세요"); });
     if (done) break;
     buf += dec.decode(value, { stream: true });
     let i;
@@ -324,7 +324,7 @@ export async function chat(actor: Actor, ctx: string, history: ChatTurn[], tools
   const system = CHAT_SYSTEM(ctx);
   const turns = history.slice(-12);
   if (t.via === "claude-code" || t.via === "codex") {
-    if (!mcp) throw new OpError("이 Mac 에 MCP 토큰(STUDIO_MCP_TOKEN)이 없어서 구독 연결로 도구를 쓰지 못해요. .env.local 에 넣어 주세요");
+    if (!mcp) throw new OpError("구독 연결로 스튜디오 도구를 쓰려면 MCP 토큰이 있어야 해요. .env.local 에 STUDIO_MCP_TOKEN 을 넣어 주세요");
     const prompt = turns.map((x) => `${x.role === "user" ? "사용자" : "도우미"}: ${x.text}`).join("\n\n") + "\n\n도우미:";
     if (t.via === "claude-code") {
       const cfg = JSON.stringify({ mcpServers: { "card-studio": { type: "http", url: mcp.url, headers: { Authorization: `Bearer ${mcp.token}`, "X-Studio-Via": "ai" } } } });

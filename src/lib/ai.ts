@@ -123,7 +123,7 @@ export async function draftPostData(w: Workspace, p: DraftInput, extra: string, 
     if (!err) return (await polishWriting(t, data, p.current, actor)) ?? data;
     prompt += `\n\n앞선 답:\n${raw}\n\n검사에서 틀렸어: ${err}\n고친 JSON 전체를 다시 줘.`;
   }
-  throw new OpError("AI 초안이 칸 제한을 맞추지 못했어요. 다시 해 주세요");
+  throw new OpError("AI 초안이 칸 길이를 맞추지 못했어요. 다시 해 주세요");
 }
 
 // ── 장마다 써지는 초안 (편집기: 흐린 칸 → 글이 써짐 → 그 장 미리보기) ──
@@ -258,7 +258,7 @@ export async function draftPostStream(w: Workspace, p: DraftInput, extra: string
   } catch (e) { if (signal?.aborted) throw e; }
   const fitted: PostData = { photos: data.photos, caption: caption.slice(0, 2200), slides: raws.map((s, n) => fitSlide(t, s, n)).filter((x): x is SlideData => !!x).slice(0, t.maxSlides).map((s, n) => keepPhotos(s, n, p.current) as SlideData) };
   if (!validatePost(t, fitted)) return finish(fitted, "칸보다 긴 글을 칸 길이에 맞춰 잘랐어요. 잘린 곳을 확인해 주세요");
-  throw new OpError("AI 초안이 칸 제한을 맞추지 못했어요. 다시 해 주세요");
+  throw new OpError("AI 초안이 칸 길이를 맞추지 못했어요. 다시 해 주세요");
 }
 
 // ── 검수: AI 종합 피드백 (편집기 '검수' 창, 사람이 누를 때만 · 판단 등급) ──

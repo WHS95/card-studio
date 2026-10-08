@@ -21,11 +21,11 @@ export default function Members({ ws, rows, roles, full, planName, limit }: { ws
           <label className="fld">역할<select name="role" className="input" defaultValue="editor">{opts}</select></label>
           <button className="btn primary" disabled={pending || full}>더하기</button>
         </form>
-        {full && <p className="small muted" style={{ margin: 0 }}>{planName} 요금제 인원이 다 찼어요. 요금제를 바꾸면 더 더할 수 있어요. <Link href="/plans">요금제 보기</Link></p>}
+        {full && <p className="small muted" style={{ margin: 0 }}>{planName} 요금제 인원이 다 찼어요. 요금제를 바꾸면 더 많은 사람과 함께 쓸 수 있어요. <Link href="/plans">요금제 보기</Link></p>}
         {st?.temp && (
           <div className="mem-temp" role="status">
             <b>임시 비밀번호 · 지금 한 번만 보여요</b>
-            <p className="small muted" style={{ margin: 0 }}>{st.temp.email} · 메일로 보내지 않으니 직접 전해 주세요</p>
+            <p className="small muted" style={{ margin: 0 }}>{st.temp.email} · 메일로 가지 않아요. 직접 전해 주세요</p>
             <code>{st.temp.password}</code>
           </div>
         )}
@@ -44,7 +44,7 @@ export default function Members({ ws, rows, roles, full, planName, limit }: { ws
                   <noscript><button className="btn">바꾸기</button></noscript>
                 </form>
                 <form action={act}>{hidden}<input type="hidden" name="op" value="reset" /><input type="hidden" name="user" value={r.userId} /><input type="hidden" name="email" value={r.email} /><button className="btn" disabled={pending}>임시 비밀번호 다시 만들기</button></form>
-                <form action={act}>{hidden}<input type="hidden" name="op" value="remove" /><input type="hidden" name="user" value={r.userId} /><button className="btn" disabled={pending}>빼기</button></form>
+                <form action={act}>{hidden}<input type="hidden" name="op" value="remove" /><input type="hidden" name="user" value={r.userId} /><button className="btn" disabled={pending} onClick={(e) => { if (!confirm(`${r.name || r.email} 계정을 이 서비스에서 뺄까요? 계정은 그대로 남아서 다시 더할 수 있어요.`)) e.preventDefault(); }}>빼기</button></form>
               </span>
             </div>
           ))}

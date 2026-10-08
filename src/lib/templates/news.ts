@@ -25,7 +25,7 @@ export const news: Template = {
       { key: "photo", label: "사진", type: "photo", video: true, tune: ["h", "y"] },
       choiceField("layout", "사진 배치", [["full", "꽉 차게"], ["inset", "안쪽 상자"]], "full"),
       { key: "source", label: "사진 출처 (작게)", type: "text", max: 30, optional: true, hint: "예: X / @account" },
-      { key: "kicker", label: "윗줄", type: "text", max: 30, optional: true, hint: "예: AI NEWS | 브랜드 (| 로 나눔)" },
+      { key: "kicker", label: "윗줄", type: "text", max: 30, optional: true, hint: "예: AI NEWS | 브랜드 (| 로 나눠요)" },
       { key: "title", label: "제목", type: "text", max: 32, lines: 2, rich: true },
       { key: "body", label: "본문", type: "text", max: 180, lines: 6, optional: true, rich: true },
       NUM, BG_LD, ALIGN, SIZE, HL,

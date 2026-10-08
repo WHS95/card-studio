@@ -18,7 +18,7 @@ export default async function Insights({ params, searchParams }: PageProps<"/w/[
       {typeof q.error === "string" && <p className="err">{q.error}</p>}
       <section className="mk-box">
         <b className="mk-box-t">성과 적을 차례 {ins.due.length}</b>
-        <p className="small muted mk-box-s">게시하고 {days}일 지난 게시물 · 날짜는 서비스 설정에서</p>
+        <p className="small muted mk-box-s">게시하고 {days}일 지난 게시물 · 날짜는 서비스 설정에서 바꿔요</p>
         {ins.due.map((d) => (
           <div key={d.id} className="mk-due">
             <b>D{d.day} {d.slot} · {d.title || "제목 없음"}</b><span className="small muted">게시 {d.daysAgo}일 전</span>
@@ -52,7 +52,7 @@ export default async function Insights({ params, searchParams }: PageProps<"/w/[
           <div className="mk-scroll"><table className="mk-table"><thead><tr><th>게시물</th><th>기둥</th><th>도달</th><th>저장률</th><th>참여율</th></tr></thead>
             <tbody>{ins.top.map((p) => <tr key={p.id}><td><Link href={`/w/${w.id}/p/${p.id}`}>D{p.day} {p.slot} · {p.title || "제목 없음"}</Link></td><td>{p.category}</td><td>{p.reach.toLocaleString()}</td><td>{p.saveRate}%</td><td>{p.engagement}%</td></tr>)}</tbody></table></div>
         </section>
-      </> : <p className="hint">게시한 게시물의 편집기 아래 &apos;게시 성과&apos;에 숫자를 적으면 여기서 비교해요.</p>}
+      </> : <p className="hint">게시한 뒤 편집기 아래 &apos;게시 성과&apos;에 숫자를 적으면 여기서 비교해요.</p>}
     </ServiceShell>
   );
 }

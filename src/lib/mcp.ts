@@ -79,13 +79,13 @@ model: ${VEO_MODELS.map((m) => m.id).join(" · ")} (기본 lite; frames·referen
   },
   {
     name: "move_post",
-    description: "게시물을 빈 칸으로 옮기기 (day·slot 을 안 주면 비어 있는 첫 칸).",
+    description: "게시물을 빈자리로 옮기기 (day·slot 을 안 주면 비어 있는 첫 자리).",
     inputSchema: obj({ id: str, day: int, slot: str }, ["id"]),
     run: async (a) => summary(await movePost(String(a.id), { day: a.day, slot: a.slot })),
   },
   {
     name: "duplicate_post",
-    description: "같은 글·사진으로 빈 칸에 새 초안 만들기 (게시 링크·성과는 빼고). 시리즈·재활용용.",
+    description: "같은 글·사진으로 빈자리에 새 초안 만들기 (게시 링크·성과는 빼고). 시리즈·재활용용.",
     inputSchema: obj({ id: str, day: int, slot: str }, ["id"]),
     run: async (a) => postOut(await duplicatePost(String(a.id), { day: a.day, slot: a.slot })),
   },
@@ -107,7 +107,7 @@ model: ${VEO_MODELS.map((m) => m.id).join(" · ")} (기본 lite; frames·referen
     inputSchema: obj({ ws: str, key: str, action: { type: "string", enum: ["apply", "dismiss"] } }, ["ws", "key", "action"]),
     run: async (a) => {
       const ws = String(a.ws), key = String(a.key);
-      const sg = need((await insights(ws)).suggestions.find((x) => x.key === key), "그 제안을 찾지 못했어요 (이미 넘겼거나 바뀌었어요)");
+      const sg = need((await insights(ws)).suggestions.find((x) => x.key === key), "그 제안을 찾지 못했어요. 이미 넘겼거나 새 제안으로 바뀌었어요. get_insights 로 다시 확인해 주세요");
       if (a.action === "dismiss") { await dismissSuggestion(ws, key); return { ok: true }; }
       if (sg.kind === "share") { await applyShareSuggestion(ws, sg.from, sg.to, sg.delta); await dismissSuggestion(ws, key); return { ok: true, pillars: (await getWorkspace(ws))?.pillars }; }
       const idea = await followUpIdea(sg.postId, "mcp"); await dismissSuggestion(ws, key); return { ok: true, idea };
@@ -166,13 +166,13 @@ model: ${VEO_MODELS.map((m) => m.id).join(" · ")} (기본 lite; frames·referen
   },
   {
     name: "schedule_idea",
-    description: "승인한 주제를 달력 칸에 넣어 기획 게시물로 만든다. day·slot 을 안 주면 비어 있는 첫 칸. 자료 출처가 게시물 메모에 붙는다. 그다음 create_post 대신 update_post 로 data 를 채운다.",
+    description: "승인한 주제를 제작 목록 자리에 넣어 기획 게시물로 만든다. day·slot 을 안 주면 비어 있는 첫 자리. 자료 출처가 게시물 메모에 붙는다. 그다음 create_post 대신 update_post 로 data 를 채운다.",
     inputSchema: obj({ id: str, day: int, slot: str }, ["id"]),
     run: async (a) => postOut(await scheduleIdea(String(a.id), a.day !== undefined && a.slot !== undefined ? { day: a.day, slot: a.slot } : undefined)),
   },
   {
     name: "schedule_ideas",
-    description: "승인한 주제 여러 개를 ids 순서대로 빈 칸에 하루씩 넣는다 (fromDay 부터, 없으면 1일차부터 비어 있는 칸).",
+    description: "승인한 주제 여러 개를 ids 순서대로 빈자리에 하루씩 넣는다 (fromDay 부터, 없으면 1일차부터 비어 있는 자리).",
     inputSchema: obj({ ws: str, ids: { type: "array", items: str }, fromDay: int }, ["ws", "ids"]),
     run: async (a) => {
       const ids = (a.ids as unknown[]).map(String);
@@ -268,7 +268,7 @@ export const TOOLS: Tool[] = [
   },
   {
     name: "create_post",
-    description: "달력 빈칸(일차·시간대)에 게시물 만들기. data 를 주면 검사 후 초안, draft:true 면 제목으로 기본 초안, 둘 다 없으면 기획. 이미 있는 칸이면 만들지 않고 그 게시물을 돌려준다(created:false).",
+    description: "빈자리(일차·시간대)에 게시물 만들기. data 를 주면 검사 후 초안, draft:true 면 제목으로 기본 초안, 둘 다 없으면 기획. 이미 게시물이 있는 자리면 만들지 않고 그 게시물을 돌려준다(created:false).",
     inputSchema: obj({ ws: str, day: int, slot: { ...str, description: "HH:MM — 서비스 시간대 중 하나" }, template: str, title: str, category: str, note: str, data: { type: "object" }, draft: { type: "boolean" } }, ["ws", "day", "slot"]),
     run: async (a) => { const r = await createPostIn(String(a.ws), a as never); return { created: r.created, post: postOut(r.post) }; },
   },
@@ -292,7 +292,7 @@ export const TOOLS: Tool[] = [
   },
   {
     name: "add_media",
-    description: "사진·영상 더하기. url(https 이미지, 무료 사진은 출처 credit 필수 권장 — 위키미디어 사진은 이 서버로 받아 둔다, save:true 면 다른 주소도) 또는 filePath(이 Mac 의 JPG·PNG·MP4·MOV 절대 경로, 8MB/300MB). postId 를 주면 그 게시물 photos 끝에 붙여 저장하고 번호를 돌려준다.",
+    description: "사진·영상 더하기. url(https 이미지, 무료 사진은 출처 credit 을 꼭 넣기를 권장 — 위키미디어 사진은 이 서버로 받아 둔다, save:true 면 다른 주소도) 또는 filePath(이 Mac 의 JPG·PNG·MP4·MOV 절대 경로, 8MB/300MB). postId 를 주면 그 게시물 photos 끝에 붙여 저장하고 번호를 돌려준다.",
     inputSchema: obj({ ws: str, postId: str, url: str, filePath: str, credit: str, source: str, save: { type: "boolean" } }, ["ws"]),
     run: async (a) => {
       const ws = String(a.ws);
@@ -320,7 +320,7 @@ export const TOOLS: Tool[] = [
     inputSchema: obj({ id: str, n: int, preview: { type: "boolean" } }, ["id", "n"]),
     run: async (a) => {
       const { p, w } = await postWs(String(a.id));
-      const d = need(p.data, "내용이 없는 게시물이에요");
+      const d = need(p.data, "저장된 내용이 없는 게시물이에요. 글을 먼저 채워 주세요");
       const i = Number(a.n) - 1;
       if (!(i >= 0 && i < d.slides.length)) throw new OpError(`n 은 1~${d.slides.length} 사이로 넣어 주세요`);
       const f = await slideFile(w, p, i);
@@ -333,7 +333,7 @@ export const TOOLS: Tool[] = [
   },
   {
     name: "check_writing",
-    description: "문구 규칙(UX 라이팅) 검사: 해요체·되어요→돼요·과한 경어·명사 덩어리·빼도 되는 말·강요·과장·유행어·긴 문장. id(저장된 게시물 — 장마다·캡션) 또는 text(글 하나). level fix = 고칠 것, tip = 살펴볼 것. guide 는 규칙 전문.",
+    description: "문구 규칙(UX 라이팅) 검사: 해요체·줄여 쓰기(돼요·됐어요)·과한 경어·명사 덩어리·빼도 되는 말·강요·과장·유행어·긴 문장. id(저장된 게시물 — 장마다·캡션) 또는 text(글 하나). level fix = 고칠 것, tip = 살펴볼 것. guide 는 규칙 전문.",
     inputSchema: obj({ id: str, text: str }),
     run: async (a) => {
       if (typeof a.text === "string" && !a.id) return { issues: lintText(a.text), guide: WRITING_GUIDE };
@@ -347,7 +347,7 @@ export const TOOLS: Tool[] = [
     description: "인스타 마진 계산: 사진·영상을 뺀 글·장식이 안전 영역(표지=그리드 3:4 기준, 안쪽=피드) 밖으로 나간 픽셀 수. id(저장본) 또는 ws+template+data(저장 전).",
     inputSchema: obj({ id: str, ws: str, template: str, data: { type: "object" } }),
     run: async (a) => {
-      if (a.id) { const { p, w } = await postWs(String(a.id)); return checkPost(p.template, w.theme, need(p.data, "내용이 없는 게시물이에요")); }
+      if (a.id) { const { p, w } = await postWs(String(a.id)); return checkPost(p.template, w.theme, need(p.data, "저장된 내용이 없는 게시물이에요. 글을 먼저 채워 주세요")); }
       const w = need(await getWorkspace(String(a.ws)), "서비스를 찾지 못했어요");
       const t = templateOf(String(a.template));
       const e = validatePost(t, a.data); if (e) throw new OpError(e);
@@ -360,7 +360,7 @@ export const TOOLS: Tool[] = [
     inputSchema: obj({ id: str }, ["id"]),
     run: async (a) => {
       const { p, w } = await postWs(String(a.id));
-      const d = need(p.data, "내용이 없는 게시물이에요");
+      const d = need(p.data, "저장된 내용이 없는 게시물이에요. 글을 먼저 채워 주세요");
       const dir = dirOf(p); await mkdir(dir, { recursive: true });
       const files: { name: string; data: Buffer }[] = [];
       for (let i = 0; i < d.slides.length; i++) { const f = await slideFile(w, p, i); files.push(f); await writeFile(join(dir, f.name), f.data); }
@@ -412,7 +412,7 @@ async function guard(name: string, a: Json, actor: Actor) {
   const perm: Perm = (name === "set_status" && (a.status === "approved" || a.status === "posted" || (await getPost(String(a.id)))?.status === "posted")) || (name === "update_idea" && a.status === "approved") ? "approve" : g.perm;
   // 주제 보류·보류에서 꺼내기·승인 취소(상태만 바꿀 때)는 검수자도
   const holding = name === "update_idea" && Object.keys(a).every((k) => k === "id" || k === "status") && (a.status === "dropped" || (a.status === "review" && ["dropped", "approved"].includes((await getIdea(String(a.id)))?.status ?? "")));
-  if (!can(role, perm) && !(holding && can(role, "approve"))) throw new OpError("이 서비스에서 그 일을 할 권한이 없어요");
+  if (!can(role, perm) && !(holding && can(role, "approve"))) throw new OpError("이 서비스에서 그 일을 할 권한이 없어요. 소유자가 역할을 바꿔 줄 수 있어요");
   if (name === "update_post" && a.postId && (await getPost(String(a.postId)))?.workspace !== w.id) throw new OpError("다른 서비스의 게시물이에요");
 }
 

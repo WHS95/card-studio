@@ -10,7 +10,7 @@ export async function GET(_req: Request, ctx: RouteContext<"/api/posts/[id]/zip"
   const p = await getPost(id);
   // 그 서비스를 볼 수 있는 사람만
   const w = p && (await wsAccess(p.workspace, "view"))?.ws;
-  if (!p?.data || !w) return new Response("게시물을 찾지 못했어요", { status: 404 });
+  if (!p?.data || !w) return new Response("게시물을 찾지 못했거나 아직 글이 없어요. 글을 채워 저장한 뒤 다시 해 주세요", { status: 404 });
   const files = [];
   for (let i = 0; i < p.data.slides.length; i++) { const f = await slideFile(w, p, i); files.push({ name: f.name, data: f.data }); }
   files.push({ name: "caption.txt", data: Buffer.from(fullCaption(p), "utf8") });

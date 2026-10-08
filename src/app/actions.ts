@@ -159,7 +159,7 @@ export async function updateIdeaAction(fd: FormData) {
   try {
     // 주제 승인·승인 취소는 소유자·검수자(approve). 보류·보류에서 꺼내기는 검수자·편집자 둘 다. 그 밖의 고침은 편집 권한
     const cur = await getIdea(id);
-    if (!cur || cur.workspace !== ws) throw new OpError("찾지 못했어요");
+    if (!cur || cur.workspace !== ws) throw new OpError("주제를 찾지 못했어요. 화면을 새로 고쳐 주세요");
     const s = g("status"), statusOnly = !fd.has("title");
     const approving = s === "approved" || (s === "review" && cur.status === "approved" && statusOnly);
     const holding = statusOnly && (s === "dropped" || (s === "review" && cur.status === "dropped"));
@@ -409,7 +409,7 @@ export async function startFromTemplateAction(fd: FormData) {
   try {
     await gateWs(ws, "edit");
     const spot = await nextEmptySlot(ws);
-    if (!spot) throw new OpError("빈 칸이 없어요. 설정에서 일수를 늘려 주세요");
+    if (!spot) throw new OpError("넣을 빈자리가 없어요. 서비스 설정에서 일수를 늘려 주세요");
     const t = templateOf(tpl);
     const r = await createPostIn(ws, { day: spot.day, slot: spot.slot, template: t.id, title: sample ? `${t.name} 샘플` : `새 ${t.name}`, ...(sample && t.sample ? { data: t.sample() } : { draft: true }) });
     id = r.post.id;
@@ -428,7 +428,7 @@ export async function postToolAction(fd: FormData) {
   let to = `/w/${ws}/p/${id}`;
   try {
     const { post } = await gatePost(id, "edit");
-    if (post.workspace !== ws) throw new OpError("다른 서비스의 게시물이에요");
+    if (post.workspace !== ws) throw new OpError("이 서비스의 게시물이 아니에요. 화면을 새로 고쳐 주세요");
     if (op === "move") await movePost(id, spotOf(fd));
     else if (op === "duplicate") to = `/w/${ws}/p/${(await duplicatePost(id, spotOf(fd))).id}`;
     else if (op === "archive") { await archivePost(id); to = `/w/${ws}?view=archive`; }
@@ -439,7 +439,7 @@ export async function postToolAction(fd: FormData) {
       const from = String(fd.get("from") ?? "");
       to = from === "archive" ? `/w/${ws}?view=archive` : `/w/${ws}?ok=removed`;
     }
-    else throw new OpError("모르는 동작이에요");
+    else throw new OpError("할 일을 알 수 없어요. 화면을 새로 고친 뒤 다시 해 주세요");
   } catch (e) { const from = String(fd.get("from") ?? ""); back(op === "restore" || from === "archive" ? `/w/${ws}?view=archive` : `/w/${ws}/p/${id}`, e); }
   revalidatePath(`/w/${ws}`, "layout");
   redirect(to);
@@ -471,7 +471,7 @@ export async function memberAction(_p: MemberState, fd: FormData): Promise<Membe
     } else if (op === "role") await setMemberRole(ws, String(fd.get("user")), fd.get("role"));
     else if (op === "remove") { await removeMember(ws, String(fd.get("user"))); out = { ok: "서비스에서 뺐어요. 계정은 그대로 남아요" }; }
     else if (op === "reset") { const u = String(fd.get("user")); out = { ok: "임시 비밀번호를 새로 만들었어요", temp: { email: String(fd.get("email") ?? ""), password: await resetMemberPassword(ws, u) } }; }
-    else throw new OpError("모르는 동작이에요");
+    else throw new OpError("할 일을 알 수 없어요. 화면을 새로 고친 뒤 다시 해 주세요");
     revalidatePath(`/w/${ws}/members`);
     return out;
   } catch (e) { return { error: msg(e) }; }
@@ -494,7 +494,7 @@ export async function integrationAction(_p: KeyState, fd: FormData): Promise<Key
   const actor = await requireAuth();
   if (actor.kind !== "admin") return { error: "운영자만 바꿀 수 있어요" };
   const provider = String(fd.get("provider")) as Provider;
-  if (provider !== "anthropic" && provider !== "gemini" && provider !== "openai") return { error: "알 수 없는 연결이에요" };
+  if (provider !== "anthropic" && provider !== "gemini" && provider !== "openai") return { error: "알 수 없는 연결이에요. 화면을 새로 고친 뒤 다시 해 주세요" };
   try {
     if (fd.get("op") === "test") return { ok: provider === "gemini" ? await testGemini() : await testVia(provider, actor) };
     const v = String(fd.get("key") ?? "").trim();
@@ -555,7 +555,7 @@ export async function aiConfigAction(_p: KeyState, fd: FormData): Promise<KeySta
   if (actor.kind !== "admin") return { error: "운영자만 바꿀 수 있어요" };
   try {
     const op = String(fd.get("op") ?? "");
-    if (op.startsWith("test:")) { const v = op.slice(5) as AiVia; if (!AI_VIA.includes(v)) return { error: "알 수 없는 연결이에요" }; return { ok: await testVia(v, actor) }; }
+    if (op.startsWith("test:")) { const v = op.slice(5) as AiVia; if (!AI_VIA.includes(v)) return { error: "알 수 없는 연결이에요. 화면을 새로 고친 뒤 다시 해 주세요" }; return { ok: await testVia(v, actor) }; }
     const tiers: Record<string, unknown> = {};
     for (const k of ["judge", "write", "polish"]) tiers[k] = { via: fd.get(`${k}.via`), model: fd.get(`${k}.model`), effort: fd.get(`${k}.effort`) };
     await saveAiConfig({ enabled: AI_VIA.filter((v) => fd.get(`on.${v}`) === "on"), tiers });
@@ -570,7 +570,7 @@ export async function suggestionAction(fd: FormData) {
   try {
     await gateWs(ws, "edit");
     const sg = (await insights(ws)).suggestions.find((x) => x.key === key);
-    if (!sg) throw new OpError("그 제안이 바뀌었어요. 다시 확인해 주세요");
+    if (!sg) throw new OpError("제안이 바뀌었어요. 화면을 새로 고쳐 다시 확인해 주세요");
     if (op === "apply") {
       if (sg.kind === "share") { await gateWs(ws, "manage"); await applyShareSuggestion(ws, sg.from, sg.to, sg.delta); }
       else await followUpIdea(sg.postId, actor.kind === "admin" ? "user" : "user");

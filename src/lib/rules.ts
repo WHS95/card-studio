@@ -12,7 +12,7 @@ const texts = (v: unknown): string[] => (typeof v === "string" ? [v] : Array.isA
 export function ruleWarnings(rules: ContentRules | undefined, defaultTemplate: string, template: string, data: PostData | null): RuleWarning[] {
   const r = { ...NO_RULES, ...rules };
   const out: RuleWarning[] = [];
-  if (r.templateOnly && template !== defaultTemplate) out.push({ rule: "templateOnly", text: `서비스 기본 틀이 아닌 템플릿이에요 (기본 틀: ${templateOf(defaultTemplate).name})` });
+  if (r.templateOnly && template !== defaultTemplate) out.push({ rule: "templateOnly", text: `서비스 기본 템플릿(${templateOf(defaultTemplate).name})과 다른 템플릿이에요` });
   if (!data) return out;
   const t = templateOf(template);
   if (r.photoEvery) {
@@ -20,7 +20,7 @@ export function ruleWarnings(rules: ContentRules | undefined, defaultTemplate: s
       const k = t.kinds.find((x) => x.kind === s.kind);
       const photos = (k?.fields ?? []).filter((f) => f.type === "photo");
       const main = photos.find((f) => f.key === "photo") ?? photos[0];
-      if (!main) out.push({ rule: "photoEvery", slide: i + 1, text: `${i + 1}장(${k?.label ?? s.kind})은 사진 칸이 없는 장이에요. 사진 칸이 있는 장으로 바꿔 보세요` });
+      if (!main) out.push({ rule: "photoEvery", slide: i + 1, text: `${i + 1}장(${k?.label ?? s.kind})에는 사진 칸이 없어요. 사진 칸이 있는 장으로 바꿔 보세요` });
       else if (typeof s[main.key] !== "number") out.push({ rule: "photoEvery", slide: i + 1, text: `${i + 1}장 사진 칸이 비었어요` });
     });
   }

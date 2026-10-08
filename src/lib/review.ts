@@ -27,16 +27,16 @@ export async function autoReview(postId: string) {
   const safe = await checkPost(p.template, w.theme, d).catch(() => null);
   const out = safe?.filter((x) => !x.ok) ?? [];
   items.push(!safe ? { ok: false, text: "인스타 마진을 계산하지 못했어요. 미리보기의 '가려지는 영역'으로 확인해 주세요" }
-    : out.length ? { ok: false, text: `인스타 마진: ${out.map((x) => `${x.n}장 밖 ${x.outside}px`).join(" · ")} — 글을 줄이거나 배치를 바꿔 주세요` }
+    : out.length ? { ok: false, text: `인스타 마진: ${out.map((x) => `${x.n}장 ${x.outside}px`).join(" · ")}이 안전 영역 밖이에요. 글을 줄이거나 배치를 바꿔 주세요` }
     : { ok: true, text: `인스타 마진: ${safe.length}장 모두 안전 영역 안이에요` });
   for (const a of cl.auto) items.push({ ok: a.ok, text: a.text, ...("researchId" in a ? { href: `/w/${w.id}/research?c=check` } : {}) });
   const samples = d.photos.filter((x) => /^\/samples\//.test(x.url)).length;
-  if (samples) items.push({ ok: false, text: `샘플 그림 ${samples}개가 남아 있어요. 실제 사진으로 바꿔야 승인할 수 있어요` });
+  if (samples) items.push({ ok: false, text: `샘플 그림 ${samples}개가 남아 있어요. 실제 사진으로 바꾸면 승인할 수 있어요` });
   const noCredit = d.photos.filter((x) => x.url && !/^\/samples\//.test(x.url) && !x.credit.trim()).length;
   if (noCredit) items.push({ ok: false, text: `출처가 빈 사진이 ${noCredit}개 있어요. 사진 칸에서 출처를 적어 주세요` });
   const tags = (d.caption.match(/#[^\s#]+/g) ?? []).length;
-  items.push(!d.caption.trim() ? { ok: false, text: "캡션이 비어 있어요" }
-    : tags > 30 ? { ok: false, text: `해시태그가 ${tags}개예요. 인스타는 30개까지 받아요` }
+  items.push(!d.caption.trim() ? { ok: false, text: "캡션이 비어 있어요. 캡션을 적어 주세요" }
+    : tags > 30 ? { ok: false, text: `해시태그가 ${tags}개예요. 인스타에는 30개까지 넣을 수 있어요` }
     : { ok: true, text: `캡션 ${d.caption.length}자 · 해시태그 ${tags}개` });
   const db = await readDb();
   const rids = new Set(db.ideas.filter((i) => i.postId === p.id).flatMap((i) => i.research));

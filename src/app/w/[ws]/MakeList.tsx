@@ -13,7 +13,7 @@ export default function MakeList({ ws, rows, empty, back, canEdit }: { ws: strin
   const ops: BulkOp[] = canEdit ? [
     { op: "draft", label: "초안·기획으로" },
     { op: "skip", label: "건너뛰기" },
-    { op: "archive", label: "보관함으로" },
+    { op: "archive", label: "보관함으로 빼기" },
     { op: "remove", label: "지우기", ask: "고른 게시물 {n}개를 지울까요? 글·장·캡션이 모두 사라지고 되돌릴 수 없어요. 게시한 게시물은 지우지 않아요." },
   ] : [];
   return (
@@ -49,7 +49,7 @@ export default function MakeList({ ws, rows, empty, back, canEdit }: { ws: strin
           }} />
       )}
       {!rows.length && <p className="hint">{empty}</p>}
-      {hasData.size > 0 && <p className="small muted" style={{ margin: 0 }}>ZIP = 게시물마다 폴더 · 장별 PNG(영상 장은 MP4) + caption.txt · 글이 있는 게시물만 담겨요 · 인스타에는 직접 올려요</p>}
+      {hasData.size > 0 && <p className="small muted" style={{ margin: 0 }}>ZIP에는 게시물마다 폴더로 장별 PNG(영상 장은 MP4)와 caption.txt가 담겨요. 글이 있는 게시물만 담고, 인스타에는 직접 올려요</p>}
     </div>
   );
 }

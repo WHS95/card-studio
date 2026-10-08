@@ -72,7 +72,7 @@ export default function BriefEditor({ ws, brief: b0, pillars: p0, presets, goals
   const applyPreset = (id: string) => {
     const pr = presets.find((p) => p.id === id);
     if (!pr) return set({ industry: id });
-    if (pillars.length && !confirm(`'${pr.name}' 시작 묶음으로 기둥·말투·목표·해시태그를 바꿀까요? (지금 기둥은 사라져요)`)) return set({ industry: id });
+    if (pillars.length && !confirm(`'${pr.name}' 시작 묶음으로 기둥·말투·목표·해시태그를 바꿀까요? 지금 기둥은 지워져요.`)) return set({ industry: id });
     set({ industry: id, tone: pr.tone, goals: [...pr.goals], hashtags: [...pr.hashtags] });
     setPillars(pr.pillars.map((p) => ({ ...p, examples: [...p.examples] })));
     setExtra((x) => (x.includes("hashtags") ? x : [...x, "hashtags"]));
@@ -89,7 +89,7 @@ export default function BriefEditor({ ws, brief: b0, pillars: p0, presets, goals
       case "industry": return (
         <Dl key={k} label="업종" hint="고르면 기둥·말투·해시태그 예시를 채워요">
           <select className="stg-in" value={presets.some((p) => p.id === b.industry) ? b.industry : ""} onChange={(e) => applyPreset(e.target.value)}>
-            <option value="">직접 적기 / 고르지 않음</option>
+            <option value="">고르지 않음</option>
             {presets.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
         </Dl>);
@@ -107,7 +107,7 @@ export default function BriefEditor({ ws, brief: b0, pillars: p0, presets, goals
         <h1>목적</h1>
         <span className="small muted" role="status" aria-live="polite">누구에게 무엇을 위해 만드는지 적어요. 항목을 누르면 바로 고칠 수 있어요 · {err && canEdit ? <span className="err">{err}</span> : status}</span>
       </div>
-      {isNew && <p className="hint">새 서비스를 만들었어요. 브리프를 채우면 AI·MCP 가 이 내용으로 아이디어·초안·캡션을 써요. 나중에 채워도 돼요.</p>}
+      {isNew && <p className="hint">새 서비스를 만들었어요. 브리프를 채우면 AI가 이 내용으로 주제·초안·캡션을 써요. 나중에 채워도 돼요.</p>}
 
       <form className="stg-brief" onSubmit={(e) => e.preventDefault()}>
         <fieldset className="stg-fs" disabled={!canEdit}>
@@ -149,7 +149,7 @@ export default function BriefEditor({ ws, brief: b0, pillars: p0, presets, goals
                       </label>
                     </div>
                     <label className="fld">설명<input className="input" maxLength={200} value={p.description} onChange={(e) => setP(i, { description: e.target.value })} /></label>
-                    <label className="fld">예시 주제 <em>한 줄에 하나, 5개까지 · 주제 화면에서 바로 꺼내 써요</em>
+                    <label className="fld">예시 주제 <em>한 줄에 하나, 5개까지 · 주제 탭에서 바로 꺼내 써요</em>
                       <textarea className="input" rows={2} value={p.examples.join("\n")} onChange={(e) => setP(i, { examples: e.target.value.split("\n").slice(0, 5) })} /></label>
                     <div className="row">
                       <button type="button" className="btn" onClick={() => setOpenP(null)}>닫기</button>
@@ -160,7 +160,7 @@ export default function BriefEditor({ ws, brief: b0, pillars: p0, presets, goals
               ))}
               {!pillars.length && <p className="small muted stg-p">업종을 고르거나 직접 더해서 기둥을 만들어요. 3~5개가 알맞아요.</p>}
               <p className="small muted stg-p stg-sum">
-                <span className={sumErr ? "err" : undefined}>합 {total}%</span> · 기둥 이름 = 게시물 카테고리
+                <span className={sumErr ? "err" : undefined}>합 {total}%</span> · 기둥 이름이 게시물 카테고리가 돼요
                 {pillars.length > 1 && canEdit && <button type="button" className="stg-link" onClick={even}>똑같이 나누기</button>}
               </p>
             </div>
@@ -185,7 +185,7 @@ export default function BriefEditor({ ws, brief: b0, pillars: p0, presets, goals
               <ul className="stg-ul">
                 {DEFAULT_CHECKS.map((c) => <li key={c}>{c} <span className="small muted">· 기본</span></li>)}
                 {checks.map((c, i) => (
-                  <li key={i}>{c} <span className="small muted">· 이 서비스에서 더함</span>
+                  <li key={i}>{c} <span className="small muted">· 이 서비스에서 더한 항목</span>
                     {canEdit && <button type="button" className="stg-link" aria-label={`'${c}' 빼기`} onClick={() => set({ checklist: checks.filter((_, j) => j !== i) })}>빼기</button>}</li>
                 ))}
               </ul>
@@ -194,7 +194,7 @@ export default function BriefEditor({ ws, brief: b0, pillars: p0, presets, goals
                   onKeyDown={(e) => { if (e.key === "Enter" && newCheck.trim() && checks.length < CHECKS_MAX) { e.preventDefault(); set({ checklist: [...checks, newCheck.trim()] }); setNewCheck(""); } }} />
                 <button type="button" className="btn" disabled={!newCheck.trim() || checks.length >= CHECKS_MAX} onClick={() => { set({ checklist: [...checks, newCheck.trim()] }); setNewCheck(""); }}>더하기</button>
               </div>}
-              <p className="small muted stg-p">스튜디오가 확인할 수 있는 것(인스타 마진·규칙 경고·&apos;확인 필요&apos; 자료)은 승인 창 위에 보여 줘요.</p>
+              <p className="small muted stg-p">스튜디오가 확인할 수 있는 것(인스타 마진·규칙 경고·&apos;확인 필요&apos; 자료)은 편집기 검수 창에서 보여 줘요.</p>
             </div>
             {canEdit && !addingCheck && <AddRow label="체크리스트 항목 추가" disabled={checks.length >= CHECKS_MAX} onClick={() => setAddingCheck(true)} />}
           </section>

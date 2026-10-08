@@ -18,7 +18,7 @@ export default async function Settings() {
   const keys = [
     { provider: "anthropic" as const, name: "Anthropic API 키", use: "Claude 모델을 API 로 불러요 · 쓴 만큼 요금이 나가요 · 함께 쓰는 계정도 이 키를 써요", get: "https://console.anthropic.com/settings/keys", status: keyStatus("anthropic"), placeholder: "sk-ant-…" },
     { provider: "openai" as const, name: "OpenAI API 키", use: "GPT 모델을 API 로 불러요 · 쓴 만큼 요금이 나가요 · 함께 쓰는 계정도 이 키를 써요", get: "https://platform.openai.com/api-keys", status: keyStatus("openai"), placeholder: "sk-…" },
-    { provider: "gemini" as const, name: "Gemini · Veo (Google)", use: "카드에 넣을 AI 영상 만들기 (Veo 3.1)", get: "https://aistudio.google.com/apikey", status: keyStatus("gemini"), placeholder: "AIza…" },
+    { provider: "gemini" as const, name: "Gemini · Veo (Google)", use: "카드에 넣을 AI 영상을 만들어요 (Veo 3.1)", get: "https://aistudio.google.com/apikey", status: keyStatus("gemini"), placeholder: "AIza…" },
   ];
   return (
     <WideShell active="settings">

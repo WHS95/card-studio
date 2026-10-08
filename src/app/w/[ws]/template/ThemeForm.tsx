@@ -58,7 +58,7 @@ export default function ThemeForm({ ws, v, canEdit, defaultTemplate, theme, temp
     <>
       <div className="col">
         <h1>템플릿</h1>
-        <span className="small muted" role="status" aria-live="polite">이 서비스의 기본 틀과 카드 색을 정해요. 바꾸면 미리보기에 바로 보여요 · {st?.error && canEdit && !pending ? <span className="err">{st.error}</span> : status}</span>
+        <span className="small muted" role="status" aria-live="polite">이 서비스의 기본 틀·카드 색·워드마크를 정해요 · {st?.error && canEdit && !pending ? <span className="err">{st.error}</span> : status}</span>
       </div>
       <form className="panel" onSubmit={(e) => e.preventDefault()}>
         <section className="sect"><h2>기본 틀 <Link className="btn sp" href={`/templates?ws=${ws}`}>갤러리에서 더 보기</Link></h2>

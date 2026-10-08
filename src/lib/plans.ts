@@ -6,8 +6,8 @@ export type Plan = { id: PlanId; name: string; price: string; members: number; a
 
 export const PLANS: Record<PlanId, Plan> = {
   free: { id: "free", name: "무료", price: "0원", members: 2, aiPerMonth: 20, videoPerMonth: 3, servicesPerOwner: 1, note: "혼자 시작하기 — 서비스 1개, 함께 쓰는 사람 2명(나 포함)" },
-  pro: { id: "pro", name: "프로", price: "[가격 미정]", members: 5, aiPerMonth: 300, videoPerMonth: 30, servicesPerOwner: 3, note: "작은 팀 — 검수자를 두고 승인 흐름으로" },
-  agency: { id: "agency", name: "에이전시", price: "[가격 미정]", members: 20, aiPerMonth: 2000, videoPerMonth: 200, servicesPerOwner: 20, note: "여러 고객사 서비스를 한 곳에서" },
+  pro: { id: "pro", name: "프로", price: "[가격 미정]", members: 5, aiPerMonth: 300, videoPerMonth: 30, servicesPerOwner: 3, note: "작은 팀 — 검수자가 확인하고 승인해요" },
+  agency: { id: "agency", name: "에이전시", price: "[가격 미정]", members: 20, aiPerMonth: 2000, videoPerMonth: 200, servicesPerOwner: 20, note: "여러 고객사 서비스를 한 곳에서 관리해요" },
 };
 export const planOf = (id: PlanId | undefined) => PLANS[id ?? "free"] ?? PLANS.free;
 export const thisMonth = () => new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Seoul" }).slice(0, 7);

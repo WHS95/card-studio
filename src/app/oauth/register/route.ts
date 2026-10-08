@@ -9,7 +9,7 @@ export async function POST(req: Request) {
     const c = await registerClient(body ?? {});
     return json({ client_id: c.id, client_name: c.name, redirect_uris: c.redirectUris, token_endpoint_auth_method: "none", grant_types: ["authorization_code", "refresh_token"], response_types: ["code"], client_id_issued_at: Math.floor(Date.parse(c.createdAt) / 1000) }, 201);
   } catch (e) {
-    return json({ error: "invalid_client_metadata", error_description: e instanceof OpError ? e.message : "등록하지 못했어요" }, 400);
+    return json({ error: "invalid_client_metadata", error_description: e instanceof OpError ? e.message : "앱을 등록하지 못했어요" }, 400);
   }
 }
 export const OPTIONS = () => new Response(null, { status: 204, headers: CORS });

@@ -119,7 +119,7 @@ export default function AiPanel({ ws, ctx, ready, canChat, who, admin, cards }: 
       ) : (
         <div className="ai-box ai-off">
           <b>AI 연결 전이에요</b>
-          <p className="ai-lab">{admin ? "설정 · AI 에서 이 Mac 의 Claude Code·Codex(구독)나 API 키를 연결하면 여기서 대화로 작업할 수 있어요." : "운영자가 API 키를 연결하면 여기서 대화로 작업할 수 있어요."} 내 Claude·ChatGPT 에 이 스튜디오를 붙여(MCP) 작업한 기록도 위에 카드로 보여요.</p>
+          <p className="ai-lab">{admin ? "설정 · AI에서 Claude Code·Codex(구독)나 API 키를 연결하면 여기서 대화로 작업할 수 있어요." : "운영자가 API 키를 연결하면 여기서 대화로 작업할 수 있어요."} 내 Claude·ChatGPT에 이 스튜디오를 붙여(MCP) 작업한 기록도 위에 카드로 보여요.</p>
           <div className="ai-off-row">
             {admin && <Link className="btn primary" href="/settings">설정에서 연결하기</Link>}
             <details className="ai-ask">

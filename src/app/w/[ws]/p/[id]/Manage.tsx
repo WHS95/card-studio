@@ -11,10 +11,10 @@ export default function Manage({ ws, id, posted, empty }: { ws: string; id: stri
         <input type="hidden" name="ws" value={ws} />
         <input type="hidden" name="id" value={id} />
         <select name="spot" className="input ed-spot" aria-label="옮기거나 복제할 칸">
-          <option value="">비어 있는 첫 칸</option>
+          <option value="">비어 있는 첫 자리</option>
           {empty.map((e) => { const [d, s] = e.split(" "); return <option key={e} value={e}>D{d} {s}</option>; })}
         </select>
-        <button className="btn" name="op" value="move" disabled={!empty.length}>다른 칸으로 옮기기</button>
+        <button className="btn" name="op" value="move" disabled={!empty.length}>다른 자리로 옮기기</button>
         <button className="btn" name="op" value="duplicate" disabled={!empty.length} title="고른 칸에 같은 내용으로 새 초안을 만들어요">복제</button>
       </form>
       {!posted && (
@@ -22,10 +22,10 @@ export default function Manage({ ws, id, posted, empty }: { ws: string; id: stri
           <input type="hidden" name="ws" value={ws} />
           <input type="hidden" name="id" value={id} />
           <button className="btn" name="op" value="archive" title="지우지 않아요. 칸이 비고, 보관함에서 되살릴 수 있어요">보관함으로 빼기</button>
-          <ConfirmButton name="op" value="remove" ask="이 게시물을 지울까요? 글·장·캡션이 모두 사라지고 되돌릴 수 없어요. 나중에 다시 쓸 수도 있다면 '보관함으로 빼기'를 골라 주세요.">지우기</ConfirmButton>
+          <ConfirmButton name="op" value="remove" ask="이 게시물을 지울까요? 글·장·캡션이 모두 사라지고 되돌릴 수 없어요. 다시 쓸 수도 있다면 '보관함으로 빼기'를 골라 주세요.">지우기</ConfirmButton>
         </form>
       )}
-      <p className="ed-note">옮기기·복제는 저장한 내용으로 해요{!posted ? " · 보관함은 나중에 되살릴 수 있고, 지우기는 되돌릴 수 없어요" : " · 게시한 게시물은 게시 취소 뒤에 지울 수 있어요"}</p>
+      <p className="ed-note">옮기기·복제는 저장한 내용으로 해요{!posted ? " · 보관함으로 뺀 게시물은 되살릴 수 있어요" : " · 게시한 게시물은 게시 취소 뒤에 지울 수 있어요"}</p>
     </div>
   );
 }

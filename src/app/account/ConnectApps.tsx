@@ -25,7 +25,7 @@ export default function ConnectApps({ mcpUrl, local, rows }: { mcpUrl: string; l
   const desktop = JSON.stringify({ mcpServers: { "card-studio": { command: "npx", args: ["-y", "mcp-remote", mcpUrl, "--allow-http", "--header", "Authorization:${CARD_STUDIO_AUTH}"], env: { CARD_STUDIO_AUTH: `Bearer ${tok}` } } } }, null, 2);
   const TABS: { k: Tab; label: string; note: string; text?: string }[] = [
     { k: "cc", label: "Claude Code", note: "Claude Pro·Max 구독. 터미널에서 한 번 실행하면 어느 폴더에서든 'card-studio' 도구가 보여요.", text: `claude mcp add --scope user --transport http card-studio ${mcpUrl} \\\n  --header "Authorization: Bearer ${tok}"` },
-    { k: "cd", label: "Claude Desktop", note: "Claude Desktop 은 claude_desktop_config.json(설정 › 개발자 › 설정 편집)의 mcpServers 에 이 블록을 넣고 다시 켜요. Node.js(npx)가 필요해요.", text: desktop },
+    { k: "cd", label: "Claude Desktop", note: "claude_desktop_config.json(설정 › 개발자 › 설정 편집)의 mcpServers 에 이 블록을 넣고 Claude Desktop 을 다시 켜요. Node.js(npx)가 필요해요.", text: desktop },
     { k: "cx", label: "Codex", note: "ChatGPT 계정으로 로그인한 Codex CLI. 토큰을 환경 변수로 두고 한 번 등록해요.", text: `export CARD_STUDIO_TOKEN=${tok}\ncodex mcp add card-studio --url ${mcpUrl} --bearer-token-env-var CARD_STUDIO_TOKEN` },
     { k: "web", label: "Claude.ai · ChatGPT (배포 후)", note: "" },
   ];
@@ -35,7 +35,7 @@ export default function ConnectApps({ mcpUrl, local, rows }: { mcpUrl: string; l
       <section className="sect">
         <h2>연결 주소</h2>
         <div className="row"><input className="input w-grow" readOnly value={mcpUrl} aria-label="MCP 연결 주소" /><button type="button" className="btn" onClick={() => copy("url", mcpUrl)}>{copied === "url" ? "복사했어요" : "복사"}</button></div>
-        <p className="small muted w-m0">{local ? "이 Mac 안에서만 닿아요. Claude.ai·ChatGPT 커넥터는 https 공개 주소가 생기면 쓸 수 있어요." : "이 주소를 Claude.ai·ChatGPT 커넥터에 넣으면 이 스튜디오 로그인·동의 뒤 연결돼요."}</p>
+        <p className="small muted w-m0">{local ? "이 Mac 안에서만 닿아요. Claude.ai·ChatGPT 커넥터는 https 공개 주소가 생기면 쓸 수 있어요." : "이 주소를 Claude.ai·ChatGPT 커넥터에 넣고, 이 스튜디오에 로그인해 동의하면 연결돼요."}</p>
       </section>
       <section className="sect">
         <h2>앱별 연결 방법</h2>
@@ -56,7 +56,7 @@ export default function ConnectApps({ mcpUrl, local, rows }: { mcpUrl: string; l
                 <li>Claude: 설정 › 커넥터 › 사용자 지정 커넥터 추가 › URL › 연결 → 이 스튜디오 로그인·동의 (Pro·Max 는 여러 개, 무료는 1개)</li>
                 <li>ChatGPT: 개발자 모드 › 앱 만들기 › MCP URL · OAuth → 로그인·동의 (요금제마다 쓸 수 있는지가 달라요)</li>
               </ol>
-              {local && <span className="small muted">지금은 이 컴퓨터(127.0.0.1)에서만 돌아요. 웹 앱은 https 주소로 배포한 뒤에 닿아요.</span>}
+              {local && <span className="small muted">지금은 이 컴퓨터(127.0.0.1)에서만 돌아요. Claude.ai·ChatGPT 는 https 주소로 배포한 뒤에 연결할 수 있어요.</span>}
             </>
           )}
         </div>
@@ -81,11 +81,11 @@ export default function ConnectApps({ mcpUrl, local, rows }: { mcpUrl: string; l
             <button className="btn" disabled={pending}>연결 끊기</button>
           </form>
         ))}
-        {!rows.length && <p className="small muted w-m0">아직 연결한 앱이 없어요</p>}
+        {!rows.length && <p className="small muted w-m0">아직 연결한 앱이 없어요.</p>}
         {copied === "fail" && <p className="err">이 브라우저에서는 복사가 막혀 있어요. 글을 길게 눌러(또는 드래그해) 직접 복사해 주세요.</p>}
         {st?.error && <p className="err">{st.error}</p>}
         {st?.ok && <p className="ok">{st.ok}</p>}
-        <p className="small muted w-m0">토큰은 내 권한 안에서 일해요. 연결을 끊으면 그 앱은 바로 멈춰요. 토큰은 10개까지 만들 수 있어요.</p>
+        <p className="small muted w-m0">연결을 끊으면 그 앱은 바로 멈춰요. 토큰은 10개까지 만들 수 있어요.</p>
       </section>
     </>
   );

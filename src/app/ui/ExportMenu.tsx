@@ -25,10 +25,10 @@ export default function ExportMenu({ ws }: { ws: string }) {
       {open && (
         <div id="xmenu" role="menu" aria-label="내보내기" className="xmenu">
           <a role="menuitem" href={`/api/ws/${ws}/export`} className="xmenu-it" onClick={() => setOpen(false)}>
-            <b>서비스 백업 (JSON)</b><span>브리프·기둥·게시물·주제·자료 전부</span>
+            <b>서비스 백업 (JSON)</b><span>브리프·기둥·게시물·주제·자료를 한 파일로</span>
           </a>
           <Link role="menuitem" href={`/w/${ws}?s=approved`} className="xmenu-it" onClick={() => setOpen(false)}>
-            <b>게시물 ZIP</b><span>제작 목록에서 체크해 내려받아요 · PNG·MP4·caption.txt</span>
+            <b>게시물 ZIP으로 내려받기</b><span>제작 목록에서 골라서 내려받아요 · PNG·MP4·caption.txt</span>
           </Link>
         </div>
       )}

@@ -45,10 +45,10 @@ export default async function Calendar({ params, searchParams }: PageProps<"/w/[
     </div>
   );
   const head = archive
-    ? { t: "제작 · 보관함", s: "보관함으로 뺀 게시물이 지워지지 않고 여기 모여요. 원래 칸이나 비어 있는 첫 칸으로 되살리거나, 필요 없으면 완전히 지울 수 있어요. 게시한 게시물은 뺄 수 없어요." }
+    ? { t: "제작 · 보관함", s: "보관함으로 뺀 게시물이 여기 모여요. 원래 자리나 비어 있는 첫 자리로 되살릴 수 있어요. 게시한 게시물은 보관함으로 뺄 수 없어요." }
     : grid
       ? { t: "제작 · 그리드", s: "프로필에서 보일 순서예요(새 글이 왼쪽 위). 표지는 3:4로 잘려 좌우 약 34px이 가려져요." }
-      : { t: "제작", s: "만들 게시물 목록이에요. 줄을 누르면 편집기가 열리고, 다 만들면 편집기의 '검수'에서 피드백을 받고 승인해요. 체크한 게시물은 ZIP으로 내려받아요." };
+      : { t: "제작", s: "줄을 누르면 편집기가 열려요. 다 만들면 편집기의 '검수'에서 피드백을 받고 승인해요. 줄 앞을 체크하면 ZIP으로 내려받을 수 있어요." };
   return (
     <ServiceShell ws={w} step="make" ctx={archive ? "제작 · 보관함" : grid ? "제작 · 그리드" : "제작 · 목록"}>
       <div className="mk-head"><h1>{head.t}</h1><p>{head.s}</p></div>
@@ -79,10 +79,10 @@ export default async function Calendar({ params, searchParams }: PageProps<"/w/[
                 <Link href={`/w/${w.id}/p/${p.id}`} className="mk-row-title">{p.title || "제목 없음"}</Link>
                 <span className="small muted">원래 D{p.day} {p.slot} · {STATUS_LABEL[p.status]}{p.archivedAt ? ` · ${md(new Date(p.archivedAt).toLocaleDateString("en-CA", { timeZone: "Asia/Seoul" }))}에 뺌` : ""}</span>
               </div>
-              <label className="mk-spot">칸
+              <label className="mk-spot">자리
                 <select name="spot" className="input" defaultValue="">
-                  <option value="">원래 칸 (D{p.day} {p.slot})</option>
-                  {free && <option value={`${free.day} ${free.slot}`}>비어 있는 첫 칸 (D{free.day} {free.slot})</option>}
+                  <option value="">원래 자리 (D{p.day} {p.slot})</option>
+                  {free && <option value={`${free.day} ${free.slot}`}>비어 있는 첫 자리 (D{free.day} {free.slot})</option>}
                 </select>
               </label>
               <button className="btn primary" name="op" value="restore">되살리기</button>
@@ -92,7 +92,7 @@ export default async function Calendar({ params, searchParams }: PageProps<"/w/[
           {can(role, "edit") && archived.length > 0 && <BulkBar group="archive" action={bulkPostsAction} hidden={{ ws: w.id, back: `/w/${w.id}?view=archive` }} ops={[
             { op: "restore", label: "되살리기", primary: true },
             { op: "remove", label: "완전히 지우기", ask: "고른 게시물 {n}개를 완전히 지울까요? 되돌릴 수 없어요." },
-          ]} note="줄 앞을 체크해 골라요 · 되살리면 원래 칸, 차 있으면 비어 있는 첫 칸으로" />}
+          ]} note="줄 앞을 체크해 골라요 · 되살리면 원래 자리로, 차 있으면 비어 있는 첫 자리로 가요" />}
           {!archived.length && <p className="hint">보관함이 비어 있어요. 편집기 아래 &apos;게시물 관리&apos;에서 게시물을 뺄 수 있어요.</p>}
           <p className="small muted" style={{ margin: 0 }}>보류한 주제는 3 주제 탭의 &apos;보류&apos;에 있어요.</p>
         </>
@@ -111,7 +111,7 @@ export default async function Calendar({ params, searchParams }: PageProps<"/w/[
               meta: [p.category, templateOf(p.template).name, p.data ? `${p.data.slides.length}장` : "글 없음", p.data?.photos.some((x) => x.kind === "video") ? "영상" : ""].filter(Boolean).join(" · "),
               when: `D${p.day}${w.startDate ? ` · ${md(dateOf(w.startDate, p.day))}` : ""} ${p.slot}`,
             }))} />
-          <p className="small muted" style={{ margin: 0 }}>위에서부터 올릴 차례(일차·시간)예요. 순서는 편집기 아래 &apos;게시물 관리 · 다른 칸으로 옮기기&apos;에서 바꿔요.</p>
+          <p className="small muted" style={{ margin: 0 }}>위에서부터 올릴 차례(일차·시간)예요. 순서는 편집기 아래 &apos;게시물 관리 · 다른 자리로 옮기기&apos;에서 바꿔요.</p>
         </>
       )}
     </ServiceShell>
@@ -132,7 +132,7 @@ function Grid({ ws, posts }: { ws: string; posts: Awaited<ReturnType<typeof list
           </Link>
         ))}
       </div>
-      {list.length ? <p className="small muted" style={{ margin: 0 }}>30개까지 · 건너뛴 게시물은 빼고 보여요</p> : <p className="hint">글을 채운 게시물이 여기 보여요</p>}
+      {list.length ? <p className="small muted" style={{ margin: 0 }}>30개까지 보여요 · 건너뛴 게시물은 빼요</p> : <p className="hint">글을 채운 게시물이 여기 보여요</p>}
     </>
   );
 }

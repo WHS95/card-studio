@@ -82,7 +82,7 @@ export async function renderVideo(templateId: string, theme: Theme, post: PostDa
   ];
   const r = await ffmpeg(args);
   for (const l of layers) await rm(l.file, { force: true });
-  if (r.code !== 0) { await rm(tmp, { force: true }); console.error(r.err); throw new OpError("영상을 만들지 못했어요"); }
+  if (r.code !== 0) { await rm(tmp, { force: true }); console.error(r.err); throw new OpError("영상을 만들지 못했어요. 잠시 뒤 다시 해 주세요"); }
   const { rename } = await import("node:fs/promises");
   await rename(tmp, out);
   return out;
@@ -94,7 +94,7 @@ export async function renderVideo(templateId: string, theme: Theme, post: PostDa
  */
 export async function renderCarouselReel(templateId: string, theme: Theme, post: PostData, secs = 3): Promise<string> {
   const t = templateOf(templateId);
-  if (formatOf(t) === "reel") throw new OpError("이미 릴스 템플릿이에요. 장 MP4 를 받아 주세요");
+  if (formatOf(t) === "reel") throw new OpError("이미 릴스 템플릿이에요. 장마다 MP4 로 내려받아 주세요");
   const per = Math.min(10, Math.max(1.5, secs));
   const key = createHash("sha1").update(JSON.stringify(["carousel-reel", templateId, theme, post, per])).digest("hex").slice(0, 20);
   await mkdir(CACHE, { recursive: true });

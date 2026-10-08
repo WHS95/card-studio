@@ -11,7 +11,7 @@ export async function GET(req: Request, ctx: RouteContext<"/api/posts/[id]/reel"
   const p = await getPost(id);
   // 그 서비스를 볼 수 있는 사람만
   const w = p && (await wsAccess(p.workspace, "view"))?.ws;
-  if (!p || !w || !p.data) return new Response("게시물을 찾지 못했어요", { status: 404 });
+  if (!p || !w || !p.data) return new Response("게시물을 찾지 못했거나 아직 글이 없어요. 글을 채워 저장한 뒤 다시 해 주세요", { status: 404 });
   const secs = Number(new URL(req.url).searchParams.get("secs") ?? 3) || 3;
   try {
     const file = await renderCarouselReel(p.template, w.theme, p.data, secs);

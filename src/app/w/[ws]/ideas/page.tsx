@@ -86,7 +86,7 @@ export default async function Ideas({ params, searchParams }: PageProps<"/w/[ws]
           </details>}
         </div>
         {typeof q.error === "string" && <p className="err">{q.error}</p>}
-        {!pillars.length && <p className="hint"><Link href={`/w/${w.id}/brief`}>1 목적</Link>에서 콘텐츠 기둥을 정하면 주제를 기둥별로 모으고 예시 주제를 바로 꺼내 쓸 수 있어요.</p>}
+        {!pillars.length && <p className="hint"><Link href={`/w/${w.id}/brief`}>1 목적</Link> 탭에서 콘텐츠 기둥을 정하면 주제를 기둥별로 모으고 예시 주제를 바로 꺼내 쓸 수 있어요.</p>}
 
         <div className="stg-filters">
           <div className="stg-chips" aria-label="상태">
@@ -113,11 +113,11 @@ export default async function Ideas({ params, searchParams }: PageProps<"/w/[ws]
                   {!status && <span className={`pill${i.status === "review" ? " dark" : ""}`}>{IDEA_LABEL[i.status]}</span>}
                 </div>
                 {i.angle && <p className="stg-text">{i.angle}</p>}
-                <p className="small muted stg-p">{i.research.length ? `자료 ${i.research.length}${unsure ? ` · 그중 확인 필요 ${unsure}` : ""}: ${i.research.map((id) => rTitle.get(id)?.title).filter(Boolean).join(" · ")}` : "자료 없음 · 숫자가 들어가면 자료를 먼저 연결해 주세요"}{i.approvedBy ? ` · 승인 ${i.approvedBy}` : ""}</p>
+                <p className="small muted stg-p">{i.research.length ? `자료 ${i.research.length}${unsure ? ` · 그중 확인 필요 ${unsure}` : ""}: ${i.research.map((id) => rTitle.get(id)?.title).filter(Boolean).join(" · ")}` : "연결한 자료 없음 · 숫자를 쓰려면 자료를 먼저 연결해 주세요"}{i.approvedBy ? ` · 승인 ${i.approvedBy}` : ""}</p>
                 <div className="stg-acts">
                   {i.status === "review" && (canApprove
                     ? <form action={updateIdeaAction}><input type="hidden" name="ws" value={w.id} /><input type="hidden" name="id" value={i.id} /><button name="status" value="approved" className="btn primary">승인</button></form>
-                    : <span className="small muted">검수 대기 · 소유자·검수자가 승인하면 제작에 넣을 수 있어요</span>)}
+                    : <span className="small muted">소유자·검수자의 승인을 기다려요</span>)}
                   {post ? <Link className="btn" href={`/w/${w.id}/p/${post.id}`}>D{post.day} {post.slot} · {STATUS_LABEL[post.status]} →</Link> : i.status === "approved" && canEdit && (
                     <form action={scheduleIdeaAction} className="row">
                       <input type="hidden" name="ws" value={w.id} /><input type="hidden" name="id" value={i.id} />
@@ -131,7 +131,7 @@ export default async function Ideas({ params, searchParams }: PageProps<"/w/[ws]
                   </form>}
                   {canEdit && <form action={removeIdeaAction}>
                     <input type="hidden" name="ws" value={w.id} /><input type="hidden" name="id" value={i.id} /><input type="hidden" name="s" value={status ?? "all"} />
-                    <ConfirmButton ask={`'${i.title.slice(0, 30)}' 주제를 지울까요? 되돌릴 수 없어요.${post ? " 제작에 넣은 게시물은 그대로 남아요." : ""}`}>지우기</ConfirmButton>
+                    <ConfirmButton ask={`'${i.title.slice(0, 30)}' 주제를 지울까요?${post ? " 제작에 넣은 게시물은 그대로 남아요." : ""} 지우면 되돌릴 수 없어요.`}>지우기</ConfirmButton>
                   </form>}
                   {canEdit && <details className="stg-edit"><summary className="btn">고치기</summary>
                     <form action={updateIdeaAction} className="panel stg-edit-body">
@@ -152,7 +152,7 @@ export default async function Ideas({ params, searchParams }: PageProps<"/w/[ws]
               </article>
             );
           })}
-          {!shown.length && <p className="hint">{status === "review" ? "검수할 주제가 없어요." : status === "approved" ? "승인한 주제가 없어요. 검수 대기에서 승인하면 여기에 모여요." : "주제가 없어요. '+ 새 주제'에서 더하거나 기둥 예시를 눌러 꺼내 보세요."}</p>}
+          {!shown.length && <p className="hint">{status === "review" ? "검수할 주제가 없어요. '+ 새 주제'에서 더할 수 있어요." : status === "approved" ? "승인한 주제가 없어요. 검수 대기에서 승인하면 여기에 모여요." : "주제가 없어요. '+ 새 주제'에서 더하거나 기둥 예시를 눌러 꺼내 보세요."}</p>}
         </div>
         {(canEdit || canApprove) && shown.length > 0 && (() => {
           // 탭마다 맞는 일만 (전체 탭은 모두 — 맞지 않는 주제는 서버가 그대로 둔다)
@@ -163,7 +163,7 @@ export default async function Ideas({ params, searchParams }: PageProps<"/w/[ws]
             ...(has("approved") && canApprove ? [{ op: "unapprove", label: "승인 취소" }] : []),
             ...((has("review") || has("approved")) ? [{ op: "drop", label: "보류" }] : []),
             ...(has("dropped") ? [{ op: "restore", label: "검수 대기로 꺼내기" }] : []),
-            ...(canEdit ? [{ op: "remove", label: "지우기", ask: "고른 주제 {n}개를 지울까요? 되돌릴 수 없어요. 제작에 넣은 게시물은 그대로 남아요." }] : []),
+            ...(canEdit ? [{ op: "remove", label: "지우기", ask: "고른 주제 {n}개를 지울까요? 제작에 넣은 게시물은 그대로 남아요. 지우면 되돌릴 수 없어요." }] : []),
           ];
           return <BulkBar group="ideas" action={bulkIdeasAction} hidden={{ ws: w.id, back: href({}) }} ops={ops}
             note={status === "approved" ? "체크한 순서대로 제작 목록 끝에 붙어요" : undefined} />;

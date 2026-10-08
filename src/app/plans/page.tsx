@@ -19,7 +19,7 @@ export default async function Plans() {
       <div className="w-plans">
         {Object.values(PLANS).map((p) => (
           <article key={p.id} className="sect w-plan" data-on={used.has(p.id) || undefined}>
-            <div className="row"><b className="w-plan-name">{p.name}</b>{used.has(p.id) && <span className="pill dark">지금</span>}</div>
+            <div className="row"><b className="w-plan-name">{p.name}</b>{used.has(p.id) && <span className="pill dark">쓰는 중</span>}</div>
             <span className="w-price">{p.price}</span>
             <ul className="w-ul">
               <li>함께 쓰는 사람 {n(p.members)}명</li>
@@ -31,14 +31,14 @@ export default async function Plans() {
         ))}
       </div>
       <section className="sect">
-        <h2>내 서비스 사용량 · 이번 달</h2>
+        <h2>이번 달 내 서비스 사용량</h2>
         {mine.map((w) => {
           const p = planOf(w.plan);
           const cur = w.usage?.month === thisMonth() ? w.usage : undefined;
           return <p key={w.id} className="w-m0 w-14">{w.name} · {p.name} · 사람 {w.members?.length ?? 0}/{p.members} · AI {cur?.ai ?? 0}/{p.aiPerMonth} · AI 영상 {cur?.video ?? 0}/{p.videoPerMonth}</p>;
         })}
         {!mine.length && <p className="small muted w-m0">아직 속한 서비스가 없어요.</p>}
-        <p className="small muted w-m0">결제는 연결 전이에요. 요금제는 운영자가 서비스 설정에서 바꿔요. 구독 연결(이 Mac 의 Claude Code·Codex)로 쓴 AI 는 횟수에 세지 않아요.</p>
+        <p className="small muted w-m0">결제는 아직 연결하지 않았어요. 요금제는 운영자가 서비스 설정에서 바꿔요. 구독 연결(이 Mac 의 Claude Code·Codex)로 쓴 AI 는 횟수에 세지 않아요.</p>
       </section>
     </WideShell>
   );

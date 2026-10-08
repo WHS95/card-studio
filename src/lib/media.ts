@@ -45,7 +45,7 @@ export async function probe(file: string) {
   const j = JSON.parse(r.out) as { format?: { duration?: string }; streams?: { codec_type: string; width?: number; height?: number }[] };
   const v = j.streams?.find((s) => s.codec_type === "video");
   const duration = Number(j.format?.duration);
-  if (!v || !Number.isFinite(duration) || duration <= 0) throw new OpError("영상이 들어 있지 않은 파일이에요");
+  if (!v || !Number.isFinite(duration) || duration <= 0) throw new OpError("영상이 들어 있지 않은 파일이에요. MP4·MOV 영상을 올려 주세요");
   return { duration: Math.round(duration * 100) / 100, width: v.width ?? 0, height: v.height ?? 0, audio: !!j.streams?.some((s) => s.codec_type === "audio") };
 }
 
@@ -80,7 +80,7 @@ export async function importFile(ws: string, path: string): Promise<Photo> {
   const { createReadStream } = await import("node:fs");
   const { stat } = await import("node:fs/promises");
   const st = await stat(path).catch(() => null);
-  if (!st?.isFile()) throw new OpError("파일을 찾지 못했어요");
+  if (!st?.isFile()) throw new OpError("파일을 찾지 못했어요. 경로를 다시 확인해 주세요");
   if (st.size > VIDEO_MAX) throw new OpError("영상은 300MB 이하만 올릴 수 있어요");
   const { Readable } = await import("node:stream");
   return saveUpload(ws, Readable.toWeb(createReadStream(path)) as ReadableStream<Uint8Array>);
@@ -117,6 +117,6 @@ async function finishUpload(ws: string, tmp: string, id: string, size: number): 
   const video = join(dir, `${id}.mp4`), poster = join(dir, `${id}0.jpg`);
   await rename(tmp, video);
   const r = await ffmpeg(["-y", "-v", "error", "-ss", String(Math.min(1, info.duration / 2)), "-i", video, "-frames:v", "1", "-vf", "scale=1080:-2", "-q:v", "3", poster], 120_000);
-  if (r.code !== 0) { await rm(video, { force: true }); throw new OpError("영상 첫 장면을 뽑지 못했어요"); }
+  if (r.code !== 0) { await rm(video, { force: true }); throw new OpError("영상 첫 장면을 만들지 못했어요. 다른 영상으로 다시 올려 주세요"); }
   return { url: `/uploads/${ws}/${id}.mp4`, credit: "", source: "", kind: "video", poster: `/uploads/${ws}/${id}0.jpg`, duration: info.duration };
 }

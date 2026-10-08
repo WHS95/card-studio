@@ -48,7 +48,7 @@ async function api(path: string, init?: RequestInit) {
     const m = /"message":\s*"([^"]+)"/.exec(t)?.[1];
     if (r.status === 400 || r.status === 403) throw new OpError(`Google 이 요청을 받지 않았어요: ${m ?? r.status}`);
     if (r.status === 429) throw new OpError("Gemini 사용량 한도에 걸렸어요. 잠시 뒤 다시 해 주세요");
-    throw new OpError(`Veo 를 부르지 못했어요 (${r.status}). 잠시 뒤 다시 해 주세요`);
+    throw new OpError(`Veo 에 연결하지 못했어요(${r.status}). 잠시 뒤 다시 해 주세요`);
   }
   return r;
 }
@@ -83,14 +83,14 @@ export async function startVeo(ws: string, input: VeoInput): Promise<VeoJob> {
   if (mode === "extend") {
     const src = (await veoRegistry())[input.extendFrom ?? ""];
     if (!src || !input.extendFrom?.startsWith(`/uploads/${ws}/`)) throw new OpError("이어 붙이기는 이 스튜디오에서 Veo 로 만든 영상으로만 할 수 있어요");
-    if (Date.now() - src.at > 47 * 3600_000) throw new OpError("Google 이 영상을 2일만 보관해서, 만든 지 2일이 지난 영상은 이어 붙일 수 없어요");
+    if (Date.now() - src.at > 47 * 3600_000) throw new OpError("만든 지 2일 안의 영상만 이어 붙일 수 있어요. Google 이 영상을 2일만 보관해요");
     instance.video = { uri: src.uri };
   }
   const parameters: Record<string, unknown> = { aspectRatio: input.aspect === "16:9" ? "16:9" : "9:16", durationSeconds: String(duration), resolution, numberOfVideos: 1 };
   if (input.negative) parameters.negativePrompt = String(input.negative).slice(0, 300);
   const r = await api(`models/${model}:predictLongRunning`, { method: "POST", body: JSON.stringify({ instances: [instance], parameters }) });
   const op = (await r.json()) as { name?: string };
-  if (!op.name) throw new OpError("Veo 작업을 시작하지 못했어요");
+  if (!op.name) throw new OpError("영상 만들기를 시작하지 못했어요. 잠시 뒤 다시 해 주세요");
   const job: VeoJob = { id: randomBytes(6).toString("hex"), ws, status: "running", startedAt: Date.now(), message: `만드는 중 (보통 1~3분)${notes.length ? ` · ${notes.join(", ")} 바꿨어요` : ""}`, prompt, model };
   jobs.set(job.id, job);
   void follow(job, op.name);
@@ -107,23 +107,23 @@ async function follow(job: VeoJob, opName: string) {
         response?: { generateVideoResponse?: { generatedSamples?: { video?: { uri?: string } }[]; raiMediaFilteredReasons?: string[] } };
       };
       if (!op.done) { job.message = `만드는 중 · ${Math.round((Date.now() - job.startedAt) / 1000)}초`; continue; }
-      if (op.error) throw new OpError(`Veo 가 실패했어요: ${op.error.message ?? ""}`);
+      if (op.error) throw new OpError(`Veo 가 영상을 만들지 못했어요. ${op.error.message ?? ""}`.trim());
       const res = op.response?.generateVideoResponse;
       const uri = res?.generatedSamples?.[0]?.video?.uri;
-      if (!uri) throw new OpError(res?.raiMediaFilteredReasons?.length ? `Google 안전 기준에 걸려 영상을 만들지 않았어요: ${res.raiMediaFilteredReasons.join(" ")}` : "영상 주소를 받지 못했어요");
+      if (!uri) throw new OpError(res?.raiMediaFilteredReasons?.length ? `Google 안전 기준에 걸려 영상을 만들지 않았어요. 설명을 바꿔 다시 해 주세요. 이유: ${res.raiMediaFilteredReasons.join(" ")}` : "만든 영상을 받아 오지 못했어요. 다시 해 주세요");
       job.message = "받아서 저장하는 중";
       const file = await api(uri);
-      if (!file.body) throw new OpError("영상을 받지 못했어요");
+      if (!file.body) throw new OpError("만든 영상을 받아 오지 못했어요. 다시 해 주세요");
       const photo = await saveUpload(job.ws, file.body as ReadableStream<Uint8Array>);
       photo.credit = "AI 생성 (Google Veo)";
       photo.source = "Google Veo";
       await remember(photo.url, uri); // 2일 안에 '이어 붙이기'를 할 수 있게 구글 쪽 주소를 기억
-      Object.assign(job, { status: "done", photo, message: "다 됐어요" });
+      Object.assign(job, { status: "done", photo, message: "다 만들었어요" });
       return;
     }
     throw new OpError("10분이 지나도 끝나지 않았어요. 다시 해 주세요");
   } catch (e) {
-    Object.assign(job, { status: "error", message: e instanceof OpError ? e.message : (console.error(e), "영상을 만들지 못했어요") });
+    Object.assign(job, { status: "error", message: e instanceof OpError ? e.message : (console.error(e), "영상을 만들지 못했어요. 잠시 뒤 다시 해 주세요") });
   }
 }
 

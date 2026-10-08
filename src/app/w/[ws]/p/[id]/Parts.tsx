@@ -160,7 +160,7 @@ export function Media({ ws, photos, onChange, veo = false }: { ws: string; photo
         {veo && <button type="button" className="btn" aria-expanded={veoOpen} onClick={() => setVeoOpen(!veoOpen)}><Icon name="spark" size={14} />AI 영상 만들기 (Veo)</button>}
       </div>
       {msg && <p className={/중/.test(msg) ? "small" : "err"} style={{ margin: 0 }}>{msg}</p>}
-      {!veo ? <p className="ed-note">AI 영상(Veo): 운영자가 &apos;설정 · AI&apos;에서 Gemini 키를 넣으면 여기서 글로 영상을 만들 수 있어요.</p>
+      {!veo ? <p className="ed-note">AI 영상(Veo)은 운영자가 &apos;설정 · AI&apos;에 Gemini 키를 넣으면 쓸 수 있어요.</p>
         : <div hidden={!veoOpen}><VeoBox ws={ws} enabled={veo} photos={photos} full={full} onDone={(p) => onChange([...photos, p])} /></div>}
     </section>
   );
@@ -202,13 +202,13 @@ function VeoBox({ ws, enabled, photos, full, onDone }: { ws: string; enabled: bo
   };
   const label = (u: string) => `${photos.findIndex((p) => p.url === u) + 1}번`;
   const ready = prompt.trim().length >= 5 && (mode === "text" || (mode === "image" && first) || (mode === "frames" && first && last) || (mode === "reference" && refs.length > 0) || (mode === "extend" && ext));
-  if (!enabled) return <p className="small muted" style={{ margin: 0 }}>AI 영상(Veo): 운영자가 &apos;설정 · AI&apos;에서 Gemini 키를 넣으면 여기서 글로 영상을 만들 수 있어요.</p>;
+  if (!enabled) return <p className="small muted" style={{ margin: 0 }}>AI 영상(Veo)은 운영자가 &apos;설정 · AI&apos;에 Gemini 키를 넣으면 쓸 수 있어요.</p>;
   const go = async () => {
     setState({ busy: true, msg: "시작하는 중" });
     const body = { prompt, mode, model, aspect, duration, firstFrame: first || undefined, lastFrame: last || undefined, references: mode === "reference" ? refs : undefined, extendFrom: mode === "extend" ? ext : undefined };
     const r = await fetch(`/api/veo/${ws}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
-    const j = await r.json().catch(() => ({ error: "시작하지 못했어요" }));
-    if (!r.ok || !j.job) return setState({ busy: false, msg: j.error ?? "시작하지 못했어요", err: true });
+    const j = await r.json().catch(() => ({ error: "영상 만들기를 시작하지 못했어요. 잠시 뒤 다시 해 주세요" }));
+    if (!r.ok || !j.job) return setState({ busy: false, msg: j.error ?? "영상 만들기를 시작하지 못했어요. 잠시 뒤 다시 해 주세요", err: true });
     setState({ busy: true, msg: j.message });
     for (;;) {
       await new Promise((res) => setTimeout(res, 5000));
@@ -217,7 +217,7 @@ function VeoBox({ ws, enabled, photos, full, onDone }: { ws: string; enabled: bo
       if (s.status === "running") { setState({ busy: true, msg: s.message }); continue; }
       if (s.status === "error") return setState({ busy: false, msg: s.message, err: true });
       onDone(s.photo);
-      return setState({ busy: false, msg: "영상을 더했어요. 영상을 넣을 수 있는 칸에서 골라 쓸 수 있어요 (캡션 출처에 'AI 생성'이 붙어요)" });
+      return setState({ busy: false, msg: "영상을 더했어요. 영상 칸에서 골라 쓸 수 있어요. 캡션 출처에는 'AI 생성'이 붙어요" });
     }
   };
   const photoSelect = (value: string, set: (v: string) => void, title: string) => (
@@ -233,7 +233,7 @@ function VeoBox({ ws, enabled, photos, full, onDone }: { ws: string; enabled: bo
         </div>
         {(mode === "image" || mode === "frames") && (frames.length ? <div className="row">{photoSelect(first, setFirst, "첫 장면")}{mode === "frames" && photoSelect(last, setLast, "끝 장면")}</div> : <p className="small muted" style={{ margin: 0 }}>먼저 위 &apos;직접 올리기&apos;로 사진을 올려 주세요.</p>)}
         {mode === "reference" && (frames.length ? (
-          <div className="fld">참고 사진 <em>{refs.length}/3 · 제품·인물·장소처럼 모습이 유지돼야 하는 것</em>
+          <div className="fld">참고 사진 <em>{refs.length}/3 · 모습을 그대로 살릴 제품·인물·장소</em>
             <div className="row">{frames.map((p) => (
               <label key={p.url} className="chip"><input type="checkbox" checked={refs.includes(p.url)} disabled={!refs.includes(p.url) && refs.length >= 3} onChange={(e) => setRefs(e.target.checked ? [...refs, p.url] : refs.filter((u) => u !== p.url))} />{label(p.url)} 사진</label>
             ))}</div>
@@ -252,7 +252,7 @@ function VeoBox({ ws, enabled, photos, full, onDone }: { ws: string; enabled: bo
           <button type="button" className="btn primary" disabled={state.busy || full || !ready} onClick={go}>{state.busy ? "만드는 중…" : "영상 만들기"}</button>
           {state.msg && <span className={state.err ? "err" : "small"}>{state.msg}</span>}
         </div>
-        <span className="small muted">요금이 드는 기능이라 요금제의 한 달 영상 수만큼 만들 수 있어요. 실제 사람·브랜드는 흉내 내지 않아요. 인스타에 올릴 땐 &apos;AI 정보&apos; 표시를 켜요.</span>
+        <span className="small muted">요금제의 한 달 영상 수만큼 만들 수 있어요. 실제 사람·브랜드는 흉내 내지 않아요. 인스타에 올릴 땐 &apos;AI 정보&apos; 표시를 켜 주세요.</span>
       </div>
     </div>
   );

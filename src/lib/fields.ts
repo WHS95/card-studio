@@ -74,12 +74,12 @@ function checkField(f: Field, v: unknown, photos: Photo[], path: string) {
     if (v.length > f.max) throw new Error(`${path}${f.label} 칸은 ${f.max}자까지예요`);
     if (lineCount(v) > (f.lines ?? 1)) throw new Error(`${path}${f.label} 칸은 ${f.lines ?? 1}줄까지예요`);
   } else if (f.type === "photo") {
-    if (v !== null && v !== undefined && (typeof v !== "number" || !Number.isInteger(v) || v < 0 || v >= photos.length)) throw new Error(`${path}${f.label} 사진 번호가 맞지 않아요`);
+    if (v !== null && v !== undefined && (typeof v !== "number" || !Number.isInteger(v) || v < 0 || v >= photos.length)) throw new Error(`${path}${f.label} 칸의 사진 번호가 맞지 않아요. 사진을 다시 골라 주세요`);
     if (typeof v === "number" && isVideo(photos[v]) && !f.video) throw new Error(`${path}${f.label} 칸에는 영상을 넣을 수 없어요`);
   } else if (f.type === "toggle") {
     if (v !== undefined && typeof v !== "boolean") throw new Error(`${path}${f.label} 형식이 맞지 않아요`);
   } else if (f.type === "choice") {
-    if (v !== undefined && !f.options.some((o) => o.v === v)) throw new Error(`${path}${f.label} 값이 맞지 않아요 (${f.options.map((o) => o.v).join("|")})`);
+    if (v !== undefined && !f.options.some((o) => o.v === v)) throw new Error(`${path}${f.label} 값은 ${f.options.map((o) => o.v).join(" · ")} 중에서 골라 주세요`);
   } else if (f.type === "number") {
     if (v !== undefined && (typeof v !== "number" || !Number.isFinite(v) || v < f.min || v > f.max)) throw new Error(`${path}${f.label} 값은 ${f.min}~${f.max} 사이로 넣어 주세요`);
   } else {
@@ -92,14 +92,14 @@ const pct = (v: unknown, lo: number, hi: number, name: string) => { if (v !== un
 
 /** 템플릿 기준 검사. 틀리면 이유, 맞으면 null */
 export function validatePost(t: Template, p: unknown): string | null {
-  if (!p || typeof p !== "object") return "형식이 맞지 않아요";
+  if (!p || typeof p !== "object") return "게시물 내용 형식이 맞지 않아요";
   const post = p as PostData;
   if (!Array.isArray(post.slides) || post.slides.length < 1 || post.slides.length > t.maxSlides) return `장은 1~${t.maxSlides}장까지 만들 수 있어요`;
   if (post.slides[0]?.kind !== t.kinds[0].kind) return "첫 장에는 표지를 둬 주세요";
   if (typeof post.caption !== "string" || post.caption.length > CAPTION_MAX) return `캡션은 ${CAPTION_MAX}자까지예요`;
   if (!Array.isArray(post.photos) || post.photos.length > PHOTOS_MAX) return `사진은 ${PHOTOS_MAX}장까지예요`;
   for (const ph of post.photos) {
-    if (!ph || typeof ph.url !== "string" || typeof ph.credit !== "string" || typeof ph.source !== "string") return "사진 형식이 맞지 않아요";
+    if (!ph || typeof ph.url !== "string" || typeof ph.credit !== "string" || typeof ph.source !== "string") return "사진 정보(주소·출처) 형식이 맞지 않아요";
     if (ph.kind === "video") {
       const ok = (u: unknown) => typeof u === "string" && (UPLOAD_RE.test(u) || SAMPLE_RE.test(u));
       if (!ok(ph.url) || !ph.url.endsWith(".mp4") || !ok(ph.poster) || typeof ph.duration !== "number") return "영상은 직접 올린 것만 쓸 수 있어요";
@@ -117,10 +117,10 @@ export function validatePost(t: Template, p: unknown): string | null {
       if (vid) {
         const start = typeof s.videoStart === "number" ? s.videoStart : 0;
         const dur = typeof s.videoDur === "number" ? s.videoDur : Math.min(VIDEO_DUR.default, vid.duration ?? VIDEO_DUR.default);
-        if (start < 0 || !Number.isFinite(start)) throw new Error(`${i + 1}번째 장 영상 시작이 맞지 않아요`);
+        if (start < 0 || !Number.isFinite(start)) throw new Error(`${i + 1}번째 장 영상 시작 초는 0 이상으로 넣어 주세요`);
         const dmax = t.videoMax ?? VIDEO_DUR.max;
         if (dur < VIDEO_DUR.min || dur > dmax) throw new Error(`${i + 1}번째 장 영상 길이는 ${VIDEO_DUR.min}~${dmax}초예요`);
-        if (start + dur > (vid.duration ?? 0) + 0.05) throw new Error(`${i + 1}번째 장 영상은 ${Math.floor(vid.duration ?? 0)}초까지예요. 시작과 길이를 더해 그 안으로 맞춰 주세요`);
+        if (start + dur > (vid.duration ?? 0) + 0.05) throw new Error(`${i + 1}번째 장 영상은 ${Math.floor(vid.duration ?? 0)}초까지예요. 시작 초와 길이를 더한 값이 이 안에 들어오게 맞춰 주세요`);
         if (s.videoMute !== undefined && typeof s.videoMute !== "boolean") throw new Error(`${i + 1}번째 장 소리 설정이 맞지 않아요`);
       }
     });
