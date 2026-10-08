@@ -281,7 +281,7 @@ export default function Editor({ ws, post, empty }: { ws: Ws; post: Post; empty:
       </form>
 
       <div className="ed-top">
-        <Link href={`/w/${ws.id}`} className="ed-back">← 달력</Link>
+        <Link href={`/w/${ws.id}`} className="ed-back">← 제작</Link>
         <b className="ed-title">D{post.day} {post.slot} · {title || "제목 없음"}</b>
         <span className="ed-pill">{STATUS_LABEL[post.status]}</span>
         <span className="ed-meta">{drafting ? <b>AI 초안 쓰는 중</b> : dirty ? <b>저장 안 됨</b> : "저장됨"} · {t.name} · {category}</span>

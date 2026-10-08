@@ -10,7 +10,7 @@ import BatchSchedule from "./BatchSchedule";
 import AiIdeas from "./AiIdeas";
 import AskAi from "../../../AskAi";
 
-/** 3단계 주제: 누가 냈든 검수 대기 → 소유자·검수자가 승인 → 승인한 것만 달력에 (여러 개를 고른 순서대로) */
+/** 3단계 주제: 누가 냈든 검수 대기 → 소유자·검수자가 승인 → 승인한 것만 제작 목록에 (여러 개를 고른 순서대로 끝에) */
 export default async function Ideas({ params, searchParams }: PageProps<"/w/[ws]/ideas">) {
   const { ws } = await params;
   const q = await searchParams;
@@ -23,9 +23,6 @@ export default async function Ideas({ params, searchParams }: PageProps<"/w/[ws]
   const pillar = typeof q.pillar === "string" ? q.pillar : null;
   const shown = ideas.filter((i) => (!status || i.status === status) && (pillar === null || i.pillar === pillar));
   const postOf = new Map(posts.map((p) => [p.id, p]));
-  const taken = new Set(posts.map((p) => `${p.day} ${p.slot}`));
-  const empty: string[] = [];
-  for (let d = 1; d <= w.days && empty.length < 40; d++) for (const s of w.slots) if (!taken.has(`${d} ${s}`) && empty.length < 40) empty.push(`${d} ${s}`);
   const rTitle = new Map(research.map((r) => [r.id, r]));
   const used = new Set(ideas.map((i) => i.title));
   const href = (o: { s?: string | null; pillar?: string | null }) => {
@@ -35,13 +32,11 @@ export default async function Ideas({ params, searchParams }: PageProps<"/w/[ws]
     return `/w/${w.id}/ideas${u.size ? `?${u}` : ""}`;
   };
 
-  const starts: { day: number; slot: string }[] = [];
-  for (const e of empty) { const [d, sl] = e.split(" "); if (!starts.some((x) => x.day === Number(d))) starts.push({ day: Number(d), slot: sl }); }
   const byLabel = (b: string) => (b === "ai" ? "AI 제안" : b === "mcp" ? "MCP" : "직접");
   return (
-    <ServiceShell ws={w} step="ideas" ctx="3단계 주제 (검수 대기 → 승인 → 달력)">
+    <ServiceShell ws={w} step="ideas" ctx="3단계 주제 (검수 대기 → 승인 → 제작)">
         <div className="stg-head">
-          <div className="col stg-head-t"><h1>주제</h1><span className="small muted">새로 낸 주제는 누가 냈든 검수 대기에서 시작해요. 소유자·검수자가 승인한 주제만 달력에 넣을 수 있어요.</span></div>
+          <div className="col stg-head-t"><h1>주제</h1><span className="small muted">새로 낸 주제는 누가 냈든 검수 대기에서 시작해요. 소유자·검수자가 승인한 주제만 제작에 넣을 수 있어요.</span></div>
           {canEdit && <details className="stg-new" open={!ideas.length || undefined}>
             <summary className="btn primary">+ 새 주제</summary>
             <div className="cols2 stg-new-body">
@@ -104,7 +99,7 @@ export default async function Ideas({ params, searchParams }: PageProps<"/w/[ws]
         </div>
 
         {status === "approved" && canEdit && shown.some((i) => !i.postId) && (
-          <BatchSchedule ws={w.id} action={scheduleIdeasAction} starts={starts} items={shown.filter((i) => !i.postId).map((i) => ({ id: i.id, title: i.title, pillar: i.pillar, by: i.approvedBy ?? "" }))} />
+          <BatchSchedule ws={w.id} action={scheduleIdeasAction} items={shown.filter((i) => !i.postId).map((i) => ({ id: i.id, title: i.title, pillar: i.pillar, by: i.approvedBy ?? "" }))} />
         )}
         {status === "approved" && canEdit && shown.length > 0 && <h2 className="stg-h2">하나씩 넣기 · 고치기</h2>}
 
@@ -124,15 +119,11 @@ export default async function Ideas({ params, searchParams }: PageProps<"/w/[ws]
                 <div className="stg-acts">
                   {i.status === "review" && (canApprove
                     ? <form action={updateIdeaAction}><input type="hidden" name="ws" value={w.id} /><input type="hidden" name="id" value={i.id} /><button name="status" value="approved" className="btn primary">승인</button></form>
-                    : <span className="small muted">검수 대기 · 소유자·검수자가 승인하면 달력에 넣을 수 있어요</span>)}
+                    : <span className="small muted">검수 대기 · 소유자·검수자가 승인하면 제작에 넣을 수 있어요</span>)}
                   {post ? <Link className="btn" href={`/w/${w.id}/p/${post.id}`}>D{post.day} {post.slot} · {STATUS_LABEL[post.status]} →</Link> : i.status === "approved" && canEdit && (
                     <form action={scheduleIdeaAction} className="row">
                       <input type="hidden" name="ws" value={w.id} /><input type="hidden" name="id" value={i.id} />
-                      <select name="spot" className="input stg-auto" aria-label="넣을 칸">
-                        <option value="">비어 있는 첫 칸</option>
-                        {empty.map((e) => { const [d, s] = e.split(" "); return <option key={e} value={e}>D{d} {s}</option>; })}
-                      </select>
-                      <button className="btn" disabled={!empty.length}>이것만 달력에</button>
+                      <button className="btn">이것만 제작에</button>
                     </form>
                   )}
                   {!post && (canEdit || canApprove) && <form action={updateIdeaAction} className="row">

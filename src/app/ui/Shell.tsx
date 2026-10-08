@@ -9,7 +9,7 @@ import Icon from "./Icon";
 import AiPanel, { PanelToggle, SvcTopWatch } from "./AiPanel";
 import ExportMenu from "./ExportMenu";
 
-// 0.6 화면 틀: 왼쪽 메뉴(넓게: 전체 화면 / 좁게: 서비스 안) · 서비스 안은 위 8단계 탭(상태 표시) + '지금 할 일' 한 줄 + 오른쪽 AI 패널.
+// 0.6 화면 틀: 왼쪽 메뉴(넓게: 전체 화면 / 좁게: 서비스 안) · 서비스 안은 위 단계 탭(상태 표시) + '지금 할 일' 한 줄 + 오른쪽 AI 패널.
 // 흑백만 쓴다 (서비스 색은 카드 안에서만).
 
 const NAV = [
@@ -118,7 +118,7 @@ export async function ServiceShell({ ws, step, ctx, children }: { ws: Workspace;
           <div className="now">
             <b>지금 할 일</b>
             {flow.now ? <><span>{flow.now.note}</span><Link href={flow.now.href} className="now-go">{flow.now.label} 탭 →</Link></> : <span>막힌 단계가 없어요</span>}
-            <span className="sp">단계 8개 중 됨 {flow.counts.done} · 진행 중 {flow.counts.doing} · 할 일 {flow.counts.todo}</span>
+            <span className="sp">단계 {flow.steps.length}개 중 됨 {flow.counts.done} · 진행 중 {flow.counts.doing} · 할 일 {flow.counts.todo}</span>
           </div>
         </div>
         <SvcTopWatch />

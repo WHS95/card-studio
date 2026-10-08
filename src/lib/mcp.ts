@@ -114,7 +114,7 @@ model: ${VEO_MODELS.map((m) => m.id).join(" · ")} (기본 lite; frames·referen
   },
   {
     name: "get_flow",
-    description: "서비스의 8단계(목적·자료 조사·주제·템플릿·제작·검수·발행·성과) 지금 상태(done·doing·todo + 숫자 + 설명)와 '지금 할 일'. 무엇부터 할지 정할 때 먼저 본다.",
+    description: "서비스의 단계(목적·자료 조사·주제·템플릿·제작·검수 — 발행·성과는 나중에 다시 연다) 지금 상태(done·doing·todo + 숫자 + 설명)와 '지금 할 일'. 무엇부터 할지 정할 때 먼저 본다.",
     inputSchema: obj({ ws: str }, ["ws"]),
     run: async (a) => flowOf(need(await getWorkspace(String(a.ws)), "서비스를 찾지 못했어요")),
   },
@@ -147,13 +147,13 @@ model: ${VEO_MODELS.map((m) => m.id).join(" · ")} (기본 lite; frames·referen
   },
   {
     name: "list_ideas",
-    description: "주제(아이디어) 보관함 (최신 순). status: review(검수 대기) · approved(승인, 달력에 넣을 수 있음) · planned(달력에 넣음, postId) · dropped(보류). 새 주제를 낼 때 겹치지 않게 먼저 본다.",
+    description: "주제(아이디어) 보관함 (최신 순). status: review(검수 대기) · approved(승인, 제작에 넣을 수 있음) · planned(제작에 넣음, postId) · dropped(보류). 새 주제를 낼 때 겹치지 않게 먼저 본다.",
     inputSchema: obj({ ws: str, status: { type: "string", enum: ["review", "approved", "planned", "dropped"] }, pillar: str }, ["ws"]),
     run: async (a) => (await listIdeas(String(a.ws))).filter((i) => (!a.status || i.status === a.status) && (a.pillar === undefined || i.pillar === a.pillar)),
   },
   {
     name: "add_ideas",
-    description: "주제 여러 개 더하기 (최대 20, 모두 검수 대기로 들어간다 — 사람이 승인해야 달력에 넣을 수 있다). 각 {title(80), pillar(기둥 이름), angle(어떤 각도로·메모), template?, research?(자료 id[])}. 사실·숫자가 들어가면 add_research 로 출처를 먼저 넣고 research 로 연결한다.",
+    description: "주제 여러 개 더하기 (최대 20, 모두 검수 대기로 들어간다 — 사람이 승인해야 제작에 넣을 수 있다). 각 {title(80), pillar(기둥 이름), angle(어떤 각도로·메모), template?, research?(자료 id[])}. 사실·숫자가 들어가면 add_research 로 출처를 먼저 넣고 research 로 연결한다.",
     inputSchema: obj({ ws: str, ideas: { type: "array", items: obj({ title: str, pillar: str, angle: str, template: str, research: { type: "array", items: str } }, ["title"]) } }, ["ws", "ideas"]),
     run: async (a) => { const out = []; for (const x of (a.ideas as Json[]).slice(0, 20)) out.push(await createIdea(String(a.ws), { ...x, by: "mcp" } as never)); return out; },
   },
@@ -220,7 +220,7 @@ export const TOOLS: Tool[] = [
   },
   {
     name: "update_workspace",
-    description: "서비스 설정 고치기: name, handle, categories[], slots[](HH:MM), days(1~90), startDate(YYYY-MM-DD|null), defaultTemplate, metricsDays(1~30, 성과 적을 차례), theme{dark,light,ink,muted,accent,onAccent,wordmark{text,color,bg}}. 강조색은 채움으로만 쓴다(그 위 글자 onAccent).",
+    description: "서비스 설정 고치기: name, handle, categories[], slots[](HH:MM), days(1~365, 모자라면 저절로 늘어남), startDate(YYYY-MM-DD|null), defaultTemplate, metricsDays(1~30, 성과 적을 차례), theme{dark,light,ink,muted,accent,onAccent,wordmark{text,color,bg}}. 강조색은 채움으로만 쓴다(그 위 글자 onAccent).",
     inputSchema: obj({ ws: str, patch: { type: "object" } }, ["ws", "patch"]),
     run: (a) => updateWorkspace(String(a.ws), a.patch as WorkspacePatch),
   },
@@ -363,7 +363,7 @@ export const TOOLS: Tool[] = [
 ];
 
 export const INSTRUCTIONS = `카드뉴스 스튜디오(card-studio, ${BASE}) — 여러 서비스의 인스타 카드뉴스(1080×1350 캐러셀)를 기획·편집·검수·내보내기.
-순서(8단계): list_workspaces → get_flow(지금 할 일) → get_brief(목적·기둥·콘텐츠 규칙) → add_research(자료, 신뢰도) → add_ideas(주제, 검수 대기) → 사람이 승인 → schedule_ideas → list_templates(칸 정의) → update_post(제작) → check_safe_zone·render_slide → get_checklist → 사람이 체크하고 승인(set_status approved + checks) → export_post(발행은 사람이) → 7일 뒤 set_metrics → get_insights 제안.
+순서(6단계 — 발행·성과 탭은 잠시 닫음): list_workspaces → get_flow(지금 할 일) → get_brief(목적·기둥·콘텐츠 규칙) → add_research(자료, 신뢰도) → add_ideas(주제, 검수 대기) → 사람이 승인 → schedule_ideas → list_templates(칸 정의) → update_post(제작) → check_safe_zone·render_slide → get_checklist → 사람이 체크하고 승인(set_status approved + checks) → export_post(발행은 사람이) → 7일 뒤 set_metrics → get_insights 제안.
 규칙: 주제 승인·게시물 승인은 사람이 확인한 뒤에만. 게시(posted)는 실제 인스타 링크가 있을 때만. 무료 사진은 search_photos 로 찾아 add_media(출처 포함) → update_post 로 장 사진 칸에, 장소 이름이 나오면 실제 그 장소 사진만. 협찬은 #광고. 삭제·인스타 업로드 도구는 없다.`;
 
 // ── 권한: 도구마다 어느 서비스의 무슨 권한이 필요한지 (계정으로 붙은 AI 앱은 그 사람 역할로만) ──
@@ -407,8 +407,8 @@ const ACT: Record<string, (a: Json, r: unknown) => [string, string[]] | null> = 
   add_research: (a) => [`자료 ${(a.items as unknown[]).length}건을 넣었어요`, (a.items as Json[]).map((x) => String(x.title))],
   update_research: (a, r) => [a.confidence && Object.keys(a).length === 2 ? "자료 신뢰도를 바꿨어요" : "자료를 고쳤어요", [String((r as { title?: string })?.title ?? a.title ?? "")].filter(Boolean)],
   update_idea: (a, r) => [a.status === "approved" ? "주제를 승인했어요" : a.status === "dropped" ? "주제를 보류했어요" : a.status === "review" ? "주제를 검수 대기로 돌렸어요" : "주제를 고쳤어요", [`${(r as { title?: string })?.title ?? a.title ?? ""}${a.pillar ? ` · 기둥 ${a.pillar}` : ""}`].filter(Boolean)],
-  schedule_idea: (_a, r) => ["주제를 달력에 넣었어요", [`D${(r as Post).day} ${(r as Post).slot} · ${(r as Post).title}`]],
-  schedule_ideas: (_a, r) => [`주제 ${(r as unknown[]).length}개를 달력에 넣었어요`, (r as { day: number; slot: string; title: string }[]).map((p) => `D${p.day} ${p.slot} · ${p.title}`)],
+  schedule_idea: (_a, r) => ["주제를 제작에 넣었어요", [`D${(r as Post).day} ${(r as Post).slot} · ${(r as Post).title}`]],
+  schedule_ideas: (_a, r) => [`주제 ${(r as unknown[]).length}개를 제작에 넣었어요`, (r as { day: number; slot: string; title: string }[]).map((p) => `D${p.day} ${p.slot} · ${p.title}`)],
   create_post: (_a, r) => ["게시물을 만들었어요", [`${(r as { post: Post }).post.title}`]],
   update_post: (_a, r) => ["게시물을 고쳤어요", [`D${(r as Post).day} ${(r as Post).slot} · ${(r as Post).title}`]],
   set_status: (a, r) => [`상태를 ${a.status}(으)로 바꿨어요`, [(r as Post).title]],

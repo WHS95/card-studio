@@ -160,7 +160,7 @@ export default function BriefEditor({ ws, brief: b0, pillars: p0, presets, goals
               ))}
               {!pillars.length && <p className="small muted stg-p">아직 기둥이 없어요. 업종을 고르거나 직접 더해요. 3~5개를 권해요.</p>}
               <p className="small muted stg-p stg-sum">
-                <span className={sumErr ? "err" : undefined}>합 {total}%</span> · 기둥 이름 = 달력 카테고리 = 성과 비교 단위
+                <span className={sumErr ? "err" : undefined}>합 {total}%</span> · 기둥 이름 = 게시물 카테고리
                 {pillars.length > 1 && canEdit && <button type="button" className="stg-link" onClick={even}>똑같이 나누기</button>}
               </p>
             </div>

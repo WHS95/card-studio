@@ -98,3 +98,32 @@ a.mk-row-title:hover { text-decoration: underline; }
   .mk-spot .input { flex: 1; max-width: none; }
   .mk-row-main { flex-basis: 140px; }
 }
+
+/* ── 5 제작 · 목록 (2026-10-08: 일자 × 시간대 달력 대신) ── */
+.mk-new { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.mk-plist { display: flex; flex-direction: column; gap: 8px; }
+.mk-prow { flex-wrap: nowrap; }
+.mk-prow:hover { border-color: var(--ink); }
+.mk-prow[data-s=skip] { opacity: .5; }
+.mk-thumb-empty { display: inline-flex; align-items: center; justify-content: center; font-size: 11px; color: var(--muted); background: #f2f2f2; }
+.mk-when { flex-shrink: 0; white-space: nowrap; }
+.mk-pill { flex-shrink: 0; padding: 3px 10px; border-radius: 999px; border: 1px solid var(--line2); font-size: 12px; font-weight: 800; white-space: nowrap; }
+.mk-pill[data-s=approved] { border: 1.5px solid var(--ink); }
+.mk-pill[data-s=posted] { background: var(--ink); color: #fff; border-color: var(--ink); }
+.mk-pill[data-s=draft] { background: #f2f2f2; }
+.mk-pmeta { display: flex; gap: 12px; align-items: center; flex-shrink: 0; }
+@media (max-width: 640px) {
+  .mk-prow { flex-wrap: wrap; row-gap: 8px; }
+  .mk-prow .mk-row-main { flex: 1 1 calc(100% - 72px); }
+  .mk-pmeta { flex-basis: 100%; padding-left: 72px; gap: 10px; flex-wrap: wrap; }
+}
+
+/* ── 6 검수 · 골라서 내려받기 ── */
+.mk-pickbar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; padding: 10px 12px; border-radius: 12px; border: 1px solid var(--line2); background: #fff; }
+.mk-pickbar .btn { margin-left: auto; }
+.mk-pickall { display: inline-flex; gap: 6px; align-items: center; font-size: 13px; font-weight: 700; }
+.mk-pickrow { gap: 10px; }
+.mk-pickrow .mk-check { width: 18px; height: 18px; flex-shrink: 0; accent-color: var(--ink); }
+.mk-pickmain { flex: 1; min-width: 0; display: flex; gap: 12px; align-items: center; color: var(--ink); text-decoration: none; }
+.mk-okprev { width: 200px; max-width: 100%; aspect-ratio: 4 / 5; object-fit: cover; border-radius: 10px; border: 1px solid var(--line2); }
+@media (max-width: 640px) { .mk-pickmain { flex-wrap: wrap; } .mk-pickbar .btn { margin-left: 0; } }

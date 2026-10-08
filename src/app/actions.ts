@@ -3,7 +3,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { checkLogin, clearSession, loginUser, requireAuth, setSession, setUserSession, wsAccess, type Perm } from "@/lib/auth";
-import { addMember, changePassword, removeMember, resetMemberPassword, setMemberRole, setPlan, countAi, addResearch, applyShareSuggestion, archivePost, createIdea, createPostIn, dismissSuggestion, duplicatePost, followUpIdea, insights, movePost, nextEmptySlot, restorePost, scheduleIdeas, setDisplayName, setMetrics, createWorkspace, OpError, removeResearch, savePost, scheduleIdea, setPillars, setStatus, toggleFavorite, updateBrief, updateIdea, updateResearch, updateWorkspace } from "@/lib/ops";
+import { addMember, changePassword, removeMember, resetMemberPassword, setMemberRole, setPlan, countAi, addResearch, applyShareSuggestion, archivePost, createIdea, createPostIn, dismissSuggestion, duplicatePost, followUpIdea, insights, movePost, nextEmptySlot, restorePost, scheduleIdeas, setDisplayName, setMetrics, createWorkspace, ensureSlot, tailDay, OpError, removeResearch, savePost, scheduleIdea, setPillars, setStatus, toggleFavorite, updateBrief, updateIdea, updateResearch, updateWorkspace } from "@/lib/ops";
 import { type PostData, type PostStatus } from "@/lib/types";
 import { getIdea, getPost, getResearch, listIdeas } from "@/lib/store";
 import { templateOf } from "@/lib/templates";
@@ -86,7 +86,12 @@ export async function createPostAction(fd: FormData) {
   await requireAuth();
   const ws = String(fd.get("ws"));
   let id = "";
-  try { await gateWs(ws, "edit"); id = (await createPostIn(ws, { day: Number(fd.get("day")), slot: String(fd.get("slot")) })).post.id; }
+  try {
+    await gateWs(ws, "edit");
+    // 제작 목록의 '새 게시물'은 자리를 안 준다 → 비어 있는 첫 자리 (모자라면 일수를 늘려서)
+    const at = fd.get("day") ? { day: Number(fd.get("day")), slot: String(fd.get("slot")) } : await ensureSlot(ws, await tailDay(ws));
+    id = (await createPostIn(ws, at)).post.id;
+  }
   catch (e) { redirect(`/w/${ws}?error=${encodeURIComponent(msg(e))}`); }
   redirect(`/w/${ws}/p/${id}`);
 }
@@ -172,7 +177,8 @@ export async function scheduleIdeaAction(fd: FormData) {
   const spot = String(fd.get("spot") ?? "");
   const m = /^(\d+) (\d\d:\d\d)$/.exec(spot);
   let post = null;
-  try { await gateOwned("idea", String(fd.get("id")), ws); post = await scheduleIdea(String(fd.get("id")), m ? { day: m[1], slot: m[2] } : undefined); }
+  // 자리를 안 고르면 제작 목록 끝에
+  try { await gateOwned("idea", String(fd.get("id")), ws); post = await scheduleIdea(String(fd.get("id")), m ? { day: m[1], slot: m[2] } : await ensureSlot(ws, await tailDay(ws))); }
   catch (e) { back(`/w/${ws}/ideas`, e); }
   revalidatePath(`/w/${ws}`, "layout");
   redirect(`/w/${ws}/p/${post!.id}`);
@@ -185,9 +191,9 @@ export async function scheduleIdeasAction(fd: FormData) {
   const ids = String(fd.get("order") ?? "").split(",").map((x) => x.trim()).filter(Boolean);
   try {
     await gateWs(ws, "edit");
-    if (!ids.length) throw new OpError("달력에 넣을 주제를 골라 주세요");
+    if (!ids.length) throw new OpError("제작에 넣을 주제를 골라 주세요");
     for (const id of ids) await gateOwned("idea", id, ws);
-    await scheduleIdeas(ids, Number(fd.get("from") ?? 1));
+    await scheduleIdeas(ids, fd.get("from") ? Number(fd.get("from")) : await tailDay(ws)); // 고른 순서대로 목록 끝에
   } catch (e) { back(`/w/${ws}/ideas?s=approved`, e); }
   revalidatePath(`/w/${ws}`, "layout");
   redirect(`/w/${ws}?ok=${ids.length}`);

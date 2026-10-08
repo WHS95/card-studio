@@ -11,7 +11,7 @@ import NewService from "./NewService";
 
 const when = (iso: string) => new Date(iso).toLocaleString("ko-KR", { timeZone: "Asia/Seoul", month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).replace(/\.\s?/g, "/").replace(/\/\s*(?=\d{2}:)/, " ");
 
-/** 홈 · 모든 서비스 (?fav=1 즐겨찾기). 카드: 8단계 진행 띠 · 다음 할 일 · 즐겨찾기 별 · 더 보기. 누르면 할 일이 있는 단계로 */
+/** 홈 · 모든 서비스 (?fav=1 즐겨찾기). 카드: 단계 진행 띠 · 다음 할 일 · 즐겨찾기 별 · 더 보기. 누르면 할 일이 있는 단계로 */
 export default async function Home({ searchParams }: PageProps<"/">) {
   const actor = await requireAuth();
   const q = await searchParams;
@@ -57,7 +57,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
                       </summary>
                       <div className="w-menu">
                         <Link href={`/w/${w.id}/go`}>할 일 단계로 열기</Link>
-                        <Link href={`/w/${w.id}`}>제작 · 달력</Link>
+                        <Link href={`/w/${w.id}`}>제작 · 목록</Link>
                         {manage && <Link href={`/w/${w.id}/settings`}>서비스 설정</Link>}
                         {manage && <Link href={`/w/${w.id}/members`}>함께 쓰기</Link>}
                         {manage && <a href={`/api/ws/${w.id}/export`}>내보내기 (JSON)</a>}
@@ -67,7 +67,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
                 </div>
                 <Link href={`/w/${w.id}/go`} className="w-card-name">{w.name}</Link>
                 <p className="small muted clamp2 w-m0">{w.handle || "계정 없음"}{w.brief?.about ? ` · ${w.brief.about}` : ""}</p>
-                <div className="prog" aria-label={`8단계 중 됨 ${f.counts.done}`}>{f.steps.map((s) => <span key={s.key} data-s={s.state} title={`${s.label} · ${s.note}`} />)}</div>
+                <div className="prog" aria-label={`${f.steps.length}단계 중 됨 ${f.counts.done}`}>{f.steps.map((s) => <span key={s.key} data-s={s.state} title={`${s.label} · ${s.note}`} />)}</div>
                 <p className="small w-m0"><b>다음 할 일</b> {f.now ? f.now.note : "막힌 단계가 없어요"}</p>
                 {lastEdit[i] && <p className="small muted w-m0">{when(lastEdit[i])} 고침</p>}
               </article>
@@ -76,7 +76,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
         </div>
       )}
       {!list.length && <p className="hint">{fav ? "서비스 카드의 별을 누르면 여기 모여요." : "아직 서비스가 없어요. '새 서비스'로 시작해 보세요."}</p>}
-      <p className="small muted w-m0">{fav ? "별을 누른 서비스만 모여요." : "카드를 누르면 '할 일'이 있는 단계로 열려요. 진행 띠는 8단계(목적·자료 조사·주제·템플릿·제작·검수·발행·성과), 진한 칸 = 됨."}</p>
+      <p className="small muted w-m0">{fav ? "별을 누른 서비스만 모여요." : "카드를 누르면 '할 일'이 있는 단계로 열려요. 진행 띠는 6단계(목적·자료 조사·주제·템플릿·제작·검수), 진한 칸 = 됨."}</p>
     </WideShell>
   );
 }

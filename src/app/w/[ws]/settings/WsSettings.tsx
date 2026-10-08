@@ -16,7 +16,7 @@ export default function WsSettings({ w, admin }: { w: W; admin: boolean }) {
   const save = (force = false) => {
     const f = form.current;
     if (!f) return;
-    if (!f.checkValidity()) { f.reportValidity(); return; } // 범위 밖(일수 1~90 등)은 저장하지 않고 알려 준다
+    if (!f.checkValidity()) { f.reportValidity(); return; } // 범위 밖(일수 1~365 등)은 저장하지 않고 알려 준다
     const fd = new FormData(f);
     const s = snap(fd);
     if (!force && s === last.current) return;
@@ -40,10 +40,10 @@ export default function WsSettings({ w, admin }: { w: W; admin: boolean }) {
             <label className="fld">인스타 계정<input name="handle" className="input" defaultValue={w.handle} maxLength={30} /></label>
           </div>
         </section>
-        <section className="sect"><h2>달력</h2>
+        <section className="sect"><h2>올릴 차례</h2>
           <div className="set-g3">
             <label className="fld">1일차<input name="startDate" type="date" className="input" defaultValue={w.startDate ?? ""} /></label>
-            <label className="fld"><span>일수 <em>1~90</em></span><input name="days" type="number" min={1} max={90} className="input" defaultValue={w.days} /></label>
+            <label className="fld"><span>일수 <em>1~365 · 모자라면 저절로 늘어나요</em></span><input name="days" type="number" min={1} max={365} className="input" defaultValue={w.days} /></label>
             <label className="fld"><span>시간대 <em>쉼표로 · 6개까지</em></span><input name="slots" className="input" defaultValue={w.slots.join(", ")} /></label>
           </div>
           <label className="fld"><span>카테고리 <em>기둥 이름이 먼저 · 20개까지</em></span><input name="categories" className="input" defaultValue={w.categories.join(", ")} /></label>

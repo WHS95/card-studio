@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import Icon from "./Icon";
 
-// 위 오른쪽 '내보내기' 메뉴. 실제로 내려받는 건 서비스 백업(JSON) 하나 — 게시물 ZIP 은 게시물마다 7 발행 탭·편집기에 있다.
+// 위 오른쪽 '내보내기' 메뉴. 실제로 내려받는 건 서비스 백업(JSON) 하나 — 게시물 ZIP 은 6 검수 탭(골라서 한꺼번에)·편집기에 있다.
 export default function ExportMenu({ ws }: { ws: string }) {
   const [open, setOpen] = useState(false);
   const box = useRef<HTMLDivElement>(null);
@@ -27,8 +27,8 @@ export default function ExportMenu({ ws }: { ws: string }) {
           <a role="menuitem" href={`/api/ws/${ws}/export`} className="xmenu-it" onClick={() => setOpen(false)}>
             <b>서비스 백업 (JSON)</b><span>브리프·기둥·게시물·주제·자료 전부</span>
           </a>
-          <Link role="menuitem" href={`/w/${ws}/publish`} className="xmenu-it" onClick={() => setOpen(false)}>
-            <b>승인·게시된 게시물 ZIP</b><span>7 발행 탭에서 게시물마다 PNG·MP4·caption.txt</span>
+          <Link role="menuitem" href={`/w/${ws}/review`} className="xmenu-it" onClick={() => setOpen(false)}>
+            <b>게시물 ZIP</b><span>6 검수 탭에서 골라서 · PNG·MP4·caption.txt</span>
           </Link>
         </div>
       )}

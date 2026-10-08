@@ -126,7 +126,7 @@ export type Pillar = { name: string; description: string; share: number; templat
 /** 주제(아이디어) 상태: 누가 냈든 검수 대기 → 소유자·검수자가 승인 → 달력에 넣음. 보류는 언제든 */
 export const IDEA_STATUS = ["review", "approved", "planned", "dropped"] as const;
 export type IdeaStatus = (typeof IDEA_STATUS)[number];
-export const IDEA_LABEL: Record<IdeaStatus, string> = { review: "검수 대기", approved: "승인", planned: "달력에 넣음", dropped: "보류" };
+export const IDEA_LABEL: Record<IdeaStatus, string> = { review: "검수 대기", approved: "승인", planned: "제작에 넣음", dropped: "보류" };
 /** 아이디어 보관함: 주제 하나. 승인한 것만 달력 칸에 넣을 수 있고, 넣으면 기획 게시물이 되고 postId 가 붙는다 */
 export type Idea = {
   id: string;

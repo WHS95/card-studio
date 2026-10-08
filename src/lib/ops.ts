@@ -70,7 +70,7 @@ export async function updateWorkspace(id: string, p: WorkspacePatch) {
     handle: p.handle !== undefined ? s(p.handle, 30) : w.handle,
     categories: p.categories ? p.categories.map((c) => s(c, 20)).filter(Boolean).slice(0, 20) : w.categories,
     slots: slots?.length ? [...new Set(slots)].sort().slice(0, 6) : w.slots,
-    days: p.days !== undefined ? Math.min(90, Math.max(1, Math.round(Number(p.days)) || w.days)) : w.days,
+    days: p.days !== undefined ? Math.min(DAYS_MAX, Math.max(1, Math.round(Number(p.days)) || w.days)) : w.days,
     startDate: p.startDate === undefined ? w.startDate : p.startDate && /^\d{4}-\d{2}-\d{2}$/.test(p.startDate) ? p.startDate : null,
     defaultTemplate: p.defaultTemplate ? templateOf(p.defaultTemplate).id : w.defaultTemplate,
     metricsDays: p.metricsDays !== undefined ? Math.min(30, Math.max(1, Math.round(Number(p.metricsDays)) || 7)) : w.metricsDays,
@@ -256,8 +256,8 @@ export async function updateIdea(id: string, p: { title?: unknown; pillar?: unkn
     if (p.template !== undefined) it.template = templateOf(s(p.template, 30)).id;
     if (p.status !== undefined) {
       if (!IDEA_STATUS.includes(p.status as IdeaStatus)) fail("모르는 상태예요");
-      if (p.status === "planned") fail("달력에 넣기로 바꿔 주세요");
-      if (it.status === "planned" && it.postId && db.posts.some((x) => x.id === it.postId && !x.archivedAt)) fail("이미 달력에 들어간 주제예요. 게시물을 보관함으로 뺀 뒤 바꿀 수 있어요");
+      if (p.status === "planned") fail("제작에 넣기로 바꿔 주세요");
+      if (it.status === "planned" && it.postId && db.posts.some((x) => x.id === it.postId && !x.archivedAt)) fail("이미 제작에 들어간 주제예요. 게시물을 보관함으로 뺀 뒤 바꿀 수 있어요");
       it.status = p.status as IdeaStatus;
       if (it.status === "approved") { it.approvedBy = s(by, 30) || "?"; it.approvedAt = new Date().toISOString(); }
       else { it.approvedBy = undefined; it.approvedAt = undefined; }
@@ -276,13 +276,30 @@ export async function nextEmptySlot(wsId: string, fromDay = 1) {
   return null;
 }
 
+/** 일수 최대 (제작이 목록이라 자리가 모자라면 늘린다) */
+export const DAYS_MAX = 365;
+/** 빈 자리 — 없으면 일수를 늘려서라도 (DAYS_MAX 까지). 제작 목록의 '새 게시물'·주제 넣기가 '칸이 없어요'로 막히지 않게 */
+export async function ensureSlot(wsId: string, fromDay = 1) {
+  const got = await nextEmptySlot(wsId, fromDay);
+  if (got) return got;
+  const w = (await getWorkspace(wsId)) ?? fail("서비스를 찾지 못했어요");
+  if (w.days >= DAYS_MAX) fail(`자리가 꽉 찼어요 (${DAYS_MAX}일 × 시간대). 보관함으로 빼거나 시간대를 늘려 주세요`);
+  await mutate((db) => { const x = db.workspaces.find((y) => y.id === w.id)!; x.days = Math.min(DAYS_MAX, Math.max(x.days + 1, Math.round(fromDay))); });
+  return (await nextEmptySlot(wsId, fromDay)) ?? fail("빈 자리를 만들지 못했어요");
+}
+
+/** 제작 목록 끝 다음 일차 (보관함 제외 게시물 중 가장 늦은 일차 + 1) — 화면에서 새로 넣는 것은 목록 끝에 붙는다 */
+export async function tailDay(wsId: string) {
+  const ps = await listPosts(wsId);
+  return ps.reduce((m, p) => Math.max(m, p.day), 0) + 1;
+}
+
 /** 아이디어 → 달력 칸 (기획 게시물). 칸을 안 주면 비어 있는 첫 칸. 자료는 게시물 메모에 출처로 붙는다 */
 export async function scheduleIdea(id: string, at?: { day?: unknown; slot?: unknown }) {
   const it = (await getIdea(id)) ?? fail("아이디어를 찾지 못했어요");
-  if (it.postId && (await getPost(it.postId))) fail("이미 달력에 들어간 아이디어예요");
-  if (it.status !== "approved") fail("승인한 주제만 달력에 넣을 수 있어요");
-  const spot = at?.day !== undefined && at?.slot !== undefined ? { day: Number(at.day), slot: String(at.slot) } : await nextEmptySlot(it.workspace);
-  if (!spot) fail("빈 칸이 없어요. 설정에서 일수를 늘려 주세요");
+  if (it.postId && (await getPost(it.postId))) fail("이미 제작에 들어간 주제예요");
+  if (it.status !== "approved") fail("승인한 주제만 제작에 넣을 수 있어요");
+  const spot = at?.day !== undefined && at?.slot !== undefined ? { day: Number(at.day), slot: String(at.slot) } : await ensureSlot(it.workspace);
   const db = await readDb();
   const refs = it.research.map((rid) => db.research.find((r) => r.id === rid)).filter((r): r is Research => !!r);
   const note = [it.angle, refs.length ? `자료: ${refs.map((r) => `${r.title}${r.url ? ` ${r.url}` : ""}`).join(" / ")}` : ""].filter(Boolean).join("\n").slice(0, 500);
@@ -299,7 +316,7 @@ export async function scheduleIdeas(ids: string[], from?: number) {
   for (const id of ids.slice(0, 30)) {
     const it = (await getIdea(id)) ?? fail("아이디어를 찾지 못했어요");
     if (it.status !== "approved") fail(`'${it.title}'은 아직 승인 전이에요`);
-    const spot = (await nextEmptySlot(it.workspace, day)) ?? fail(`빈 칸이 모자라요 (${out.length}개 넣음). 설정에서 일수를 늘려 주세요`);
+    const spot = await ensureSlot(it.workspace, day);
     out.push(await scheduleIdea(id, spot));
     day = spot.day + 1;
   }
