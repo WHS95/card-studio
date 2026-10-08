@@ -5,6 +5,7 @@ import { OpError } from "./ops";
 import { ask, askStream, aiReady, pickVia } from "./llm";
 import type { Actor } from "./auth";
 import type { PostData, SlideData, Workspace } from "./types";
+import { WRITING_GUIDE, fixList, lintPost } from "./writing";
 
 // 화면 안 AI (선택): 설정 · AI 에서 연결한 것(이 Mac 의 Claude Code·Codex, API 키)으로 작업 등급마다 부른다(llm.ts).
 // 연결이 없으면 MCP(내 Claude·ChatGPT)로 같은 일을 한다. 돈이 드는 호출이라 사람이 버튼을 누를 때만. 결과는 늘 사람이 고친 뒤 저장·승인한다.
@@ -16,6 +17,7 @@ const RULES = [
   "사실이 아닌 수치·후기·인용을 지어내지 않는다. 모르면 [확인 필요]라고 적는다.",
   "특정 장소·브랜드·제품 이름은 근거 자료가 있을 때만 쓴다.",
   "협찬·광고 내용이면 캡션에 #광고를 붙인다.",
+  WRITING_GUIDE,
 ].join("\n");
 
 /** 서비스 브리프를 AI 가 읽는 글로 */
@@ -94,6 +96,21 @@ function keepPhotos(s: Record<string, unknown>, n: number, current: PostData | n
   return s;
 }
 
+/** 문구 검사(writing.ts)에서 꼭 고칠 것이 나오면 다듬기 등급으로 한 번 고친다. 구조·사실은 그대로, 못 고치면 null */
+async function polishWriting(t: ReturnType<typeof templateOf>, data: PostData, current: PostData | null, actor: Actor | null): Promise<PostData | null> {
+  const list = fixList(lintPost((k) => t.kinds.find((x) => x.kind === k), data));
+  if (!list) return null;
+  try {
+    const { text } = await ask("polish", actor, {
+      system: `너는 UX 라이터다. 사실·숫자·장 구조는 그대로 두고 문구만 고친다.\n${WRITING_GUIDE}`,
+      prompt: `아래 카드뉴스 JSON 에서 고칠 곳만 문구 규칙에 맞게 고쳐 줘. 칸 이름·장 순서·장 수·글자 수 제한·**굵게**·==강조== 표시·사진 번호는 그대로 둬.\n고칠 곳:\n${list}\n\nJSON:\n${JSON.stringify({ slides: data.slides, caption: data.caption })}\n\n답은 \`\`\`json 블록 하나: {"slides":[...], "caption":"..."}`,
+    });
+    const o = jsonOf<{ slides: Record<string, unknown>[]; caption: string }>(text);
+    const fixed: PostData = { photos: data.photos, caption: String(o.caption ?? data.caption), slides: (o.slides ?? []).map((s, n) => keepPhotos({ ...s, kind: String(s.kind) }, n, current) as SlideData) };
+    return fixed.slides.length === data.slides.length && !validatePost(t, fixed) ? fixed : null;
+  } catch { return null; }
+}
+
 /** 기획(제목·메모·자료)으로 장 글·캡션 초안. 템플릿 검사를 통과할 때까지 한 번 더 고친다 */
 export async function draftPostData(w: Workspace, p: DraftInput, extra: string, actor: Actor | null): Promise<PostData> {
   const t = templateOf(p.template);
@@ -103,7 +120,7 @@ export async function draftPostData(w: Workspace, p: DraftInput, extra: string, 
     const out = jsonOf<{ slides: Record<string, unknown>[]; caption: string }>(raw);
     const data: PostData = { photos: p.current?.photos ?? [], caption: String(out.caption ?? ""), slides: (out.slides ?? []).map((s, n) => keepPhotos({ ...s, kind: String(s.kind) }, n, p.current) as SlideData) };
     const err = validatePost(t, data);
-    if (!err) return data;
+    if (!err) return (await polishWriting(t, data, p.current, actor)) ?? data;
     prompt += `\n\n앞선 답:\n${raw}\n\n검사에서 틀렸어: ${err}\n고친 JSON 전체를 다시 줘.`;
   }
   throw new OpError("AI 초안이 칸 제한을 맞추지 못했어요. 다시 해 주세요");
@@ -117,6 +134,7 @@ export type DraftEvent =
   | { t: "slide"; i: number; slide: SlideData }
   | { t: "caption"; text: string; done: boolean }
   | { t: "fixing"; reason: string }
+  | { t: "polish"; reason: string }
   | { t: "done"; data: PostData; note?: string }
   | { t: "error"; message: string };
 
@@ -218,8 +236,17 @@ export async function draftPostStream(w: Workspace, p: DraftInput, extra: string
     try { const o = jsonOf<{ slides?: Record<string, unknown>[]; caption?: string }>(text); (o.slides ?? []).forEach((x) => raws.push(x)); caption = String(o.caption ?? caption); } catch {}
   }
   const data: PostData = { photos: p.current?.photos ?? [], caption, slides: raws.map((s, n) => keepPhotos({ ...s, kind: String(s.kind) }, n, p.current) as SlideData) };
+  const finish = async (d: PostData, note?: string) => {
+    // 문구 규칙에서 꼭 고칠 것이 있으면 한 번 다듬는다 (못 고치면 그대로)
+    if (fixList(lintPost((k) => t.kinds.find((x) => x.kind === k), d))) {
+      emit({ t: "polish", reason: "문구 규칙에 맞게 다듬는 중" });
+      const better = await polishWriting(t, d, p.current, actor);
+      if (better) d = better;
+    }
+    emit(note ? { t: "done", data: d, note } : { t: "done", data: d });
+  };
   let err = validatePost(t, data);
-  if (!err) return emit({ t: "done", data });
+  if (!err) return finish(data);
   // 칸 검사에서 틀렸으면: 한 번 고쳐 달라고 (조각 없이), 그래도 틀리면 칸에 맞춰 자른 것으로
   emit({ t: "fixing", reason: err });
   try {
@@ -227,9 +254,9 @@ export async function draftPostStream(w: Workspace, p: DraftInput, extra: string
     const o = jsonOf<{ slides: Record<string, unknown>[]; caption: string }>(raw);
     const fixed: PostData = { photos: data.photos, caption: String(o.caption ?? caption), slides: (o.slides ?? []).map((s, n) => keepPhotos({ ...s, kind: String(s.kind) }, n, p.current) as SlideData) };
     err = validatePost(t, fixed);
-    if (!err) return emit({ t: "done", data: fixed });
+    if (!err) return finish(fixed);
   } catch (e) { if (signal?.aborted) throw e; }
   const fitted: PostData = { photos: data.photos, caption: caption.slice(0, 2200), slides: raws.map((s, n) => fitSlide(t, s, n)).filter((x): x is SlideData => !!x).slice(0, t.maxSlides).map((s, n) => keepPhotos(s, n, p.current) as SlideData) };
-  if (!validatePost(t, fitted)) return emit({ t: "done", data: fitted, note: "칸보다 긴 글을 칸 길이에 맞춰 잘랐어요. 잘린 곳을 확인해 주세요" });
+  if (!validatePost(t, fitted)) return finish(fitted, "칸보다 긴 글을 칸 길이에 맞춰 잘랐어요. 잘린 곳을 확인해 주세요");
   throw new OpError("AI 초안이 칸 제한을 맞추지 못했어요. 다시 해 주세요");
 }

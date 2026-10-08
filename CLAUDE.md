@@ -13,6 +13,7 @@
 - 칸 정의 하나(`src/lib/fields.ts`)로 검사·편집 화면·최대 길이 테스트. 템플릿 추가 = `templates/<id>.ts` + `render/<id>.tsx` + 두 index 등록 + `tests/slide_safe.py` TEMPLATES.
 - 안전 영역(`render/kit.tsx` SAFE): 피드 (60,175)~(1020,1175), 표지 (175,175)~(905,1175), 릴스 (60,250)~(940,1540, 대략).
 - 강조색은 채움으로만(그 위 글자는 onAccent). 도구 화면은 흑백만, 서비스 색은 카드 안에서만.
+- 문구 규칙(UX 라이팅): `src/lib/writing.ts`·`docs/WRITING.md` — 해요체·쉬운 말·강요·과장 없이. AI 요청·MCP 안내문에 규칙, 편집기 '⚠ 문구' 경고, MCP `check_writing`. 새 문구를 넣을 때도 지킨다.
 - 로그인 `src/lib/auth.ts`: 운영자(환경 변수) + 계정(이메일·scrypt) + 역할(소유자·편집자·검수자). 화면은 `requireWs`, API·action 은 `wsAccess`.
 - MCP 는 토큰 주인 권한으로 돈다(`mcp.ts` GUARD). 토큰은 sha256 만 저장(`src/lib/tokens.ts`). OAuth 2.1(동적 등록·PKCE)은 `/oauth/*`.
 - 단계(`src/lib/flow.ts`): 목적·자료 조사·주제·템플릿·제작(목록)·검수(골라서 ZIP) — 위 탭 상태와 '지금 할 일'. 발행·성과는 `LATER` 로 잠시 닫음(화면은 `LaterPage.tsx`). 화면 틀 `src/app/ui/Shell.tsx`.

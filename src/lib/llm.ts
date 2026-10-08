@@ -10,6 +10,7 @@ import { mutate, readDb } from "./store";
 import { AI_TIERS, AI_VIA } from "./types";
 import type { Actor } from "./auth";
 import type { AiConfig, AiTier, AiVia, Effort, TierSetting } from "./types";
+import { WRITING_GUIDE } from "./writing";
 
 // AI 연결 한 곳. 연결 4가지 중 켜 둔 것을 작업 등급(판단·쓰기·다듬기)마다 골라 쓴다.
 //  · claude-code / codex: 이 Mac 에 설치·로그인된 CLI 를 실행한다(구독). 스튜디오는 로그인 토큰을 받지 않는다.
@@ -313,7 +314,9 @@ export type ChatTurn = { role: "user" | "assistant"; text: string };
 export type ToolRunner = { tools: { name: string; description: string; inputSchema: Record<string, unknown> }[]; call: (name: string, args: Record<string, unknown>) => Promise<{ text: string; isError?: boolean }> };
 
 const CHAT_SYSTEM = (ctx: string) => `너는 카드뉴스 스튜디오 안의 도우미다. 사용자가 보고 있는 서비스·화면: ${ctx}
-스튜디오 도구로 실제로 일한다(주제·자료·게시물·브리프). 규칙: 승인(approved)은 사람이 체크리스트를 보고 한다 — 너는 승인하지 않는다. 사실·숫자는 자료 조사에 출처가 있는 것만. 사진은 search_photos 로 찾아(장소 이름이 나오면 실제 그 장소 사진만) add_media(postId·credit·source) 로 넣고 update_post 로 장의 사진 칸에 번호를 넣는다 — 영상은 직접 올린 것·AI 영상만 되니 사람에게 부탁한다. 새 주제는 검수 대기로 들어간다. 답은 한국어로 짧게, 한 일을 한두 줄로 알려 준다.`;
+스튜디오 도구로 실제로 일한다(주제·자료·게시물·브리프). 규칙: 승인(approved)은 사람이 체크리스트를 보고 한다 — 너는 승인하지 않는다. 사실·숫자는 자료 조사에 출처가 있는 것만. 사진은 search_photos 로 찾아(장소 이름이 나오면 실제 그 장소 사진만) add_media(postId·credit·source) 로 넣고 update_post 로 장의 사진 칸에 번호를 넣는다 — 영상은 직접 올린 것·AI 영상만 되니 사람에게 부탁한다. 새 주제는 검수 대기로 들어간다. 답은 한국어로 짧게, 한 일을 한두 줄로 알려 준다.
+장 글·캡션·주제를 쓰거나 고칠 때, 그리고 네 답에도 아래 문구 규칙을 지킨다. 게시물을 고친 뒤엔 check_writing 으로 살펴본다.
+${WRITING_GUIDE}`;
 
 export async function chat(actor: Actor, ctx: string, history: ChatTurn[], tools: ToolRunner, mcp: { url: string; token: string } | null) {
   const t = await pickVia("judge", actor);

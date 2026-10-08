@@ -129,6 +129,7 @@ export default function Editor({ ws, post, empty }: { ws: Ws; post: Post; empty:
           setSel(slides.length - 1);
         } else if (e.t === "caption") put({ caption: String(e.text ?? ""), phase: "caption", partial: null });
         else if (e.t === "fixing") put({ phase: "fixing" });
+        else if (e.t === "polish") put({ phase: "polish" });
         else if (e.t === "done") { final = e.data as PostData; note = String(e.note ?? ""); }
         else if (e.t === "error") throw new Error(String(e.message ?? "AI 초안을 쓰지 못했어요"));
       };
@@ -471,7 +472,7 @@ export default function Editor({ ws, post, empty }: { ws: Ws; post: Post; empty:
   );
 }
 
-const WARN_SHORT: Record<string, string> = { photoEvery: "사진", coverQuestion: "질문", ctaComment: "댓글" };
+const WARN_SHORT: Record<string, string> = { photoEvery: "사진", coverQuestion: "질문", ctaComment: "댓글", uxWriting: "문구" };
 const STATUS_BTN: Record<string, string> = { approved: "승인하기", posted: "게시 표시", draft: "초안으로", skip: "건너뛰기" };
 
 /** 상태 바꾸기: 저장 안 된 고침이 있으면 막는다 (화면과 다른 버전이 승인되지 않게) */

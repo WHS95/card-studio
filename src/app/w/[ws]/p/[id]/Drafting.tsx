@@ -13,7 +13,7 @@ export type Drafting = {
   slides: SlideData[]; // 다 쓴 장
   partial: Rec | null; // 지금 쓰는 장 (덜 온 것)
   caption: string; // 쓰는 중인 캡션
-  phase: "start" | "write" | "caption" | "fixing";
+  phase: "start" | "write" | "caption" | "fixing" | "polish";
   via: string; // 연결 이름 (Claude Code 등)
   before: { data: PostData; dirty: boolean }; // 멈추면 돌아갈 곳
 };
@@ -32,7 +32,7 @@ export function Bar({ w = "100%" }: { w?: string }) {
 /** 위 진행 줄: AI 초안 쓰는 중 · 생성됨 n · 전체 N + 칸 막대 */
 export function DraftBar({ d }: { d: Drafting }) {
   const total = draftTotal(d), done = d.slides.length;
-  const label = d.phase === "start" ? "AI가 장 수를 정하고 있어요" : d.phase === "caption" ? "캡션을 쓰고 있어요" : d.phase === "fixing" ? "글자 수를 맞추고 있어요" : "AI 초안 쓰는 중";
+  const label = d.phase === "start" ? "AI가 장 수를 정하고 있어요" : d.phase === "caption" ? "캡션을 쓰고 있어요" : d.phase === "fixing" ? "글자 수를 맞추고 있어요" : d.phase === "polish" ? "문구를 다듬고 있어요" : "AI 초안 쓰는 중";
   return (
     <div className="ed-draftbar" role="status" aria-live="polite">
       <Icon name="spark" size={16} />
@@ -64,12 +64,12 @@ export function TypingCard({ d, kindOf }: { d: Drafting; kindOf: (k: string) => 
   const n = d.slides.length;
   const p = d.partial;
   const k = p && typeof p.kind === "string" ? kindOf(p.kind) : undefined;
-  if (d.phase === "caption" || d.phase === "fixing") return (
+  if (d.phase === "caption" || d.phase === "fixing" || d.phase === "polish") return (
     <section className="ed-card ed-fields ed-typing">
-      <h2>{d.phase === "caption" ? "캡션 · 쓰는 중" : "글자 수 맞추는 중"}</h2>
+      <h2>{d.phase === "caption" ? "캡션 · 쓰는 중" : d.phase === "polish" ? "문구 다듬는 중" : "글자 수 맞추는 중"}</h2>
       {d.phase === "caption"
         ? <div className="ed-ro ed-ro-area">{d.caption ? <>{d.caption}<i className="ed-caret" /></> : <><Bar w="80%" /><Bar w="55%" /></>}</div>
-        : <p className="ed-note">검사에서 칸보다 긴 글이 있었어요. AI가 한 번 더 고치고 있어요.</p>}
+        : <p className="ed-note">{d.phase === "polish" ? "문구 규칙(해요체·쉬운 말·강요·과장 없이)에서 고칠 곳이 있었어요. AI가 그 부분만 다듬고 있어요." : "검사에서 칸보다 긴 글이 있었어요. AI가 한 번 더 고치고 있어요."}</p>}
     </section>
   );
   const keys = p ? Object.keys(p) : [];
@@ -104,7 +104,7 @@ export function TypingCard({ d, kindOf }: { d: Drafting; kindOf: (k: string) => 
 export function DraftToast({ d, note, onStop, onUndo, onRetry, onClose }: { d: Drafting | null; note: DraftNote | null; onStop: () => void; onUndo: () => void; onRetry: () => void; onClose: () => void }) {
   if (d) {
     const total = draftTotal(d);
-    const text = d.phase === "start" ? "AI가 초안을 준비하고 있어요" : d.phase === "caption" ? "캡션을 쓰고 있어요" : d.phase === "fixing" ? "글자 수를 맞추고 있어요" : "AI가 초안을 쓰고 있어요";
+    const text = d.phase === "start" ? "AI가 초안을 준비하고 있어요" : d.phase === "caption" ? "캡션을 쓰고 있어요" : d.phase === "fixing" ? "글자 수를 맞추고 있어요" : d.phase === "polish" ? "문구를 다듬고 있어요" : "AI가 초안을 쓰고 있어요";
     const sub = d.phase === "write" ? `${Math.min(d.slides.length + 1, total)}/${d.total || "…"}장` : d.phase === "caption" ? `${d.slides.length}/${d.slides.length}장 다 씀` : "";
     return (
       <div className="ed-toast" role="status" aria-live="polite">

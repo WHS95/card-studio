@@ -103,13 +103,15 @@ export type Brief = {
   checklist?: string[]; // 승인 체크리스트에 서비스가 더한 항목 (기본 항목은 DEFAULT_CHECKS)
 };
 /** 콘텐츠 규칙: 자동으로 알 수 있는 것만 (경고만, 막지 않는다) */
-export type ContentRules = { photoEvery: boolean; templateOnly: boolean; coverQuestion: boolean; ctaComment: boolean };
-export const NO_RULES: ContentRules = { photoEvery: false, templateOnly: false, coverQuestion: false, ctaComment: false };
+export type ContentRules = { photoEvery: boolean; templateOnly: boolean; coverQuestion: boolean; ctaComment: boolean; uxWriting: boolean };
+/** 규칙 기본값 — 문구 규칙(UX 라이팅)만 기본으로 켜져 있다 (예전 저장본에 값이 없으면 이 값) */
+export const NO_RULES: ContentRules = { photoEvery: false, templateOnly: false, coverQuestion: false, ctaComment: false, uxWriting: true };
 export const RULE_LABEL: Record<keyof ContentRules, { label: string; note: string }> = {
   photoEvery: { label: "모든 장에 사진·영상", note: "사진 칸이 비었거나, 사진 칸이 없는 장을 쓰면 경고" },
   templateOnly: { label: "정한 틀만 쓰기", note: "서비스 기본 틀과 다른 템플릿이면 경고" },
   coverQuestion: { label: "표지는 질문형", note: "표지 제목이 '?'로 끝나지 않으면 경고" },
   ctaComment: { label: "마지막 장 댓글 유도", note: "마지막 장 글에 '댓글'이 없으면 경고" },
+  uxWriting: { label: "문구 규칙 (UX 라이팅)", note: "해요체·쉬운 말·강요·과장 없이 — 장 글과 캡션을 자동으로 살펴 경고 (기본 켜짐, docs/WRITING.md)" },
 };
 /** 승인 체크리스트 기본 항목 (모든 서비스 공통, 뺄 수 없다) */
 export const DEFAULT_CHECKS = [

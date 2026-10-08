@@ -13,6 +13,7 @@ import { countVideo, addResearch, applyShareSuggestion, checklistOf, createIdea,
 import { flowOf } from "./flow";
 import { importFile, importUrl, ffmpeg } from "./media";
 import { searchPhotos, UA } from "./photos";
+import { WRITING_GUIDE, lintPost, lintText } from "./writing";
 import { checkPost } from "./check";
 import { fullCaption, slideFile } from "./exporter";
 import { zip } from "./zip";
@@ -273,7 +274,7 @@ export const TOOLS: Tool[] = [
   },
   {
     name: "update_post",
-    description: "게시물 고치기. data 는 통째로(get_post 로 받아 고친 것). 승인된 게시물 data 를 고치면 다시 초안이 된다. 게시된 것은 게시 취소 뒤에.",
+    description: "게시물 고치기. data 는 통째로(get_post 로 받아 고친 것). 승인된 게시물 data 를 고치면 다시 초안이 된다. 게시된 것은 게시 취소 뒤에. 글은 문구 규칙(해요체·쉬운 말·강요·과장 없이)을 지키고, 고친 뒤 check_writing 으로 살펴본다.",
     inputSchema: obj({ id: str, data: { type: "object" }, title: str, category: str, note: str, template: str }, ["id"]),
     run: async (a) => postOut(await savePost(String(a.id), a as never)),
   },
@@ -331,6 +332,17 @@ export const TOOLS: Tool[] = [
     },
   },
   {
+    name: "check_writing",
+    description: "문구 규칙(UX 라이팅) 검사: 해요체·되어요→돼요·과한 경어·명사 덩어리·빼도 되는 말·강요·과장·유행어·긴 문장. id(저장된 게시물 — 장마다·캡션) 또는 text(글 하나). level fix = 고칠 것, tip = 살펴볼 것. guide 는 규칙 전문.",
+    inputSchema: obj({ id: str, text: str }),
+    run: async (a) => {
+      if (typeof a.text === "string" && !a.id) return { issues: lintText(a.text), guide: WRITING_GUIDE };
+      const { p } = await postWs(String(a.id));
+      const t = templateOf(p.template);
+      return { spots: lintPost((k) => t.kinds.find((x) => x.kind === k), p.data), guide: WRITING_GUIDE };
+    },
+  },
+  {
     name: "check_safe_zone",
     description: "인스타 마진 계산: 사진·영상을 뺀 글·장식이 안전 영역(표지=그리드 3:4 기준, 안쪽=피드) 밖으로 나간 픽셀 수. id(저장본) 또는 ws+template+data(저장 전).",
     inputSchema: obj({ id: str, ws: str, template: str, data: { type: "object" } }),
@@ -364,7 +376,9 @@ export const TOOLS: Tool[] = [
 
 export const INSTRUCTIONS = `카드뉴스 스튜디오(card-studio, ${BASE}) — 여러 서비스의 인스타 카드뉴스(1080×1350 캐러셀)를 기획·편집·검수·내보내기.
 순서(6단계 — 발행·성과 탭은 잠시 닫음): list_workspaces → get_flow(지금 할 일) → get_brief(목적·기둥·콘텐츠 규칙) → add_research(자료, 신뢰도) → add_ideas(주제, 검수 대기) → 사람이 승인 → schedule_ideas → list_templates(칸 정의) → update_post(제작) → check_safe_zone·render_slide → get_checklist → 사람이 체크하고 승인(set_status approved + checks) → export_post(발행은 사람이) → 7일 뒤 set_metrics → get_insights 제안.
-규칙: 주제 승인·게시물 승인은 사람이 확인한 뒤에만. 게시(posted)는 실제 인스타 링크가 있을 때만. 무료 사진은 search_photos 로 찾아 add_media(출처 포함) → update_post 로 장 사진 칸에, 장소 이름이 나오면 실제 그 장소 사진만. 협찬은 #광고. 삭제·인스타 업로드 도구는 없다.`;
+규칙: 주제 승인·게시물 승인은 사람이 확인한 뒤에만. 게시(posted)는 실제 인스타 링크가 있을 때만. 무료 사진은 search_photos 로 찾아 add_media(출처 포함) → update_post 로 장 사진 칸에, 장소 이름이 나오면 실제 그 장소 사진만. 협찬은 #광고. 삭제·인스타 업로드 도구는 없다.
+문구: 장 글·캡션·주제를 쓸 때 아래 규칙을 지키고, update_post 뒤 check_writing 으로 살펴본다.
+${WRITING_GUIDE}`;
 
 // ── 권한: 도구마다 어느 서비스의 무슨 권한이 필요한지 (계정으로 붙은 AI 앱은 그 사람 역할로만) ──
 type On = "ws" | "post" | "idea" | "research";
@@ -372,7 +386,7 @@ const GUARD: Record<string, { on: On; perm: Perm } | "admin"> = {
   update_workspace: { on: "ws", perm: "manage" }, list_posts: { on: "ws", perm: "view" }, get_post: { on: "post", perm: "view" },
   draft_post: { on: "ws", perm: "view" }, create_post: { on: "ws", perm: "edit" }, update_post: { on: "post", perm: "edit" },
   set_status: { on: "post", perm: "edit" }, add_media: { on: "ws", perm: "edit" }, render_slide: { on: "post", perm: "view" },
-  check_safe_zone: { on: "post", perm: "view" }, export_post: "admin", generate_video: { on: "ws", perm: "edit" }, get_video_job: { on: "ws", perm: "edit" },
+  check_safe_zone: { on: "post", perm: "view" }, check_writing: { on: "post", perm: "view" }, export_post: "admin", generate_video: { on: "ws", perm: "edit" }, get_video_job: { on: "ws", perm: "edit" },
   move_post: { on: "post", perm: "edit" }, duplicate_post: { on: "post", perm: "edit" }, set_metrics: { on: "post", perm: "edit" }, get_insights: { on: "ws", perm: "view" },
   get_brief: { on: "ws", perm: "view" }, update_brief: { on: "ws", perm: "edit" }, list_ideas: { on: "ws", perm: "view" }, add_ideas: { on: "ws", perm: "edit" },
   update_idea: { on: "idea", perm: "edit" }, schedule_idea: { on: "idea", perm: "edit" }, next_empty_slot: { on: "ws", perm: "view" },
@@ -390,6 +404,7 @@ async function guard(name: string, a: Json, actor: Actor) {
   const g = GUARD[name];
   if (g === "admin" || (name === "add_media" && a.filePath)) throw new OpError("이 도구(또는 Mac 파일 가져오기)는 운영자만 써요");
   if (!g) return; // list_workspaces·list_templates·validate_post·create_workspace 는 안에서 걸러진다
+  if (name === "check_writing" && !a.id) return; // 글 하나만 검사 — 서비스 데이터를 읽지 않는다
   const w = await getWorkspace(await wsOf(g.on, a));
   const role = w ? roleIn(actor, w) : null;
   if (!w || !role) throw new OpError("서비스를 찾지 못했어요");

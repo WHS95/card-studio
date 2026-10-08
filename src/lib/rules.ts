@@ -1,5 +1,6 @@
 import { templateOf } from "./templates";
 import { NO_RULES, RULE_LABEL, type ContentRules, type PostData } from "./types";
+import { issueLine, lintPost } from "./writing";
 
 // 콘텐츠 규칙 검사 (브리프의 규칙 · 경고만, 저장은 막지 않는다). 편집기(화면)와 서버(승인 체크·MCP)가 같이 쓴다.
 
@@ -33,6 +34,10 @@ export function ruleWarnings(rules: ContentRules | undefined, defaultTemplate: s
   if (r.ctaComment && data.slides.length) {
     const last = data.slides[data.slides.length - 1];
     if (!texts(last).some((x) => x.includes("댓글"))) out.push({ rule: "ctaComment", slide: data.slides.length, text: "마지막 장에 '댓글' 유도가 없어요" });
+  }
+  if (r.uxWriting) {
+    for (const spot of lintPost((k) => t.kinds.find((x) => x.kind === k), data))
+      out.push({ rule: "uxWriting", slide: spot.slide, text: `${spot.caption ? "캡션" : `${spot.slide}장`} 문구: ${issueLine(spot.issues)}` });
   }
   return out;
 }

@@ -63,7 +63,7 @@ export const poster: Template = {
     caption: "샘플 캡션이에요.",
     slides: [
       { kind: "cover", top: "==10월 한 달== 함께 하는", tape: "챌린지 오픈", title: "나만의 기준으로\n끝까지 해 보기", photo: 0, bottom: "**지금 신청**하면 기록증을 드려요", bg: "paper", hl: "text" },
-      { kind: "point", tape: "완주의 기준,", head: "꼭 ==42.195km==일 필요 있나요?", body: "5K도 좋고, 10K도 좋아요.\n이번 챌린지에서는\n**내가 직접 결승선을 정합니다.**\n\n거리보다 중요한 건\n**내가 정한 거리를\n끝까지 해 보는 것.**", photo: 0, img: "right", slogan: "RUN YOUR LIFE", bg: "paper", size: "m", hl: "text" },
+      { kind: "point", tape: "완주의 기준,", head: "꼭 ==42.195km==일 필요 있나요?", body: "5K도 좋고, 10K도 좋아요.\n이번 챌린지에서는\n**내가 직접 결승선을 정해요.**\n\n거리보다 중요한 건\n**내가 정한 거리를\n끝까지 해 보는 것.**", photo: 0, img: "right", slogan: "RUN YOUR LIFE", bg: "paper", size: "m", hl: "text" },
       { kind: "items", top: "==완주한 분 모두== 받을 수 있는", tape: "완주 리워드", items: [{ label: "모바일 기록증", sub: "앱으로 보내드려요", photo: 1 }, { label: "할인 쿠폰", sub: "5,000원", photo: 2 }, { label: "완주 키링", sub: "선착순", photo: 0 }], bottom: "**못 와도, 완주는 완주니까!**", bg: "paper", hl: "text" },
       { kind: "cta", tape: "지금 참여", big: "프로필 링크에서\n==신청==하세요", pill: "프로필 링크", bg: "paper", align: "center", hl: "fill" },
     ],

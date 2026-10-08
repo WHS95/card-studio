@@ -174,7 +174,7 @@ export async function checklistOf(postId: string) {
 
 const list = (v: unknown, n: number, each: number) => (Array.isArray(v) ? v : typeof v === "string" ? v.split(/[,\n]/) : []).map((x) => s(x, each)).filter(Boolean).slice(0, n);
 const tag = (x: string) => (x.startsWith("#") ? x : `#${x}`).replace(/\s+/g, "");
-const rulesOf = (v: unknown): ContentRules => { const o = (v && typeof v === "object" ? v : {}) as Record<string, unknown>; return Object.fromEntries(Object.keys(NO_RULES).map((k) => [k, o[k] === true || o[k] === "on" || o[k] === "true"])) as ContentRules; };
+const rulesOf = (v: unknown): ContentRules => { const o = (v && typeof v === "object" ? v : {}) as Record<string, unknown>; return Object.fromEntries(Object.keys(NO_RULES).map((k) => [k, o[k] === undefined ? NO_RULES[k as keyof ContentRules] : o[k] === true || o[k] === "on" || o[k] === "true"])) as ContentRules; };
 
 export async function updateBrief(id: string, p: Partial<Record<keyof Brief, unknown>>) {
   const w = (await getWorkspace(id)) ?? fail("서비스를 찾지 못했어요");

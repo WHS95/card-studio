@@ -1,10 +1,10 @@
 import type { Template } from "../fields";
 
-// 소개 (모임·가게·서비스) — 표지(라벨·이름·한 줄) / 질문 답 / 이런 분께(줄) / 순위 목록 / 참여 방법
+// 소개 (모임·가게·서비스) — 표지(라벨·이름·한 줄) / 질문 답 / 이런 사람에게(줄) / 순위 목록 / 참여 방법
 export const intro: Template = {
   id: "intro",
   name: "소개 카드",
-  description: "모임·가게·서비스 하나를 여러 장으로 소개 (질문 답·이런 분께·순위·참여 방법)",
+  description: "모임·가게·서비스 하나를 여러 장으로 소개 (질문 답·이런 사람에게·순위·참여 방법)",
   maxSlides: 8,
   kinds: [
     { kind: "cover", label: "표지", fixed: true, fields: [
@@ -18,7 +18,7 @@ export const intro: Template = {
       { key: "q", label: "질문", type: "text", max: 24 },
       { key: "a", label: "답", type: "text", max: 300, lines: 8 },
     ], blank: () => ({ kind: "qa", photo: null, q: "", a: "" }) },
-    { kind: "rows", label: "이런 분께", light: true, fields: [
+    { kind: "rows", label: "이런 사람에게", light: true, fields: [
       { key: "small", label: "작은 제목", type: "text", max: 24 },
       { key: "big", label: "큰 제목", type: "text", max: 12 },
       { key: "rows", label: "줄", type: "items", min: 1, max: 5, item: [
@@ -26,7 +26,7 @@ export const intro: Template = {
         { key: "v", label: "내용", type: "text", max: 44 },
         { key: "chips", label: "쉼표로 칩 나누기", type: "toggle" },
       ] },
-    ], blank: () => ({ kind: "rows", small: "", big: "이런 분께 맞아요", rows: [{ k: "", v: "", chips: false }] }) },
+    ], blank: () => ({ kind: "rows", small: "", big: "이런 사람에게 맞아요", rows: [{ k: "", v: "", chips: false }] }) },
     { kind: "ranked", label: "순위 목록", light: true, fields: [
       { key: "small", label: "작은 제목", type: "text", max: 24 },
       { key: "big", label: "큰 제목", type: "text", max: 12 },

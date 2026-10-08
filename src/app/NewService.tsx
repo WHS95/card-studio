@@ -23,7 +23,7 @@ export default function NewService({ presets, action, open, quota }: { presets: 
           <label className="fld">한 줄 소개<input name="about" className="input" maxLength={300} placeholder="무엇을 하는 서비스인지" /></label>
           <p className="small w-sub">기본 테마는 흑백이에요. 색·워드마크는 4단계 템플릿 탭에서 바꿔요.{quota ? ` ${quota}` : ""}</p>
           <div className="row w-end">
-            <button type="button" className="btn" onClick={() => ref.current?.close()}>취소</button>
+            <button type="button" className="btn" onClick={() => ref.current?.close()}>닫기</button>
             <button className="btn primary">만들기</button>
           </div>
         </form>
