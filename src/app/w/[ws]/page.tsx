@@ -7,6 +7,7 @@ import { POST_STATUS, STATUS_LABEL, type PostStatus } from "@/lib/types";
 import { templateOf } from "@/lib/templates";
 import { createPostAction, postToolAction } from "../../actions";
 import { ServiceShell } from "../../ui/Shell";
+import ConfirmButton from "../../ui/ConfirmButton";
 import Icon from "../../ui/Icon";
 
 const dateOf = (start: string, day: number) => { const d = new Date(`${start}T00:00:00+09:00`); d.setDate(d.getDate() + day - 1); return d.toLocaleDateString("en-CA", { timeZone: "Asia/Seoul" }); };
@@ -43,7 +44,7 @@ export default async function Calendar({ params, searchParams }: PageProps<"/w/[
     </div>
   );
   const head = archive
-    ? { t: "제작 · 보관함", s: "보관함으로 뺀 게시물이 지워지지 않고 여기 모여요. 원래 칸이나 비어 있는 첫 칸으로 되살릴 수 있어요. 게시한 게시물은 뺄 수 없어요." }
+    ? { t: "제작 · 보관함", s: "보관함으로 뺀 게시물이 지워지지 않고 여기 모여요. 원래 칸이나 비어 있는 첫 칸으로 되살리거나, 필요 없으면 완전히 지울 수 있어요. 게시한 게시물은 뺄 수 없어요." }
     : grid
       ? { t: "제작 · 그리드", s: "프로필에서 보일 순서예요(새 글이 왼쪽 위). 표지는 3:4로 잘려 좌우 약 34px이 가려져요." }
       : { t: "제작", s: "만들 게시물 목록이에요. 줄을 누르면 편집기가 열려요. 승인한 주제는 3 주제 탭에서 여기로 넣어요." };
@@ -57,7 +58,7 @@ export default async function Calendar({ params, searchParams }: PageProps<"/w/[
           {POST_STATUS.map((s) => <Link key={s} className={`chip mk-chip${filter === s ? " on" : ""}`} href={href({ s })}>{STATUS_LABEL[s]} {counts[s]}</Link>)}
         </div>}
       </div>
-      {typeof q.ok === "string" && <p className="ok">주제 {q.ok}개를 제작 목록에 넣었어요. 줄을 눌러 글을 채워 주세요.</p>}
+      {q.ok === "removed" ? <p className="ok">게시물을 지웠어요.</p> : typeof q.ok === "string" && <p className="ok">주제 {q.ok}개를 제작 목록에 넣었어요. 줄을 눌러 글을 채워 주세요.</p>}
       {typeof q.error === "string" && <p className="err">{q.error}</p>}
       {!archive && !grid && mix.length > 0 && (
         <div className="mk-mix"><b>기둥 비중 (지금/목표)</b>{mix.map((m) => <span key={m.name}>{m.name} {m.now}/{m.target}%</span>)}</div>
@@ -66,7 +67,7 @@ export default async function Calendar({ params, searchParams }: PageProps<"/w/[
         <>
           {archived.map((p) => (
             <form key={p.id} action={postToolAction} className="mk-row">
-              <input type="hidden" name="ws" value={w.id} /><input type="hidden" name="id" value={p.id} /><input type="hidden" name="op" value="restore" />
+              <input type="hidden" name="ws" value={w.id} /><input type="hidden" name="id" value={p.id} /><input type="hidden" name="from" value="archive" />
               {p.data
                 // eslint-disable-next-line @next/next/no-img-element
                 ? <img className="mk-thumb" src={`/api/posts/${p.id}/slide/1?png=1&v=${encodeURIComponent(p.updatedAt)}`} alt="" loading="lazy" />
@@ -81,7 +82,8 @@ export default async function Calendar({ params, searchParams }: PageProps<"/w/[
                   {free && <option value={`${free.day} ${free.slot}`}>비어 있는 첫 칸 (D{free.day} {free.slot})</option>}
                 </select>
               </label>
-              <button className="btn primary">되살리기</button>
+              <button className="btn primary" name="op" value="restore">되살리기</button>
+              {can(role, "edit") && <ConfirmButton name="op" value="remove" ask={`'${(p.title || "제목 없음").slice(0, 30)}' 게시물을 완전히 지울까요? 되돌릴 수 없어요.`}>완전히 지우기</ConfirmButton>}
             </form>
           ))}
           {!archived.length && <p className="hint">보관함이 비어 있어요. 편집기 아래 &apos;게시물 관리&apos;에서 게시물을 뺄 수 있어요.</p>}

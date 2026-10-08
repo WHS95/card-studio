@@ -4,7 +4,8 @@ import { listIdeas, listPosts, listResearch } from "@/lib/store";
 import { TEMPLATES, templateOf } from "@/lib/templates";
 import { IDEA_LABEL, IDEA_STATUS, STATUS_LABEL, type IdeaStatus } from "@/lib/types";
 import { aiEnabled } from "@/lib/ai";
-import { createIdeaAction, scheduleIdeaAction, scheduleIdeasAction, updateIdeaAction } from "../../../actions";
+import { createIdeaAction, removeIdeaAction, scheduleIdeaAction, scheduleIdeasAction, updateIdeaAction } from "../../../actions";
+import ConfirmButton from "../../../ui/ConfirmButton";
 import { ServiceShell } from "../../../ui/Shell";
 import BatchSchedule from "./BatchSchedule";
 import AiIdeas from "./AiIdeas";
@@ -130,6 +131,10 @@ export default async function Ideas({ params, searchParams }: PageProps<"/w/[ws]
                     <input type="hidden" name="ws" value={w.id} /><input type="hidden" name="id" value={i.id} />
                     {i.status === "approved" && canApprove && <button name="status" value="review" className="btn">승인 취소</button>}
                     {(i.status === "dropped" ? <button name="status" value="review" className="btn">검수 대기로 꺼내기</button> : <button name="status" value="dropped" className="btn">보류</button>)}
+                  </form>}
+                  {canEdit && <form action={removeIdeaAction}>
+                    <input type="hidden" name="ws" value={w.id} /><input type="hidden" name="id" value={i.id} /><input type="hidden" name="s" value={status ?? "all"} />
+                    <ConfirmButton ask={`'${i.title.slice(0, 30)}' 주제를 지울까요? 되돌릴 수 없어요.${post ? " 제작에 넣은 게시물은 그대로 남아요." : ""}`}>지우기</ConfirmButton>
                   </form>}
                   {canEdit && <details className="stg-edit"><summary className="btn">고치기</summary>
                     <form action={updateIdeaAction} className="panel stg-edit-body">

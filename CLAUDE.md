@@ -20,7 +20,7 @@
 - 주제는 review → approved(소유자·검수자) → 달력. 초안 → 승인은 승인 체크리스트(`DEFAULT_CHECKS` + 서비스 항목)를 모두 체크해야(`Post.review` 기록). 콘텐츠 규칙(`src/lib/rules.ts`)은 경고만.
 - 성과 제안(`ops.insights`): 성과 적은 게시물 7편부터, 기둥 비중 ±10%p · 후속편 — 적용은 사람이.
 - AI(`src/lib/llm.ts`): Claude Code·Codex(구독 — 운영자 본인·로컬만, 토큰을 받지 않음) · Anthropic·OpenAI API 키, 작업 등급별 모델. AI 패널은 MCP 도구로 일하고 `logActivity` 로 기록. 패널 Claude Code 는 `--tools ""`로 스튜디오 MCP 만 쓴다. 편집기 AI 초안은 `/api/ai/draft`(NDJSON)로 장마다 흘려 받아 흐린 칸 → 글 → 미리보기 순으로 보여 준다(`askStream`·`draftPostStream`). 사진은 `search_photos`(위키미디어 공용, 자유 라이선스).
-- 상태는 `NEXT_STATUS` 길로만(초안→승인→게시, 게시는 인스타 링크 필수). 게시물은 지우지 않고 보관함으로.
+- 상태는 `NEXT_STATUS` 길로만(초안→승인→게시, 게시는 인스타 링크 필수). 게시물은 보관함으로 빼거나 화면에서 지운다(게시된 것은 안 됨). MCP 에는 지우기가 없다.
 - 일부러 없는 것: 삭제 도구, 인스타 업로드.
 
 ## 규칙

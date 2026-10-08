@@ -363,6 +363,27 @@ export function removeResearch(id: string) {
   });
 }
 
+/** 주제 지우기 (화면에서만 — MCP 에는 삭제 도구가 없다). 제작에 넣은 게시물은 그대로 남는다 */
+export function removeIdea(id: string) {
+  return mutate((db) => {
+    const it = db.ideas.find((x) => x.id === id) ?? fail("주제를 찾지 못했어요");
+    db.ideas = db.ideas.filter((x) => x.id !== id);
+    return it;
+  });
+}
+
+/** 게시물 지우기 (화면에서만, 되돌릴 수 없다). 게시한 것은 기록이라 게시 취소 뒤에. 이 게시물로 넣은 주제는 다시 '승인'으로 돌려 다시 넣을 수 있게 */
+export function removePost(id: string) {
+  return mutate((db) => {
+    const p = db.posts.find((x) => x.id === id) ?? fail("게시물을 찾지 못했어요");
+    if (p.status === "posted") fail("게시한 게시물은 기록으로 남겨 둬요. 게시 취소 뒤에 지울 수 있어요");
+    db.posts = db.posts.filter((x) => x.id !== id);
+    const now = new Date().toISOString();
+    for (const it of db.ideas) if (it.postId === id) { it.postId = undefined; it.status = "approved"; it.updatedAt = now; }
+    return p;
+  });
+}
+
 // ── 게시물 옮기기 · 복제 · 보관 · 성과 ──────────────────────────────
 
 async function emptySpot(wsId: string, day: unknown, slot: unknown) {

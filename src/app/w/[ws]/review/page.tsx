@@ -9,6 +9,8 @@ import { ServiceShell } from "../../../ui/Shell";
 import Icon from "../../../ui/Icon";
 import ApproveForm from "./ApproveForm";
 import ReviewList, { type ReviewRow } from "./ReviewList";
+import ConfirmButton from "../../../ui/ConfirmButton";
+import { postToolAction } from "../../../actions";
 
 /** 6단계 검수: 승인을 기다리는 초안 + 승인 전 확인(스튜디오가 확인한 것 · 사람이 체크할 것) · 승인된 것 · 골라서 ZIP 내려받기. ?s=draft|approved ?p=게시물 */
 export default async function Review({ params, searchParams }: PageProps<"/w/[ws]/review">) {
@@ -44,7 +46,7 @@ export default async function Review({ params, searchParams }: PageProps<"/w/[ws
             <section className="mk-dialog" aria-labelledby="ap-t">
               <h2 id="ap-t">승인 전 확인 · D{cur.day} {cur.title || "제목 없음"}</h2>
               <p className="small muted" style={{ margin: 0 }}>모두 체크하면 승인할 수 있어요. 누가 언제 체크했는지 남아요.</p>
-              <div className="row"><a className="btn" href={`/api/posts/${cur.id}/zip`}>이 게시물 ZIP</a><Link className="btn" href={`/w/${w.id}/p/${cur.id}`}>편집기에서 열기</Link></div>
+              <div className="row"><a className="btn" href={`/api/posts/${cur.id}/zip`}>이 게시물 ZIP</a><Link className="btn" href={`/w/${w.id}/p/${cur.id}`}>편집기에서 열기</Link>{can(role, "edit") && <form action={postToolAction}><input type="hidden" name="ws" value={w.id} /><input type="hidden" name="id" value={cur.id} /><input type="hidden" name="from" value="review" /><ConfirmButton name="op" value="remove" ask={`'${(cur.title || "제목 없음").slice(0, 30)}' 게시물을 지울까요? 글·장·캡션이 모두 사라지고 되돌릴 수 없어요.`}>지우기</ConfirmButton></form>}</div>
               <b className="mk-sub">스튜디오가 확인한 것</b>
               <div className="mk-auto"><Icon name={safe && !out.length ? "check" : "warn"} size={16} /><span>{!safe ? "인스타 마진을 계산하지 못했어요. 편집기에서 확인해 주세요" : out.length ? `인스타 마진: ${out.map((x) => `${x.n}장 밖 ${x.outside}px`).join(" · ")}` : `인스타 마진: ${safe.length}장 모두 안전 영역 안이에요`}</span></div>
               {cl.auto.map((a, i) => <div key={i} className="mk-auto"><Icon name={a.ok ? "check" : "warn"} size={16} /><span>{a.text}{"researchId" in a ? <> · <Link href={`/w/${w.id}/research?c=check`}>자료 열기</Link></> : null}</span></div>)}
@@ -59,7 +61,7 @@ export default async function Review({ params, searchParams }: PageProps<"/w/[ws
               <p className="small muted" style={{ margin: 0 }}>{cur.review ? `${cur.review.by} · ${new Date(cur.review.at).toLocaleString("ko-KR", { timeZone: "Asia/Seoul", month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })} 승인 · 체크 ${cur.review.checks.length}개` : "승인 기록이 없어요"}</p>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img className="mk-okprev" src={`/api/posts/${cur.id}/slide/1?png=1&v=${encodeURIComponent(cur.updatedAt)}`} alt="" />
-              <div className="row"><a className="btn primary" href={`/api/posts/${cur.id}/zip`}>이 게시물 ZIP</a><Link className="btn" href={`/w/${w.id}/p/${cur.id}`}>편집기에서 게시 표시</Link></div>
+              <div className="row"><a className="btn primary" href={`/api/posts/${cur.id}/zip`}>이 게시물 ZIP</a><Link className="btn" href={`/w/${w.id}/p/${cur.id}`}>편집기에서 게시 표시</Link>{can(role, "edit") && <form action={postToolAction}><input type="hidden" name="ws" value={w.id} /><input type="hidden" name="id" value={cur.id} /><input type="hidden" name="from" value="review" /><ConfirmButton name="op" value="remove" ask={`'${(cur.title || "제목 없음").slice(0, 30)}' 게시물을 지울까요? 글·장·캡션이 모두 사라지고 되돌릴 수 없어요.`}>지우기</ConfirmButton></form>}</div>
               <p className="small muted" style={{ margin: 0 }}>인스타에 올린 뒤 편집기에서 게시 링크를 붙이면 &apos;게시&apos;가 돼요.</p>
             </section>
           )}

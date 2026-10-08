@@ -6,6 +6,7 @@ import { aiEnabled } from "@/lib/ai";
 import { addResearchAction, createIdeaAction, updateResearchAction } from "../../../actions";
 import { ServiceShell } from "../../../ui/Shell";
 import AiResearch from "./AiResearch";
+import ConfirmButton from "../../../ui/ConfirmButton";
 import AskAi from "../../../AskAi";
 
 /** 2단계 자료 조사: 출처 주소 + 요약 + 메모 + 신뢰도. 주제·게시물의 근거 */
@@ -100,6 +101,10 @@ export default async function ResearchPage({ params, searchParams }: PageProps<"
                     <input type="hidden" name="ws" value={w.id} /><input type="hidden" name="title" value={r.title.slice(0, 80)} /><input type="hidden" name="research" value={r.id} /><input type="hidden" name="angle" value={r.summary.slice(0, 1000)} /><input type="hidden" name="from" value="research" />
                     <button className="btn">이 자료로 주제 더하기</button>
                   </form>
+                  {canEdit && <form action={updateResearchAction}>
+                    <input type="hidden" name="ws" value={w.id} /><input type="hidden" name="id" value={r.id} />
+                    <ConfirmButton name="op" value="remove" ask={`'${r.title.slice(0, 30)}' 자료를 지울까요? 이 자료를 연결한 주제에서도 빠지고, 되돌릴 수 없어요.`}>지우기</ConfirmButton>
+                  </form>}
                   {canEdit && <details className="stg-edit"><summary className="btn">고치기</summary>
                     <form action={updateResearchAction} className="panel stg-edit-body">
                       <input type="hidden" name="ws" value={w.id} /><input type="hidden" name="id" value={r.id} />
@@ -112,7 +117,6 @@ export default async function ResearchPage({ params, searchParams }: PageProps<"
                       </div>
                       <div className="row">
                         <button className="btn">저장</button>
-                        <button className="btn" name="op" value="remove" formNoValidate>지우기</button>
                       </div>
                     </form>
                   </details>}

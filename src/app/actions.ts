@@ -3,7 +3,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { checkLogin, clearSession, loginUser, requireAuth, setSession, setUserSession, wsAccess, type Perm } from "@/lib/auth";
-import { addMember, changePassword, removeMember, resetMemberPassword, setMemberRole, setPlan, countAi, addResearch, applyShareSuggestion, archivePost, createIdea, createPostIn, dismissSuggestion, duplicatePost, followUpIdea, insights, movePost, nextEmptySlot, restorePost, scheduleIdeas, setDisplayName, setMetrics, createWorkspace, ensureSlot, tailDay, OpError, removeResearch, savePost, scheduleIdea, setPillars, setStatus, toggleFavorite, updateBrief, updateIdea, updateResearch, updateWorkspace } from "@/lib/ops";
+import { addMember, changePassword, removeMember, resetMemberPassword, setMemberRole, setPlan, countAi, addResearch, applyShareSuggestion, archivePost, createIdea, createPostIn, dismissSuggestion, duplicatePost, followUpIdea, insights, movePost, nextEmptySlot, restorePost, scheduleIdeas, setDisplayName, setMetrics, createWorkspace, ensureSlot, tailDay, OpError, removeResearch, removeIdea, removePost, savePost, scheduleIdea, setPillars, setStatus, toggleFavorite, updateBrief, updateIdea, updateResearch, updateWorkspace } from "@/lib/ops";
 import { type PostData, type PostStatus } from "@/lib/types";
 import { getIdea, getPost, getResearch, listIdeas } from "@/lib/store";
 import { templateOf } from "@/lib/templates";
@@ -170,6 +170,16 @@ export async function updateIdeaAction(fd: FormData) {
   redirect(`/w/${ws}/ideas`);
 }
 
+/** 주제 지우기 (편집 권한, 되돌릴 수 없음) */
+export async function removeIdeaAction(fd: FormData) {
+  await requireAuth();
+  const ws = String(fd.get("ws")), id = String(fd.get("id"));
+  try { await gateOwned("idea", id, ws); await removeIdea(id); }
+  catch (e) { back(`/w/${ws}/ideas`, e); }
+  revalidatePath(`/w/${ws}`, "layout");
+  redirect(`/w/${ws}/ideas${fd.get("s") ? `?s=${encodeURIComponent(String(fd.get("s")))}` : ""}`);
+}
+
 /** 아이디어 → 달력 (칸을 고르면 그 칸, 아니면 비어 있는 첫 칸) → 편집기로 */
 export async function scheduleIdeaAction(fd: FormData) {
   await requireAuth();
@@ -311,8 +321,14 @@ export async function postToolAction(fd: FormData) {
     else if (op === "duplicate") to = `/w/${ws}/p/${(await duplicatePost(id, spotOf(fd))).id}`;
     else if (op === "archive") { await archivePost(id); to = `/w/${ws}?view=archive`; }
     else if (op === "restore") await restorePost(id, spotOf(fd));
+    else if (op === "remove") {
+      // 지우기 (되돌릴 수 없음) — 누른 화면으로 돌아간다: 보관함 · 검수 · 그 밖은 제작 목록
+      await removePost(id);
+      const from = String(fd.get("from") ?? "");
+      to = from === "archive" ? `/w/${ws}?view=archive` : from === "review" ? `/w/${ws}/review` : `/w/${ws}?ok=removed`;
+    }
     else throw new OpError("모르는 동작이에요");
-  } catch (e) { back(op === "restore" ? `/w/${ws}?view=archive` : `/w/${ws}/p/${id}`, e); }
+  } catch (e) { const from = String(fd.get("from") ?? ""); back(op === "restore" || from === "archive" ? `/w/${ws}?view=archive` : from === "review" ? `/w/${ws}/review` : `/w/${ws}/p/${id}`, e); }
   revalidatePath(`/w/${ws}`, "layout");
   redirect(to);
 }
