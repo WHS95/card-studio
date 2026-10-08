@@ -3,7 +3,8 @@ import { CONFIDENCE, CONF_LABEL, type Confidence } from "@/lib/types";
 import AutoSelect from "../../../ui/AutoSelect";
 import { listIdeas, listResearch } from "@/lib/store";
 import { aiEnabled } from "@/lib/ai";
-import { addResearchAction, createIdeaAction, updateResearchAction } from "../../../actions";
+import { addResearchAction, bulkResearchAction, createIdeaAction, updateResearchAction } from "../../../actions";
+import BulkBar, { BulkCheck } from "../../../ui/BulkBar";
 import { ServiceShell } from "../../../ui/Shell";
 import AiResearch from "./AiResearch";
 import ConfirmButton from "../../../ui/ConfirmButton";
@@ -60,6 +61,7 @@ export default async function ResearchPage({ params, searchParams }: PageProps<"
           </details>}
         </div>
         {typeof q.error === "string" && <p className="err">{q.error}</p>}
+        {typeof q.done === "string" && <p className="ok">{q.done}</p>}
 
         <div className="stg-filters">
           <div className="stg-chips stg-chips-search">
@@ -82,8 +84,9 @@ export default async function ResearchPage({ params, searchParams }: PageProps<"
             const used = usedBy(r.id);
             const meta = [r.memo && `메모: ${r.memo}`, ...r.tags.map((t) => `#${t}`), r.by !== "user" && (r.by === "ai" ? "AI 조사" : "MCP")].filter(Boolean).join(" · ");
             return (
-              <article key={r.id} className="stg-card">
+              <article key={r.id} className="stg-card bulk-row">
                 <div className="stg-card-t">
+                  {canEdit && <BulkCheck group="research" id={r.id} label={r.title} />}
                   <b className="stg-title">{r.title}</b>
                   <span className={`pill${r.confidence === "check" ? " dark" : ""}`}>{CONF_LABEL[r.confidence ?? "medium"]}</span>
                   <span className="small muted stg-right">주제 {used}</span>
@@ -126,6 +129,10 @@ export default async function ResearchPage({ params, searchParams }: PageProps<"
           })}
           {!list.length && <p className="hint">{all.length ? "조건에 맞는 자료가 없어요. 거르기를 바꿔 보세요." : "'+ 자료 더하기'에서 직접 더하거나 AI·MCP로 조사해 보세요."}</p>}
         </div>
+        {canEdit && list.length > 0 && <BulkBar group="research" action={bulkResearchAction} hidden={{ ws: w.id, back: qs({}) }} ops={[
+          ...CONFIDENCE.map((c) => ({ op: `conf:${c}`, label: `신뢰도 ${CONF_LABEL[c]}` })),
+          { op: "remove", label: "지우기", ask: "고른 자료 {n}개를 지울까요? 연결한 주제에서도 빠지고, 되돌릴 수 없어요." },
+        ]} />}
     </ServiceShell>
   );
 }

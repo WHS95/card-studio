@@ -195,20 +195,108 @@ export async function scheduleIdeaAction(fd: FormData) {
   redirect(`/w/${ws}/p/${post!.id}`);
 }
 
-/** 승인한 주제 여러 개 → 고른 순서대로 빈 칸에 하루씩 */
-export async function scheduleIdeasAction(fd: FormData) {
+// ── 골라서 한꺼번에 (ui/BulkBar: order = 고른 id 를 고른 순서대로) ──
+
+const idsOf = (fd: FormData) => [...new Set(String(fd.get("order") ?? "").split(",").map((x) => x.trim()).filter(Boolean))].slice(0, 200);
+/** 돌아갈 주소: 같은 서비스 화면만 (거르기·보기를 그대로) */
+const backOf = (fd: FormData, ws: string, dflt: string) => { const b = String(fd.get("back") ?? ""); return b.startsWith(`/w/${ws}`) && !b.includes("//") ? b : dflt; };
+const withMsg = (to: string, k: "done" | "error", m: string) => {
+  const u = new URL(to, "http://x");
+  for (const x of ["done", "error", "ok"]) u.searchParams.delete(x);
+  u.searchParams.set(k, m);
+  return u.pathname + u.search;
+};
+/** 하나씩 하고, 안 된 것은 이유를 모아 둔다 (하나가 막혀도 나머지는 한다) */
+async function eachOf(ids: string[], fn: (id: string) => Promise<unknown>) {
+  if (!ids.length) throw new OpError("먼저 줄 앞을 체크해 골라 주세요");
+  let done = 0; const why: string[] = [];
+  for (const id of ids) { try { await fn(id); done++; } catch (e) { why.push(msg(e)); } }
+  return { done, why };
+}
+const report = (to: string, r: { done: number; why: string[] }, verb: string) =>
+  r.done ? withMsg(to, "done", `${r.done}개를 ${verb}${r.why.length ? ` · ${r.why.length}개는 그대로예요: ${r.why[0]}` : ""}`)
+    : withMsg(to, "error", `바꾼 게 없어요: ${r.why[0] ?? "고른 것을 확인해 주세요"}`);
+
+const CONF_TO: Record<string, string> = { high: "높음으로", medium: "보통으로", check: "확인 필요로" };
+
+/** 자료 여러 개: 지우기 · 신뢰도 바꾸기 (편집 권한) */
+export async function bulkResearchAction(fd: FormData) {
   await requireAuth();
-  const ws = String(fd.get("ws"));
-  const ids = String(fd.get("order") ?? "").split(",").map((x) => x.trim()).filter(Boolean);
+  const ws = String(fd.get("ws")), op = String(fd.get("op") ?? ""), ids = idsOf(fd);
+  const to = backOf(fd, ws, `/w/${ws}/research`);
+  const conf = op.startsWith("conf:") ? op.slice(5) : "";
+  let r = { done: 0, why: [] as string[] };
   try {
     await gateWs(ws, "edit");
-    if (!ids.length) throw new OpError("제작에 넣을 주제를 골라 주세요");
-    for (const id of ids) await gateOwned("idea", id, ws);
-    await scheduleIdeas(ids, fd.get("from") ? Number(fd.get("from")) : await tailDay(ws)); // 고른 순서대로 목록 끝에
-  } catch (e) { back(`/w/${ws}/ideas?s=approved`, e); }
+    if (op !== "remove" && !CONF_TO[conf]) throw new OpError("할 일을 알 수 없어요. 화면을 새로 고친 뒤 다시 해 주세요");
+    r = await eachOf(ids, async (id) => { await gateOwned("research", id, ws); return op === "remove" ? removeResearch(id) : updateResearch(id, { confidence: conf }); });
+  } catch (e) { back(to, e); }
   revalidatePath(`/w/${ws}`, "layout");
-  redirect(`/w/${ws}?ok=${ids.length}`);
+  redirect(report(to, r, op === "remove" ? "지웠어요" : `신뢰도 ${CONF_TO[conf]} 바꿨어요`));
 }
+
+const IDEA_VERB: Record<string, string> = { approve: "승인했어요", unapprove: "승인 취소했어요", drop: "보류했어요", restore: "검수 대기로 꺼냈어요", remove: "지웠어요" };
+
+/** 주제 여러 개: 승인 · 승인 취소(승인 권한) · 보류 · 꺼내기(편집·승인) · 지우기 · 고른 순서대로 제작에 넣기(편집) */
+export async function bulkIdeasAction(fd: FormData) {
+  await requireAuth();
+  const ws = String(fd.get("ws")), op = String(fd.get("op") ?? ""), ids = idsOf(fd);
+  const to = backOf(fd, ws, `/w/${ws}/ideas`);
+  let r = { done: 0, why: [] as string[] }, made = 0;
+  try {
+    if (op !== "schedule" && !IDEA_VERB[op]) throw new OpError("할 일을 알 수 없어요. 화면을 새로 고친 뒤 다시 해 주세요");
+    const { actor } = op === "approve" || op === "unapprove" ? await gateWs(ws, "approve")
+      : op === "drop" || op === "restore" ? await gateWs(ws, "approve").catch(() => gateWs(ws, "edit"))
+      : await gateWs(ws, "edit");
+    if (op === "schedule") {
+      if (!ids.length) throw new OpError("먼저 줄 앞을 체크해 골라 주세요");
+      const ok = (await Promise.all(ids.map(getIdea))).filter((i) => i && i.workspace === ws && i.status === "approved" && !i.postId).map((i) => i!.id);
+      if (!ok.length) throw new OpError("승인한 주제 중 아직 제작에 넣지 않은 것만 넣을 수 있어요");
+      made = (await scheduleIdeas(ok.slice(0, 30), await tailDay(ws))).length; // 고른 순서대로 목록 끝에
+    } else {
+      r = await eachOf(ids, async (id) => {
+        const it = await getIdea(id);
+        if (!it || it.workspace !== ws) throw new OpError("주제를 찾지 못했어요");
+        if (op === "remove") return removeIdea(id);
+        const t = it.title.slice(0, 20);
+        const next = op === "approve" ? (it.status === "review" ? "approved" : fail(`'${t}' 주제는 검수 대기가 아니에요`))
+          : op === "unapprove" ? (it.status === "approved" && !it.postId ? "review" : fail(`'${t}' 주제는 제작 전 승인 상태가 아니에요`))
+          : op === "drop" ? ((it.status === "review" || it.status === "approved") && !it.postId ? "dropped" : fail(`'${t}' 주제는 이미 제작에 넣었거나 보류했어요`))
+          : it.status === "dropped" ? "review" : fail(`'${t}' 주제는 보류 상태가 아니에요`);
+        return updateIdea(id, { status: next }, actor.name);
+      });
+    }
+  } catch (e) { back(to, e); }
+  revalidatePath(`/w/${ws}`, "layout");
+  redirect(op === "schedule" ? `/w/${ws}?ok=${made}` : report(to, r, IDEA_VERB[op]));
+}
+
+const POST_VERB: Record<string, string> = { remove: "지웠어요", archive: "보관함으로 뺐어요", draft: "초안(글이 없으면 기획)으로 돌렸어요", skip: "건너뛰었어요", restore: "되살렸어요" };
+
+/** 게시물 여러 개: 지우기 · 보관함으로 · 초안으로 · 건너뛰기 · 되살리기 (편집 권한). 승인은 편집기 '검수'에서 하나씩(체크리스트) */
+export async function bulkPostsAction(fd: FormData) {
+  await requireAuth();
+  const ws = String(fd.get("ws")), op = String(fd.get("op") ?? ""), ids = idsOf(fd);
+  const to = backOf(fd, ws, `/w/${ws}`);
+  let r = { done: 0, why: [] as string[] };
+  try {
+    if (!POST_VERB[op]) throw new OpError("할 일을 알 수 없어요. 화면을 새로 고친 뒤 다시 해 주세요");
+    await gateWs(ws, "edit");
+    r = await eachOf(ids, async (id) => {
+      const p = await getPost(id);
+      if (!p || p.workspace !== ws) throw new OpError("게시물을 찾지 못했어요");
+      const t = (p.title || "제목 없음").slice(0, 20);
+      if (op === "remove") return removePost(id);
+      if (op === "archive") return archivePost(id);
+      if (op === "restore") return restorePost(id);
+      if (op === "draft") return p.status === "approved" || p.status === "skip" ? setStatus(id, "draft") : fail(`'${t}' 게시물은 승인·건너뜀 상태가 아니에요`);
+      return p.status === "plan" || p.status === "draft" || p.status === "approved" ? setStatus(id, "skip") : fail(`'${t}' 게시물은 게시했거나 이미 건너뛰었어요`);
+    });
+  } catch (e) { back(to, e); }
+  revalidatePath(`/w/${ws}`, "layout");
+  redirect(report(to, r, POST_VERB[op]));
+}
+const fail = (m: string): never => { throw new OpError(m); };
 
 export async function addResearchAction(fd: FormData) {
   await requireAuth();

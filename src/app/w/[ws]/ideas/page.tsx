@@ -4,10 +4,10 @@ import { listIdeas, listPosts, listResearch } from "@/lib/store";
 import { TEMPLATES, templateOf } from "@/lib/templates";
 import { IDEA_LABEL, IDEA_STATUS, STATUS_LABEL, type IdeaStatus } from "@/lib/types";
 import { aiEnabled } from "@/lib/ai";
-import { createIdeaAction, removeIdeaAction, scheduleIdeaAction, scheduleIdeasAction, updateIdeaAction } from "../../../actions";
+import { bulkIdeasAction, createIdeaAction, removeIdeaAction, scheduleIdeaAction, updateIdeaAction } from "../../../actions";
+import BulkBar, { BulkCheck, type BulkOp } from "../../../ui/BulkBar";
 import ConfirmButton from "../../../ui/ConfirmButton";
 import { ServiceShell } from "../../../ui/Shell";
-import BatchSchedule from "./BatchSchedule";
 import AiIdeas from "./AiIdeas";
 import AskAi from "../../../AskAi";
 
@@ -99,18 +99,15 @@ export default async function Ideas({ params, searchParams }: PageProps<"/w/[ws]
           </div>}
         </div>
 
-        {status === "approved" && canEdit && shown.some((i) => !i.postId) && (
-          <BatchSchedule ws={w.id} action={scheduleIdeasAction} items={shown.filter((i) => !i.postId).map((i) => ({ id: i.id, title: i.title, pillar: i.pillar, by: i.approvedBy ?? "" }))} />
-        )}
-        {status === "approved" && canEdit && shown.length > 0 && <h2 className="stg-h2">하나씩 넣기 · 고치기</h2>}
-
+        {typeof q.done === "string" && <p className="ok">{q.done}</p>}
         <div className="list stg-list">
           {shown.map((i) => {
             const post = i.postId ? postOf.get(i.postId) : undefined;
             const unsure = i.research.filter((id) => rTitle.get(id)?.confidence === "check").length;
             return (
-              <article key={i.id} className="stg-card" data-s={i.status}>
+              <article key={i.id} className="stg-card bulk-row" data-s={i.status}>
                 <div className="stg-card-t">
+                  {(canEdit || canApprove) && <BulkCheck group="ideas" id={i.id} label={i.title} ordered={i.status === "approved" && !i.postId && canEdit} />}
                   <b className="stg-title">{i.title}</b>
                   <span className="small muted">{[i.pillar || "기둥 없음", templateOf(i.template).name, byLabel(i.by)].map((x) => ` · ${x}`).join("")}</span>
                   {!status && <span className={`pill${i.status === "review" ? " dark" : ""}`}>{IDEA_LABEL[i.status]}</span>}
@@ -157,6 +154,21 @@ export default async function Ideas({ params, searchParams }: PageProps<"/w/[ws]
           })}
           {!shown.length && <p className="hint">{status === "review" ? "검수할 주제가 없어요." : status === "approved" ? "승인한 주제가 없어요. 검수 대기에서 승인하면 여기에 모여요." : "주제가 없어요. '+ 새 주제'에서 더하거나 기둥 예시를 눌러 꺼내 보세요."}</p>}
         </div>
+        {(canEdit || canApprove) && shown.length > 0 && (() => {
+          // 탭마다 맞는 일만 (전체 탭은 모두 — 맞지 않는 주제는 서버가 그대로 둔다)
+          const has = (s: IdeaStatus) => !status || status === s;
+          const ops: BulkOp[] = [
+            ...(has("approved") && canEdit ? [{ op: "schedule", label: "고른 순서대로 제작에 넣기", primary: true }] : []),
+            ...(has("review") && canApprove ? [{ op: "approve", label: "승인", primary: !has("approved") }] : []),
+            ...(has("approved") && canApprove ? [{ op: "unapprove", label: "승인 취소" }] : []),
+            ...((has("review") || has("approved")) ? [{ op: "drop", label: "보류" }] : []),
+            ...(has("dropped") ? [{ op: "restore", label: "검수 대기로 꺼내기" }] : []),
+            ...(canEdit ? [{ op: "remove", label: "지우기", ask: "고른 주제 {n}개를 지울까요? 되돌릴 수 없어요. 제작에 넣은 게시물은 그대로 남아요." }] : []),
+          ];
+          return <BulkBar group="ideas" action={bulkIdeasAction} hidden={{ ws: w.id, back: href({}) }} ops={ops}
+            note={status === "approved" ? "체크한 순서대로 제작 목록 끝에 붙어요" : undefined} />;
+        })()}
+
     </ServiceShell>
   );
 }

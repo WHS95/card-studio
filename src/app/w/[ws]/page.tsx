@@ -5,7 +5,8 @@ import { nextEmptySlot } from "@/lib/ops";
 import { ruleWarnings } from "@/lib/rules";
 import { POST_STATUS, STATUS_LABEL, type PostStatus } from "@/lib/types";
 import { templateOf } from "@/lib/templates";
-import { createPostAction, postToolAction } from "../../actions";
+import { bulkPostsAction, createPostAction, postToolAction } from "../../actions";
+import BulkBar, { BulkCheck } from "../../ui/BulkBar";
 import { ServiceShell } from "../../ui/Shell";
 import ConfirmButton from "../../ui/ConfirmButton";
 import MakeList from "./MakeList";
@@ -60,13 +61,15 @@ export default async function Calendar({ params, searchParams }: PageProps<"/w/[
       </div>
       {q.ok === "removed" ? <p className="ok">게시물을 지웠어요.</p> : typeof q.ok === "string" && <p className="ok">주제 {q.ok}개를 제작 목록에 넣었어요. 줄을 눌러 글을 채워 주세요.</p>}
       {typeof q.error === "string" && <p className="err">{q.error}</p>}
+      {typeof q.done === "string" && <p className="ok">{q.done}</p>}
       {!archive && !grid && mix.length > 0 && (
         <div className="mk-mix"><b>기둥 비중 (지금/목표)</b>{mix.map((m) => <span key={m.name}>{m.name} {m.now}/{m.target}%</span>)}</div>
       )}
       {archive ? (
         <>
           {archived.map((p) => (
-            <form key={p.id} action={postToolAction} className="mk-row">
+            <form key={p.id} action={postToolAction} className="mk-row bulk-row">
+              {can(role, "edit") && <BulkCheck group="archive" id={p.id} label={p.title || "제목 없음"} />}
               <input type="hidden" name="ws" value={w.id} /><input type="hidden" name="id" value={p.id} /><input type="hidden" name="from" value="archive" />
               {p.data
                 // eslint-disable-next-line @next/next/no-img-element
@@ -86,6 +89,10 @@ export default async function Calendar({ params, searchParams }: PageProps<"/w/[
               {can(role, "edit") && <ConfirmButton name="op" value="remove" ask={`'${(p.title || "제목 없음").slice(0, 30)}' 게시물을 완전히 지울까요? 되돌릴 수 없어요.`}>완전히 지우기</ConfirmButton>}
             </form>
           ))}
+          {can(role, "edit") && archived.length > 0 && <BulkBar group="archive" action={bulkPostsAction} hidden={{ ws: w.id, back: `/w/${w.id}?view=archive` }} ops={[
+            { op: "restore", label: "되살리기", primary: true },
+            { op: "remove", label: "완전히 지우기", ask: "고른 게시물 {n}개를 완전히 지울까요? 되돌릴 수 없어요." },
+          ]} note="줄 앞을 체크해 골라요 · 되살리면 원래 칸, 차 있으면 비어 있는 첫 칸으로" />}
           {!archived.length && <p className="hint">보관함이 비어 있어요. 편집기 아래 &apos;게시물 관리&apos;에서 게시물을 뺄 수 있어요.</p>}
           <p className="small muted" style={{ margin: 0 }}>보류한 주제는 3 주제 탭의 &apos;보류&apos;에 있어요.</p>
         </>
@@ -97,7 +104,7 @@ export default async function Calendar({ params, searchParams }: PageProps<"/w/[
               <span className="small muted">빈 기획 게시물을 만들고 편집기로 가요</span>
             </form>
           )}
-          <MakeList ws={w.id} empty={filter ? `${STATUS_LABEL[filter]} 게시물이 없어요.` : "게시물이 없어요. 3 주제에서 승인한 주제를 넣거나 '+ 새 게시물'로 시작해요."}
+          <MakeList ws={w.id} back={href({})} canEdit={can(role, "edit")} empty={filter ? `${STATUS_LABEL[filter]} 게시물이 없어요.` : "게시물이 없어요. 3 주제에서 승인한 주제를 넣거나 '+ 새 게시물'로 시작해요."}
             rows={posts.filter((p) => !filter || p.status === filter).map((p) => ({
               id: p.id, title: p.title || "제목 없음", status: p.status, label: STATUS_LABEL[p.status], warn: warns[p.id],
               thumb: p.data ? `/api/posts/${p.id}/slide/1?png=1&v=${encodeURIComponent(p.updatedAt)}` : null,

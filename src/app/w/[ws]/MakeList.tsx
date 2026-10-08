@@ -1,34 +1,26 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
 import Icon from "../../ui/Icon";
+import BulkBar, { BulkCheck, type BulkOp } from "../../ui/BulkBar";
+import { bulkPostsAction } from "../../actions";
 
 export type MakeRow = { id: string; title: string; meta: string; thumb: string | null; warn: number; when: string; status: string; label: string };
 
-/** 5 제작 목록: 줄을 누르면 편집기, 글이 있는 게시물은 체크해서 ZIP 하나로 내려받기 (검수 탭에서 옮겨 옴) */
-export default function MakeList({ ws, rows, empty }: { ws: string; rows: MakeRow[]; empty: string }) {
-  const [picked, setPicked] = useState<string[]>([]);
-  const can = rows.filter((r) => r.thumb).map((r) => r.id);
-  const got = picked.filter((id) => can.includes(id));
-  const all = can.length > 0 && got.length === can.length;
-  const flip = (id: string) => setPicked((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id]));
+/** 5 제작 목록: 줄을 누르면 편집기. 줄 앞을 체크해 한꺼번에 — 글이 있는 것은 ZIP, 편집 권한이면 지우기·보관함·초안으로·건너뛰기 (승인은 편집기 '검수'에서 하나씩) */
+export default function MakeList({ ws, rows, empty, back, canEdit }: { ws: string; rows: MakeRow[]; empty: string; back: string; canEdit: boolean }) {
+  const hasData = new Set(rows.filter((r) => r.thumb).map((r) => r.id));
+  const ops: BulkOp[] = canEdit ? [
+    { op: "draft", label: "초안·기획으로" },
+    { op: "skip", label: "건너뛰기" },
+    { op: "archive", label: "보관함으로" },
+    { op: "remove", label: "지우기", ask: "고른 게시물 {n}개를 지울까요? 글·장·캡션이 모두 사라지고 되돌릴 수 없어요. 게시한 게시물은 지우지 않아요." },
+  ] : [];
   return (
     <div className="mk-plist">
-      {can.length > 0 && (
-        <div className="mk-pickbar">
-          <label className="mk-pickall"><input type="checkbox" checked={all} onChange={() => setPicked(all ? [] : can)} />전체</label>
-          <span className="small muted">{got.length ? `${got.length}개 골랐어요` : "내려받을 게시물을 체크해요 · 승인한 것만 보려면 위 '승인'"}</span>
-          {got.length
-            ? <a className="btn primary" href={`/api/ws/${ws}/zip?ids=${got.join(",")}`} download>고른 {got.length}개 ZIP으로 내려받기</a>
-            : <button type="button" className="btn" disabled>고른 게시물 ZIP으로 내려받기</button>}
-        </div>
-      )}
       {rows.map((p) => (
-        <div key={p.id} className="mk-row mk-prow mk-pickrow" data-s={p.status}>
-          {p.thumb
-            ? <input type="checkbox" className="mk-check" aria-label={`${p.title} 고르기`} checked={got.includes(p.id)} onChange={() => flip(p.id)} />
-            : <span className="mk-check" aria-hidden />}
+        <div key={p.id} className="mk-row mk-prow mk-pickrow bulk-row" data-s={p.status}>
+          <BulkCheck group="posts" id={p.id} label={p.title} />
           <Link href={`/w/${ws}/p/${p.id}`} className="mk-pickmain">
             {p.thumb
               // eslint-disable-next-line @next/next/no-img-element
@@ -46,8 +38,18 @@ export default function MakeList({ ws, rows, empty }: { ws: string; rows: MakeRo
           </Link>
         </div>
       ))}
+      {rows.length > 0 && (
+        <BulkBar group="posts" action={bulkPostsAction} hidden={{ ws, back }} ops={ops}
+          note={canEdit ? "줄 앞을 체크해 골라요 · 승인은 편집기의 '검수'에서" : "내려받을 게시물을 체크해요"}
+          extra={(ids) => {
+            const z = ids.filter((id) => hasData.has(id));
+            return z.length
+              ? <a className="btn primary" href={`/api/ws/${ws}/zip?ids=${z.join(",")}`} download>{z.length}개 ZIP으로 내려받기</a>
+              : <button type="button" className="btn" disabled>ZIP으로 내려받기</button>;
+          }} />
+      )}
       {!rows.length && <p className="hint">{empty}</p>}
-      {can.length > 0 && <p className="small muted" style={{ margin: 0 }}>ZIP = 게시물마다 폴더 · 장별 PNG(영상 장은 MP4) + caption.txt · 인스타에는 직접 올려요</p>}
+      {hasData.size > 0 && <p className="small muted" style={{ margin: 0 }}>ZIP = 게시물마다 폴더 · 장별 PNG(영상 장은 MP4) + caption.txt · 글이 있는 게시물만 담겨요 · 인스타에는 직접 올려요</p>}
     </div>
   );
 }
