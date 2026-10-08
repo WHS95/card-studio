@@ -75,7 +75,7 @@ export function LayerToggles({ layers, onChange }: { layers: Layers; onChange: (
   const t = (k: keyof Layers, label: string, title: string) => (
     <button type="button" className={`chip${layers[k] ? " on" : ""}`} aria-pressed={layers[k]} title={title} onClick={() => onChange({ ...layers, [k]: !layers[k] })}>{label}</button>
   );
-  return <div className="ed-layers" role="group" aria-label="겹쳐 보기">{t("safe", "안전 영역", "글·장식이 이 안에 있어야 안 가려져요")}{t("grid", "그리드 3:4", "프로필 그리드에서 잘리는 부분 (표지)")}{t("ui", "인스타 UI", "인스타 화면 요소 자리 (대략)")}</div>;
+  return <div className="ed-layers" role="group" aria-label="겹쳐 보기">{t("safe", "안전 영역", "글·장식을 이 안에 두면 가려지지 않아요")}{t("grid", "그리드 3:4", "프로필 그리드에서 잘리는 부분 (표지)")}{t("ui", "인스타 UI", "인스타 화면 요소 자리 (대략)")}</div>;
 }
 
 /** 크게 보기: 인스타 피드 모양 + 겹침 + 영상 미리보기 */
@@ -116,7 +116,7 @@ export function Modal({ handle, imgs, n, total, caption, layers, setLayers, isVi
           <button type="button" className="btn ed-mnav" aria-label="다음 장" disabled={n >= total - 1} onClick={() => onMove(n + 1)}>→</button>
         </div>
         {isVideo(n) && <div className="ed-row ed-mplay"><button type="button" className="btn" onClick={play} disabled={busy}>{busy ? "영상 만드는 중 (수십 초)" : showVid ? "영상 다시 만들기" : "▶ 영상으로 보기"}</button><span>글 + 영상을 합친 실제 MP4예요</span></div>}
-        <p className="ed-mfoot">영상 장이면 여기서 재생돼요 · ←/→ 로 장 넘기기 · &apos;더 보기&apos; 위치는 기기마다 달라서 대략 (약 125자 / 2줄)</p>
+        <p className="ed-mfoot">영상 장이면 여기서 재생돼요 · ←/→ 로 장 넘기기 · &apos;더 보기&apos; 위치는 기기마다 조금 달라요 (약 125자·2줄)</p>
       </div>
     </div>
   );

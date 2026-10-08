@@ -28,7 +28,7 @@ export default async function Publish({ params }: PageProps<"/w/[ws]/publish">) 
           </div>
         ))}
         {!ready.length && <p className="small muted" style={{ margin: 0 }}>승인된 게시물이 없어요. 6 검수에서 승인하면 여기로 와요.</p>}
-        <p className="small muted" style={{ margin: 0 }}>ZIP = 장별 PNG(영상 장은 MP4) + caption.txt · 링크는 https://www.instagram.com/p/… 또는 /reel/… 만</p>
+        <p className="small muted" style={{ margin: 0 }}>ZIP = 장별 PNG(영상 장은 MP4) + caption.txt · 링크는 https://www.instagram.com/p/… 나 /reel/… 주소를 붙여요</p>
       </section>
       {ready.length > 0 && <section className="sect"><h2>릴스로 만들기</h2>
         <ReelForm posts={ready.map((p) => ({ id: p.id, label: `D${p.day} · ${p.title || "제목 없음"}` }))} />

@@ -39,7 +39,7 @@ const g = globalThis as unknown as { __veoJobs?: Map<string, VeoJob> };
 const jobs = (g.__veoJobs ??= new Map());
 
 export const veoEnabled = () => !!getKey("gemini");
-const key = () => getKey("gemini") ?? (() => { throw new OpError("운영자가 'AI 연동'에서 Gemini 키를 넣어 주세요"); })();
+const key = () => getKey("gemini") ?? (() => { throw new OpError("Gemini 키가 없어요. 운영자가 설정 · AI 에서 키를 넣으면 쓸 수 있어요"); })();
 
 async function api(path: string, init?: RequestInit) {
   const r = await fetch(path.startsWith("http") ? path : `${API}/${path}`, { ...init, headers: { "x-goog-api-key": key(), "content-type": "application/json", ...(init?.headers ?? {}) } });
@@ -48,7 +48,7 @@ async function api(path: string, init?: RequestInit) {
     const m = /"message":\s*"([^"]+)"/.exec(t)?.[1];
     if (r.status === 400 || r.status === 403) throw new OpError(`Google 이 요청을 받지 않았어요: ${m ?? r.status}`);
     if (r.status === 429) throw new OpError("Gemini 사용량 한도에 걸렸어요. 잠시 뒤 다시 해 주세요");
-    throw new OpError(`Veo 호출이 실패했어요 (${r.status})`);
+    throw new OpError(`Veo 를 부르지 못했어요 (${r.status}). 잠시 뒤 다시 해 주세요`);
   }
   return r;
 }
@@ -69,7 +69,7 @@ export async function startVeo(ws: string, input: VeoInput): Promise<VeoJob> {
   if (mode === "extend" && resolution !== "720p") { resolution = "720p"; notes.push("이어 붙이기는 720p 로"); }
   const instance: Record<string, unknown> = { prompt };
   const photoData = async (u: string | undefined, what: string) => {
-    if (!u || !UPLOAD_RE.test(u) || u.endsWith(".mp4") || !u.startsWith(`/uploads/${ws}/`)) throw new OpError(`${what}은 이 서비스에 직접 올린 사진(JPG·PNG)만 돼요`);
+    if (!u || !UPLOAD_RE.test(u) || u.endsWith(".mp4") || !u.startsWith(`/uploads/${ws}/`)) throw new OpError(`${what}은 이 서비스에 직접 올린 JPG·PNG 사진으로 골라 주세요`);
     const buf = await readFile(join(process.cwd(), "public", u));
     return { inlineData: { mimeType: u.endsWith(".png") ? "image/png" : "image/jpeg", data: buf.toString("base64") } };
   };
@@ -82,7 +82,7 @@ export async function startVeo(ws: string, input: VeoInput): Promise<VeoJob> {
   }
   if (mode === "extend") {
     const src = (await veoRegistry())[input.extendFrom ?? ""];
-    if (!src || !input.extendFrom?.startsWith(`/uploads/${ws}/`)) throw new OpError("이어 붙이기는 이 스튜디오에서 Veo 로 만든 영상만 돼요");
+    if (!src || !input.extendFrom?.startsWith(`/uploads/${ws}/`)) throw new OpError("이어 붙이기는 이 스튜디오에서 Veo 로 만든 영상으로만 할 수 있어요");
     if (Date.now() - src.at > 47 * 3600_000) throw new OpError("Google 이 영상을 2일만 보관해서, 만든 지 2일이 지난 영상은 이어 붙일 수 없어요");
     instance.video = { uri: src.uri };
   }
@@ -136,7 +136,7 @@ export function getVeoJob(id: string, ws: string) {
 export async function testGemini() {
   const r = await api("models?pageSize=50");
   const j = (await r.json()) as { models?: { name: string }[] };
-  return (j.models ?? []).some((m) => m.name.includes("veo")) ? "연결됐어요 (Veo 모델 보임)" : "연결은 됐지만 이 키로는 Veo 모델이 안 보여요 (결제·지역 확인)";
+  return (j.models ?? []).some((m) => m.name.includes("veo")) ? "연결했어요. Veo 모델을 쓸 수 있어요" : "연결했지만 이 키로는 Veo 모델을 쓸 수 없어요. 결제와 지역 설정을 확인해 주세요";
 }
 
 // Veo 로 만든 영상의 구글 쪽 주소 (이어 붙이기용, 2일 보관) — .cache/veo.json (git 제외)

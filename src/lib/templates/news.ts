@@ -68,9 +68,9 @@ export const news: Template = {
     ],
     caption: "샘플 캡션이에요.",
     slides: [
-      { kind: "cover", photo: 0, kicker: "WEEKLY | NEWS", title: "이번 주 꼭 알아야 할\n소식 ==5가지==", sub: "1분이면 다 읽어요", pos: "bottom", size: "m", brand: true },
-      { kind: "split", photo: 1, layout: "full", source: "샘플 이미지", kicker: "NEWS | 브랜드", title: "낮아진 진입 장벽,\n누구나 쓰는 ==새 기능==", body: "새 기능이 공개됐어요. **설정 한 번이면** 바로 쓸 수 있고,\n작업 시간이 크게 줄었다는 반응이에요.", num: true, bg: "light", align: "left", size: "m", hl: "text" },
-      { kind: "split", photo: 2, layout: "inset", source: "", kicker: "", title: "기준은 세 가지예요", body: "1. **압도적인 역량**\n2. **적당함에 안주하지 않는 태도**\n3. **함께 일하는 마음**", num: false, bg: "light", align: "center", size: "m", hl: "fill" },
+      { kind: "cover", photo: 0, kicker: "WEEKLY | NEWS", title: "이번 주 알아 두면 좋은\n소식 ==5가지==", sub: "1분이면 다 읽어요", pos: "bottom", size: "m", brand: true },
+      { kind: "split", photo: 1, layout: "full", source: "샘플 이미지", kicker: "NEWS | 브랜드", title: "누구나 쉽게 쓰는\n==새 기능==", body: "새 기능이 공개됐어요. **설정 한 번이면** 바로 쓸 수 있고,\n작업 시간이 크게 줄었다는 반응이에요.", num: true, bg: "light", align: "left", size: "m", hl: "text" },
+      { kind: "split", photo: 2, layout: "inset", source: "", kicker: "", title: "기준은 세 가지예요", body: "1. **깊이 있는 실력**\n2. **적당함에 안주하지 않는 태도**\n3. **함께 일하는 마음**", num: false, bg: "light", align: "center", size: "m", hl: "fill" },
       { kind: "full", photo: 3, source: "@sample", title: "셀카 한 장 = 입장권", body: "사진 한 장 올리면 나랑 닮은 캐릭터가 뚝딱.\n**한마디 남기면** 꽃길로 입장해요.", num: true, size: "m", hl: "fill" },
       { kind: "text", kicker: "SUMMARY", title: "한 줄로 정리하면", body: "작게 시작해서 **꾸준히** 쌓는 것.\n\n==오늘 하나만== 해 보세요.", bg: "dark", align: "left", size: "l", hl: "fill" },
       { kind: "cta", line: "도움이 됐다면", big: "저장하고\n==팔로우==", pill: "프로필 링크에서 더 보기", bg: "dark", hl: "fill" },

@@ -14,17 +14,17 @@ export default function Manage({ ws, id, posted, empty }: { ws: string; id: stri
           {empty.map((e) => { const [d, s] = e.split(" "); return <option key={e} value={e}>D{d} {s}</option>; })}
         </select>
         <button className="btn" name="op" value="move" disabled={!empty.length}>다른 칸으로 옮기기</button>
-        <button className="btn" name="op" value="duplicate" disabled={!empty.length} title="고른 칸에 새 초안으로">복제</button>
+        <button className="btn" name="op" value="duplicate" disabled={!empty.length} title="고른 칸에 같은 내용으로 새 초안을 만들어요">복제</button>
       </form>
       {!posted && (
         <form action={postToolAction} className="ed-row">
           <input type="hidden" name="ws" value={ws} />
           <input type="hidden" name="id" value={id} />
           <input type="hidden" name="op" value="archive" />
-          <button className="btn" title="칸이 비고, 보관함에서 되살릴 수 있어요 (지우지는 않아요)">보관함으로 빼기</button>
+          <button className="btn" title="지우지 않아요. 칸이 비고, 보관함에서 되살릴 수 있어요">보관함으로 빼기</button>
         </form>
       )}
-      <p className="ed-note">옮기기·복제는 고른 칸으로 · 저장 안 된 고침은 들어가지 않아요{!posted ? " · 보관함은 지우지 않고 빼 두기" : ""}</p>
+      <p className="ed-note">옮기기·복제는 저장한 내용으로 해요{!posted ? " · 보관함으로 빼도 지워지지 않아요" : ""}</p>
     </div>
   );
 }

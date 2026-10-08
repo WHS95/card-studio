@@ -50,7 +50,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
                   <Link href={`/w/${w.id}/go`} className="w-hero-link" aria-hidden tabIndex={-1}>{(w.name.trim()[0] ?? "?").toUpperCase()}</Link>
                   <span className="w-hero-tools">
                     <form action={favoriteAction}><input type="hidden" name="ws" value={w.id} />
-                      <button className="tool" aria-pressed={on} aria-label={on ? `${w.name} 즐겨찾기 해제` : `${w.name} 즐겨찾기`} title={on ? "즐겨찾기 해제" : "즐겨찾기"}><Icon name="star" /></button></form>
+                      <button className="tool" aria-pressed={on} aria-label={on ? `${w.name} 즐겨찾기에서 빼기` : `${w.name} 즐겨찾기`} title={on ? "즐겨찾기에서 빼기" : "즐겨찾기"}><Icon name="star" /></button></form>
                     <details className="w-more">
                       <summary className="tool" aria-label={`${w.name} 더 보기`} title="더 보기">
                         <svg width="18" height="18" viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth={1.6}><circle cx="5" cy="10" r="1.2" /><circle cx="10" cy="10" r="1.2" /><circle cx="15" cy="10" r="1.2" /></svg>
@@ -67,7 +67,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
                 </div>
                 <Link href={`/w/${w.id}/go`} className="w-card-name">{w.name}</Link>
                 <p className="small muted clamp2 w-m0">{w.handle || "계정 없음"}{w.brief?.about ? ` · ${w.brief.about}` : ""}</p>
-                <div className="prog" aria-label={`${f.steps.length}단계 중 됨 ${f.counts.done}`}>{f.steps.map((s) => <span key={s.key} data-s={s.state} title={`${s.label} · ${s.note}`} />)}</div>
+                <div className="prog" aria-label={`${f.steps.length}단계 중 ${f.counts.done}단계 마침`}>{f.steps.map((s) => <span key={s.key} data-s={s.state} title={`${s.label} · ${s.note}`} />)}</div>
                 <p className="small w-m0"><b>다음 할 일</b> {f.now ? f.now.note : "막힌 단계가 없어요"}</p>
                 {lastEdit[i] && <p className="small muted w-m0">{when(lastEdit[i])} 고침</p>}
               </article>
@@ -75,8 +75,8 @@ export default async function Home({ searchParams }: PageProps<"/">) {
           })}
         </div>
       )}
-      {!list.length && <p className="hint">{fav ? "서비스 카드의 별을 누르면 여기 모여요." : "아직 서비스가 없어요. '새 서비스'로 시작해 보세요."}</p>}
-      <p className="small muted w-m0">{fav ? "별을 누른 서비스만 모여요." : "카드를 누르면 '할 일'이 있는 단계로 열려요. 진행 띠는 6단계(목적·자료 조사·주제·템플릿·제작·검수), 진한 칸 = 됨."}</p>
+      {!list.length && <p className="hint">{fav ? "서비스 카드의 별을 누르면 여기 모여요." : "'새 서비스'를 눌러 첫 서비스를 만들어 보세요."}</p>}
+      <p className="small muted w-m0">{fav ? "별을 누른 서비스만 모여요." : "카드를 누르면 '할 일'이 있는 단계로 열려요. 진행 띠는 6단계(목적·자료 조사·주제·템플릿·제작·검수)이고, 진한 칸은 마친 단계예요."}</p>
     </WideShell>
   );
 }

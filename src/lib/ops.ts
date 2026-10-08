@@ -33,8 +33,8 @@ export async function createWorkspace(input: { id: unknown; name: unknown; handl
   const name = s(input.name, 30);
   const id = s(input.id, 30).toLowerCase();
   if (!name) fail("서비스 이름을 적어 주세요");
-  if (!/^[a-z0-9-]{2,30}$/.test(id)) fail("주소용 영문은 소문자·숫자·- 로 2~30자예요");
-  if (await getWorkspace(id)) fail("이미 있는 주소예요");
+  if (!/^[a-z0-9-]{2,30}$/.test(id)) fail("주소는 영문 소문자·숫자·- 로 2~30자까지 쓸 수 있어요");
+  if (await getWorkspace(id)) fail("이미 쓰고 있는 주소예요. 다른 주소를 적어 주세요");
   const ws: Workspace = {
     id, name, handle: s(input.handle, 30), theme: DEFAULT_THEME(name, hex(input.accent, NEUTRAL_ACCENT)),
     categories: ["정보", "소식", "팁", "참여"], slots: ["12:30"], days: 30, startDate: null, defaultTemplate: "magazine",
@@ -91,8 +91,8 @@ export async function updateWorkspace(id: string, p: WorkspacePatch) {
 export async function createPostIn(wsId: string, p: { day: number; slot: string; template?: string; title?: string; category?: string; note?: string; data?: unknown; draft?: boolean }) {
   const w = (await getWorkspace(wsId)) ?? fail("서비스를 찾지 못했어요");
   const day = Math.round(Number(p.day));
-  if (!(day >= 1 && day <= w.days)) fail(`일차는 1~${w.days}예요`);
-  if (!w.slots.includes(p.slot)) fail(`시간대는 ${w.slots.join(", ")} 중 하나예요`);
+  if (!(day >= 1 && day <= w.days)) fail(`일차는 1~${w.days} 사이로 골라 주세요`);
+  if (!w.slots.includes(p.slot)) fail(`시간대는 ${w.slots.join(", ")} 중에서 골라 주세요`);
   const t = templateOf(p.template ?? w.defaultTemplate);
   const title = s(p.title, 80), category = s(p.category, 20) || w.categories[0] || "";
   let data: PostData | null = null;
@@ -128,14 +128,14 @@ export const requiredChecks = (w: Workspace) => [...DEFAULT_CHECKS, ...(w.brief?
 /** 상태는 NEXT_STATUS 길로만. 승인은 저장된 내용 + 체크리스트를 모두 체크, 게시는 승인된 것 + 인스타 링크 */
 export async function setStatus(id: string, status: PostStatus, postedUrl?: string, opts: { checks?: string[]; by?: string } = {}) {
   const cur = (await getPost(id)) ?? fail("게시물을 찾지 못했어요");
-  if (!POST_STATUS.includes(status)) fail("모르는 상태예요");
-  if (!NEXT_STATUS[cur.status].includes(status)) fail(`${cur.status} 에서 ${status} 로는 바꿀 수 없어요 (가능: ${NEXT_STATUS[cur.status].join(", ") || "없음"})`);
+  if (!POST_STATUS.includes(status)) fail("상태 값이 맞지 않아요");
+  if (!NEXT_STATUS[cur.status].includes(status)) fail(NEXT_STATUS[cur.status].length ? `지금 상태(${cur.status})에서는 ${NEXT_STATUS[cur.status].join(", ")} 로만 바꿀 수 있어요` : `지금 상태(${cur.status})에서는 상태를 바꿀 수 없어요`);
   const to: PostStatus = cur.status === "skip" && !cur.data ? "plan" : status;
-  if (to !== "skip" && to !== "plan" && !cur.data) fail("저장된 내용이 없어요");
+  if (to !== "skip" && to !== "plan" && !cur.data) fail("저장된 내용이 없어요. 글을 먼저 저장해 주세요");
   // '샘플로 시작'의 자리 표시 그림이 남아 있으면 승인·게시하지 않는다
   if ((to === "approved" || to === "posted") && cur.data?.photos.some((p) => /^\/samples\//.test(p.url))) fail("샘플 그림이 남아 있어요. 실제 사진으로 바꾼 뒤 승인해 주세요");
   const url = (postedUrl ?? "").trim();
-  if (to === "posted" && !/^https:\/\/(www\.)?instagram\.com\/(p|reel)\/[A-Za-z0-9_-]+\/?/.test(url)) fail("게시 링크(https://www.instagram.com/p/…)가 필요해요");
+  if (to === "posted" && !/^https:\/\/(www\.)?instagram\.com\/(p|reel)\/[A-Za-z0-9_-]+\/?/.test(url)) fail("인스타 게시물 링크(https://www.instagram.com/p/…)를 넣어 주세요");
   const patch: Partial<Post> = { status: to };
   // 초안 → 승인: 체크리스트를 모두 체크해야 (게시 취소로 돌아온 승인은 이미 체크한 것)
   if (to === "approved" && cur.status === "draft") {
@@ -163,7 +163,7 @@ export async function checklistOf(postId: string) {
   return {
     required: requiredChecks(w),
     auto: [
-      ...(warns.length ? warns.map((x) => ({ ok: false, text: ruleLine(x) })) : [{ ok: true, text: "콘텐츠 규칙 경고 없음" }]),
+      ...(warns.length ? warns.map((x) => ({ ok: false, text: ruleLine(x) })) : [{ ok: true, text: "콘텐츠 규칙 경고가 없어요" }]),
       ...(unsure.length ? unsure.map((r) => ({ ok: false, text: `'확인 필요' 자료: ${r.title}`, researchId: r.id })) : []),
     ],
     review: p.review ?? null,
@@ -195,7 +195,7 @@ export async function updateBrief(id: string, p: Partial<Record<keyof Brief, unk
     rules: has("rules") ? rulesOf(p.rules) : b.rules,
     checklist: has("checklist") ? list(p.checklist, CHECKS_MAX, 80).filter((x) => !(DEFAULT_CHECKS as readonly string[]).includes(x)) : b.checklist,
   };
-  if (brief.link && !/^https?:\/\//.test(brief.link)) fail("링크는 http(s):// 로 시작해요");
+  if (brief.link && !/^https?:\/\//.test(brief.link)) fail("링크는 http:// 나 https:// 로 시작하게 적어 주세요");
   return upsertWorkspace({ ...w, brief });
 }
 
@@ -215,7 +215,7 @@ export async function setPillars(id: string, input: unknown) {
     });
   }
   const total = pillars.reduce((a, p) => a + p.share, 0);
-  if (pillars.length && total !== 100) fail(`기둥 비중 합이 100%여야 해요 (지금 ${total}%)`);
+  if (pillars.length && total !== 100) fail(`기둥 비중을 더해 100%가 되게 맞춰 주세요 (지금 ${total}%)`);
   const categories = [...new Set([...pillars.map((p) => p.name), ...w.categories])].slice(0, 20);
   return upsertWorkspace({ ...w, pillars, categories });
 }
@@ -255,8 +255,8 @@ export async function updateIdea(id: string, p: { title?: unknown; pillar?: unkn
     if (p.angle !== undefined) it.angle = s(p.angle, 1000);
     if (p.template !== undefined) it.template = templateOf(s(p.template, 30)).id;
     if (p.status !== undefined) {
-      if (!IDEA_STATUS.includes(p.status as IdeaStatus)) fail("모르는 상태예요");
-      if (p.status === "planned") fail("제작에 넣기로 바꿔 주세요");
+      if (!IDEA_STATUS.includes(p.status as IdeaStatus)) fail("상태 값이 맞지 않아요");
+      if (p.status === "planned") fail("제작에 넣으려면 '제작에 넣기'를 써 주세요");
       if (it.status === "planned" && it.postId && db.posts.some((x) => x.id === it.postId && !x.archivedAt)) fail("이미 제작에 들어간 주제예요. 게시물을 보관함으로 뺀 뒤 바꿀 수 있어요");
       it.status = p.status as IdeaStatus;
       if (it.status === "approved") { it.approvedBy = s(by, 30) || "?"; it.approvedAt = new Date().toISOString(); }
@@ -304,7 +304,7 @@ export async function scheduleIdea(id: string, at?: { day?: unknown; slot?: unkn
   const refs = it.research.map((rid) => db.research.find((r) => r.id === rid)).filter((r): r is Research => !!r);
   const note = [it.angle, refs.length ? `자료: ${refs.map((r) => `${r.title}${r.url ? ` ${r.url}` : ""}`).join(" / ")}` : ""].filter(Boolean).join("\n").slice(0, 500);
   const r = await createPostIn(it.workspace, { day: spot!.day, slot: spot!.slot, template: it.template, title: it.title, category: it.pillar, note });
-  if (!r.created) fail(`D${spot!.day} ${spot!.slot} 칸에는 이미 게시물이 있어요`);
+  if (!r.created) fail(`D${spot!.day} ${spot!.slot} 칸에는 이미 게시물이 있어요. 다른 칸을 골라 주세요`);
   await mutate((d) => { const x = d.ideas.find((y) => y.id === id)!; x.status = "planned"; x.postId = r.post.id; x.updatedAt = new Date().toISOString(); });
   return r.post;
 }
@@ -315,7 +315,7 @@ export async function scheduleIdeas(ids: string[], from?: number) {
   let day = Math.max(1, Math.round(Number(from)) || 1);
   for (const id of ids.slice(0, 30)) {
     const it = (await getIdea(id)) ?? fail("아이디어를 찾지 못했어요");
-    if (it.status !== "approved") fail(`'${it.title}'은 아직 승인 전이에요`);
+    if (it.status !== "approved") fail(`'${it.title}' 주제는 아직 승인 전이에요. 승인한 주제만 제작에 넣을 수 있어요`);
     const spot = await ensureSlot(it.workspace, day);
     out.push(await scheduleIdea(id, spot));
     day = spot.day + 1;
@@ -331,7 +331,7 @@ export async function addResearch(wsId: string, p: { title: unknown; url?: unkno
   const w = (await getWorkspace(wsId)) ?? fail("서비스를 찾지 못했어요");
   const title = s(p.title, 120), url = s(p.url, 500);
   if (!title) fail("자료 제목을 적어 주세요");
-  if (url && !/^https:\/\/[^\s"'<>]+$/.test(url)) fail("출처 주소는 https:// 로 시작해요");
+  if (url && !/^https:\/\/[^\s"'<>]+$/.test(url)) fail("출처 주소는 https:// 로 시작하게 적어 주세요");
   return mutate((db) => {
     if (db.research.filter((x) => x.workspace === w.id).length >= RESEARCH_MAX) fail(`자료는 서비스마다 ${RESEARCH_MAX}개까지예요`);
     const r: Research = { id: newId(), workspace: w.id, title, url, summary: s(p.summary, 2000), memo: s(p.memo, 500), tags: list(p.tags, 10, 20), confidence: confOf(p.confidence), by: p.by ?? "user", createdAt: new Date().toISOString() };
@@ -344,7 +344,7 @@ export async function updateResearch(id: string, p: { title?: unknown; url?: unk
   return mutate((db) => {
     const r = db.research.find((x) => x.id === id) ?? fail("자료를 찾지 못했어요");
     if (p.title !== undefined) r.title = s(p.title, 120) || r.title;
-    if (p.url !== undefined) { const u = s(p.url, 500); if (u && !/^https:\/\/[^\s"'<>]+$/.test(u)) fail("출처 주소는 https:// 로 시작해요"); r.url = u; }
+    if (p.url !== undefined) { const u = s(p.url, 500); if (u && !/^https:\/\/[^\s"'<>]+$/.test(u)) fail("출처 주소는 https:// 로 시작하게 적어 주세요"); r.url = u; }
     if (p.summary !== undefined) r.summary = s(p.summary, 2000);
     if (p.memo !== undefined) r.memo = s(p.memo, 500);
     if (p.tags !== undefined) r.tags = list(p.tags, 10, 20);
@@ -369,9 +369,9 @@ async function emptySpot(wsId: string, day: unknown, slot: unknown) {
   const w = (await getWorkspace(wsId)) ?? fail("서비스를 찾지 못했어요");
   if (day === undefined || slot === undefined || day === "" || slot === "") return (await nextEmptySlot(wsId)) ?? fail("빈 칸이 없어요. 설정에서 일수를 늘려 주세요");
   const d = Math.round(Number(day)), sl = String(slot);
-  if (!(d >= 1 && d <= w.days)) fail(`일차는 1~${w.days}예요`);
-  if (!w.slots.includes(sl)) fail(`시간대는 ${w.slots.join(", ")} 중 하나예요`);
-  if ((await listPosts(wsId)).some((p) => p.day === d && p.slot === sl)) fail(`D${d} ${sl} 칸에는 이미 게시물이 있어요`);
+  if (!(d >= 1 && d <= w.days)) fail(`일차는 1~${w.days} 사이로 골라 주세요`);
+  if (!w.slots.includes(sl)) fail(`시간대는 ${w.slots.join(", ")} 중에서 골라 주세요`);
+  if ((await listPosts(wsId)).some((p) => p.day === d && p.slot === sl)) fail(`D${d} ${sl} 칸에는 이미 게시물이 있어요. 다른 칸을 골라 주세요`);
   return { day: d, slot: sl };
 }
 
@@ -410,7 +410,7 @@ export async function restorePost(id: string, to: { day?: unknown; slot?: unknow
 /** 게시 성과 적기 (게시된 것만). 숫자는 0 이상 정수 */
 export async function setMetrics(id: string, m: Partial<Record<keyof Metrics, unknown>>) {
   const p = (await getPost(id)) ?? fail("게시물을 찾지 못했어요");
-  if (p.status !== "posted") fail("게시된 게시물에만 성과를 적어요");
+  if (p.status !== "posted") fail("성과는 게시한 게시물에만 적을 수 있어요");
   const n = (v: unknown, d: number) => (v === undefined || v === "" ? d : Math.max(0, Math.min(1e9, Math.round(Number(v)) || 0)));
   const o = p.metrics;
   const metrics: Metrics = { reach: n(m.reach, o?.reach ?? 0), likes: n(m.likes, o?.likes ?? 0), comments: n(m.comments, o?.comments ?? 0), saves: n(m.saves, o?.saves ?? 0), shares: n(m.shares, o?.shares ?? 0), follows: n(m.follows, o?.follows ?? 0), at: new Date().toISOString() };
@@ -495,7 +495,7 @@ export async function applyShareSuggestion(wsId: string, from: string, to: strin
 /** 제안 적용: 후속편을 주제로 (검수 대기) */
 export async function followUpIdea(postId: string, by: Idea["by"] = "user") {
   const p = (await getPost(postId)) ?? fail("게시물을 찾지 못했어요");
-  return createIdea(p.workspace, { title: `${p.title} 후속편`.slice(0, 80), pillar: p.category, angle: `저장률이 높았던 '${p.title}'(D${p.day})의 후속. 같은 독자에게 한 걸음 더`, template: p.template, by });
+  return createIdea(p.workspace, { title: `${p.title} 후속편`.slice(0, 80), pillar: p.category, angle: `저장률이 높았던 '${p.title}'(D${p.day})에 이어 써요. 같은 독자에게 한 걸음 더 들어가요`, template: p.template, by });
 }
 export async function dismissSuggestion(wsId: string, key: string) {
   return mutate((db) => {
@@ -540,8 +540,8 @@ const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 /** 멤버 더하기. 처음 보는 이메일이면 계정을 만들고 임시 비밀번호를 한 번 돌려준다 (소유자가 직접 전한다) */
 export async function addMember(wsId: string, p: { email: unknown; name?: unknown; role: unknown }) {
   const email = s(p.email, 120).toLowerCase(), name = s(p.name, 30), role = p.role as Role;
-  if (!EMAIL.test(email)) fail("이메일 형식이 맞지 않아요");
-  if (!ROLES.includes(role)) fail("역할이 맞지 않아요");
+  if (!EMAIL.test(email)) fail("이메일 주소를 다시 확인해 주세요 (예: name@example.com)");
+  if (!ROLES.includes(role)) fail("역할은 소유자·편집자·검수자 중에서 골라 주세요");
   let temp: string | null = null;
   const out = await mutate((db) => {
     const w = db.workspaces.find((x) => x.id === wsId) ?? fail("서비스를 찾지 못했어요");
@@ -561,11 +561,11 @@ export async function addMember(wsId: string, p: { email: unknown; name?: unknow
 }
 
 export async function setMemberRole(wsId: string, userId: string, role: unknown) {
-  if (!ROLES.includes(role as Role)) fail("역할이 맞지 않아요");
+  if (!ROLES.includes(role as Role)) fail("역할은 소유자·편집자·검수자 중에서 골라 주세요");
   return mutate((db) => {
     const w = db.workspaces.find((x) => x.id === wsId) ?? fail("서비스를 찾지 못했어요");
     const m = w.members?.find((x) => x.userId === userId) ?? fail("함께 쓰는 사람이 아니에요");
-    if (m.role === "owner" && role !== "owner" && w.members!.filter((x) => x.role === "owner").length === 1) fail("소유자가 한 명은 있어야 해요");
+    if (m.role === "owner" && role !== "owner" && w.members!.filter((x) => x.role === "owner").length === 1) fail("소유자는 한 명 이상 있어야 해요. 다른 사람을 먼저 소유자로 바꿔 주세요");
     m.role = role as Role;
     return m;
   });
@@ -576,7 +576,7 @@ export async function removeMember(wsId: string, userId: string) {
   return mutate((db) => {
     const w = db.workspaces.find((x) => x.id === wsId) ?? fail("서비스를 찾지 못했어요");
     const m = w.members?.find((x) => x.userId === userId) ?? fail("함께 쓰는 사람이 아니에요");
-    if (m.role === "owner" && w.members!.filter((x) => x.role === "owner").length === 1) fail("마지막 소유자는 뺄 수 없어요");
+    if (m.role === "owner" && w.members!.filter((x) => x.role === "owner").length === 1) fail("마지막 소유자는 뺄 수 없어요. 다른 사람을 먼저 소유자로 바꿔 주세요");
     w.members = w.members!.filter((x) => x.userId !== userId);
     return m;
   });
@@ -595,10 +595,10 @@ export async function resetMemberPassword(wsId: string, userId: string) {
 }
 
 export async function changePassword(userId: string, current: string, next: string) {
-  if (next.length < 10) fail("새 비밀번호는 10자 이상이에요");
+  if (next.length < 10) fail("새 비밀번호는 10자 이상으로 정해 주세요");
   return mutate((db) => {
     const u = db.users.find((x) => x.id === userId) ?? fail("계정을 찾지 못했어요");
-    if (!verifyPassword(current, u.pass)) fail("지금 비밀번호가 맞지 않아요");
+    if (!verifyPassword(current, u.pass)) fail("지금 비밀번호가 맞지 않아요. 다시 확인해 주세요");
     u.pass = hashPassword(next);
     return u;
   });
@@ -606,7 +606,7 @@ export async function changePassword(userId: string, current: string, next: stri
 
 /** 요금제 바꾸기 (결제 연결 전이라 운영자만 — 부르는 쪽에서 확인) */
 export async function setPlan(wsId: string, plan: unknown) {
-  if (!(["free", "pro", "agency"] as unknown[]).includes(plan)) fail("모르는 요금제예요");
+  if (!(["free", "pro", "agency"] as unknown[]).includes(plan)) fail("요금제는 무료·프로·에이전시 중에서 골라 주세요");
   return mutate((db) => {
     const w = db.workspaces.find((x) => x.id === wsId) ?? fail("서비스를 찾지 못했어요");
     w.plan = plan as PlanId;
@@ -620,7 +620,7 @@ export async function countAi(wsId: string, unlimited = false) {
     const w = db.workspaces.find((x) => x.id === wsId) ?? fail("서비스를 찾지 못했어요");
     const m = thisMonth(), plan = planOf(w.plan);
     const used = w.usage?.month === m ? w.usage.ai : 0;
-    if (!unlimited && used >= plan.aiPerMonth) fail(`이번 달 AI 사용 한도(${plan.aiPerMonth}번)를 다 썼어요`);
+    if (!unlimited && used >= plan.aiPerMonth) fail(`이번 달 AI 사용 한도(${plan.aiPerMonth}번)를 다 썼어요. 다음 달에 다시 쓸 수 있어요`);
     w.usage = { month: m, ai: used + 1, video: w.usage?.month === m ? w.usage.video ?? 0 : 0 };
     return w.usage;
   });
@@ -633,7 +633,7 @@ export async function countVideo(wsId: string, unlimited = false, peek = false) 
     const m = thisMonth(), plan = planOf(w.plan);
     const same = w.usage?.month === m;
     const used = same ? w.usage!.video ?? 0 : 0;
-    if (!unlimited && used >= plan.videoPerMonth) fail(`이번 달 AI 영상 한도(${plan.videoPerMonth}편)를 다 썼어요`);
+    if (!unlimited && used >= plan.videoPerMonth) fail(`이번 달 AI 영상 한도(${plan.videoPerMonth}편)를 다 썼어요. 다음 달에 다시 만들 수 있어요`);
     if (peek) return w.usage;
     w.usage = { month: m, ai: same ? w.usage!.ai : 0, video: used + 1 };
     return w.usage;

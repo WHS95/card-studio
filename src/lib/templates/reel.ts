@@ -9,7 +9,7 @@ export const reel: Template = {
   format: "reel",
   videoMax: 90,
   inspired: "말하는 영상 위에 판을 두고 자막을 크게 띄우는 정보 릴스",
-  description: "9:16 릴스. 위 판(로고·자막) + 아래 영상 / 영상 가득 + 자막. 자막은 초마다 바뀌어요",
+  description: "9:16 릴스. 위 판(로고·자막) + 아래 영상 / 영상 가득 + 자막. 자막은 정한 초에 바뀌어요",
   maxSlides: 1,
   kinds: [
     { kind: "reel", label: "릴스", fixed: true, fields: [

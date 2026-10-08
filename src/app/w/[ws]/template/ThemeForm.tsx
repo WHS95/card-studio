@@ -51,14 +51,14 @@ export default function ThemeForm({ ws, v, canEdit, defaultTemplate, theme, temp
     return () => clearTimeout(t);
   }, [tpl, c, wm, ws, canEdit]);
   const setColor = (k: keyof Colors) => (val: string) => setC((x) => ({ ...x, [k]: val }));
-  const status = !canEdit ? "색·틀은 소유자가 바꿔요" : pending ? "저장하는 중…" : st?.ok ? `저장됨 · ${st.at}` : "바꾸면 자동 저장";
+  const status = !canEdit ? "색·틀은 소유자가 바꿔요" : pending ? "저장하는 중…" : st?.ok ? `${st.at}에 저장했어요` : "바꾸면 바로 저장돼요";
   const cf = (k: keyof Colors, label: string, note?: string, compact?: boolean) => <ColorField label={label} note={note} value={c[k]} onChange={setColor(k)} disabled={!canEdit} compact={compact} />;
 
   return (
     <>
       <div className="col">
         <h1>템플릿</h1>
-        <span className="small muted" role="status" aria-live="polite">이 서비스의 기본 틀과 카드 색. 바꾸면 미리보기가 바로 바뀌고 자동 저장돼요 · {st?.error && canEdit && !pending ? <span className="err">{st.error}</span> : status}</span>
+        <span className="small muted" role="status" aria-live="polite">이 서비스의 기본 틀과 카드 색을 정해요. 바꾸면 미리보기에 바로 보여요 · {st?.error && canEdit && !pending ? <span className="err">{st.error}</span> : status}</span>
       </div>
       <form className="panel" onSubmit={(e) => e.preventDefault()}>
         <section className="sect"><h2>기본 틀 <Link className="btn sp" href={`/templates?ws=${ws}`}>갤러리에서 더 보기</Link></h2>
@@ -72,14 +72,14 @@ export default function ThemeForm({ ws, v, canEdit, defaultTemplate, theme, temp
               </label>
             ))}
           </div>
-          <p className="small muted stg-p">콘텐츠 규칙 &apos;정한 틀만 쓰기&apos;가 켜져 있으면 다른 틀은 편집기에서 경고가 떠요. 기둥마다 기본 틀은 1 목적 탭에서.</p>
+          <p className="small muted stg-p">콘텐츠 규칙 &apos;정한 틀만 쓰기&apos;가 켜져 있으면 다른 틀을 쓸 때 편집기에서 알려 줘요. 기둥마다 기본 틀은 1 목적 탭에서 정해요.</p>
         </section>
         <section className="sect"><h2>카드 색</h2>
           <div className="stg-colors">
             {cf("dark", "어두운 바탕", "표지·어두운 장")}{cf("light", "밝은 바탕", "밝은 장·어두운 장 위 글자")}{cf("ink", "글자", "밝은 장 위 글자")}
             {cf("muted", "보조 글자", "작은 글")}{cf("accent", "강조색", "==강조== 채움 · 버튼")}{cf("onAccent", "강조색 위 글자", "채움 위 글자")}
           </div>
-          <p className="small muted stg-p">강조색은 채움으로 써요(그 위 글자 = 강조색 위 글자). &apos;강조색 글자&apos;는 장마다 고를 수 있고, 강조색이 밝으면 밝은 바탕에선 채움으로 바뀌어요.</p>
+          <p className="small muted stg-p">강조색은 바탕 채움으로 써요(그 위 글자는 &apos;강조색 위 글자&apos; 색). &apos;강조색 글자&apos;는 장마다 고를 수 있어요. 강조색이 밝으면 밝은 바탕에서는 채움으로 그려요.</p>
         </section>
         <section className="sect"><h2>워드마크</h2>
           <div className="stg-wm">

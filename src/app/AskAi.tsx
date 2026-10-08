@@ -16,10 +16,10 @@ export default function AskAi({ prompt, label = "내 AI 구독으로 하기" }: 
       <div className="row">
         <a className="btn" href={`https://claude.ai/new?q=${q}`} target="_blank" rel="noreferrer">Claude 에서</a>
         <a className="btn" href={`https://chatgpt.com/?q=${q}`} target="_blank" rel="noreferrer">ChatGPT 에서</a>
-        <button type="button" className="btn" onClick={async () => { setCopied((await copyText(prompt)) ? "ok" : "fail"); setTimeout(() => setCopied(""), 2500); }}>{copied === "ok" ? "복사했어요" : copied === "fail" ? "복사가 막혔어요" : "요청 복사"}</button>
+        <button type="button" className="btn" onClick={async () => { setCopied((await copyText(prompt)) ? "ok" : "fail"); setTimeout(() => setCopied(""), 2500); }}>{copied === "ok" ? "복사했어요" : copied === "fail" ? "복사하지 못했어요" : "요청 복사"}</button>
       </div>
       {copied === "fail" && <textarea className="input" rows={3} readOnly value={prompt} onFocus={(e) => e.currentTarget.select()} aria-label="직접 선택해 복사" />}
-      <span className="small muted">그 앱에 이 스튜디오를 커넥터로 연결해 두어야 해요 — <a href="/connect">AI 앱 연결</a></span>
+      <span className="small muted">그 앱에 이 스튜디오를 커넥터로 연결하면 쓸 수 있어요 — <a href="/connect">AI 앱 연결</a></span>
     </div>
   );
 }

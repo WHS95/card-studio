@@ -27,8 +27,8 @@ export default async function Insights({ params, searchParams }: PageProps<"/w/[
         ))}
         {!ins.due.length && <p className="small muted mk-due">지금 적을 게시물이 없어요.</p>}
       </section>
-      <div className="mk-h"><b>다음 기획 제안</b><span className="small muted">성과 적은 게시물 {Math.min(ins.measured, ins.suggestFrom)}/{ins.suggestFrom} · {ins.suggestFrom}편부터 떠요 · 적용은 사람이</span></div>
-      {ins.measured < ins.suggestFrom && <p className="small muted" style={{ margin: 0 }}>{ins.suggestFrom - ins.measured}편 더 적으면 기둥 비중·후속편 제안이 떠요. 인스타 연결이 없어서 숫자는 사람이 인사이트를 보고 옮겨 적어요.</p>}
+      <div className="mk-h"><b>다음 기획 제안</b><span className="small muted">성과 적은 게시물 {Math.min(ins.measured, ins.suggestFrom)}/{ins.suggestFrom} · {ins.suggestFrom}편부터 떠요 · 적용은 직접 골라요</span></div>
+      {ins.measured < ins.suggestFrom && <p className="small muted" style={{ margin: 0 }}>{ins.suggestFrom - ins.measured}편 더 적으면 기둥 비중·후속편 제안이 떠요. 숫자는 인스타 인사이트를 보고 직접 옮겨 적어요.</p>}
       {ins.suggestions.length > 0 && <div className="mk-sugs">
         {ins.suggestions.map((sg) => (
           <form key={sg.key} action={suggestionAction} className="mk-sug">
@@ -52,7 +52,7 @@ export default async function Insights({ params, searchParams }: PageProps<"/w/[
           <div className="mk-scroll"><table className="mk-table"><thead><tr><th>게시물</th><th>기둥</th><th>도달</th><th>저장률</th><th>참여율</th></tr></thead>
             <tbody>{ins.top.map((p) => <tr key={p.id}><td><Link href={`/w/${w.id}/p/${p.id}`}>D{p.day} {p.slot} · {p.title || "제목 없음"}</Link></td><td>{p.category}</td><td>{p.reach.toLocaleString()}</td><td>{p.saveRate}%</td><td>{p.engagement}%</td></tr>)}</tbody></table></div>
         </section>
-      </> : <p className="hint">아직 기록된 성과가 없어요. 게시된 게시물 편집기 아래 &apos;게시 성과&apos;에 숫자를 적어 주세요.</p>}
+      </> : <p className="hint">게시한 게시물의 편집기 아래 &apos;게시 성과&apos;에 숫자를 적으면 여기서 비교해요.</p>}
     </ServiceShell>
   );
 }

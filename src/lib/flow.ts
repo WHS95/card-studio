@@ -28,12 +28,12 @@ export async function flowOf(w: Workspace) {
   const check = research.filter((r) => r.confidence === "check").length;
   const drafts = n("draft"), plans = n("plan"), ok = n("approved"), posted = n("posted");
   const raw: Record<StepKey, [StepState, number, string]> = {
-    brief: briefDone(w.brief) && pillarsOk ? ["done", 0, "브리프·기둥이 채워졌어요"] : ["todo", 0, "브리프(소개·대상·말투)와 기둥 비중 100%를 채워 주세요"],
-    research: research.length === 0 ? ["todo", 0, "자료를 하나 이상 모아 주세요"] : check ? ["doing", research.length, `확인 필요 자료 ${check}건`] : ["done", research.length, `자료 ${research.length}건`],
-    ideas: review ? ["todo", review, `주제 ${review}개가 검수를 기다려요`] : approved ? ["doing", approved, `승인 ${approved}개가 제작을 기다려요`] : ideas.length ? ["done", 0, "검수할 주제가 없어요"] : ["todo", 0, "주제를 하나 이상 내 주세요"],
-    template: ["done", 0, `기본 틀이 정해져 있어요`],
+    brief: briefDone(w.brief) && pillarsOk ? ["done", 0, "브리프와 기둥을 채웠어요"] : ["todo", 0, "브리프(소개·대상·말투)와 기둥 비중 100%를 채워 주세요"],
+    research: research.length === 0 ? ["todo", 0, "자료를 하나 이상 모아 주세요"] : check ? ["doing", research.length, `확인할 자료가 ${check}건 있어요`] : ["done", research.length, `자료 ${research.length}건`],
+    ideas: review ? ["todo", review, `주제 ${review}개가 검수를 기다려요`] : approved ? ["doing", approved, `승인한 주제 ${approved}개가 제작을 기다려요`] : ideas.length ? ["done", 0, "검수할 주제가 없어요"] : ["todo", 0, "주제를 하나 이상 내 주세요"],
+    template: ["done", 0, "기본 틀을 정했어요"],
     make: plans + drafts ? ["doing", plans + drafts, `기획 ${plans} · 초안 ${drafts}`] : posts.length ? ["done", 0, "만들 게시물이 없어요"] : ["todo", 0, "승인한 주제를 제작에 넣어 주세요"],
-    review: drafts ? ["doing", drafts, `초안 ${drafts}편이 승인을 기다려요`] : ["done", ok, ok ? `승인 ${ok}편 · 골라서 내려받기` : "승인 기다리는 초안이 없어요"],
+    review: drafts ? ["doing", drafts, `초안 ${drafts}편이 승인을 기다려요`] : ["done", ok, ok ? `승인한 ${ok}편을 골라 내려받을 수 있어요` : "승인을 기다리는 초안이 없어요"],
     publish: ok ? ["doing", ok, `승인 ${ok}편이 올릴 차례예요`] : ["done", posted, posted ? `게시 ${posted}편` : "올릴 차례인 게시물이 없어요"],
     insights: due ? ["todo", due, `게시 ${w.metricsDays ?? 7}일 지난 ${due}편 성과를 적어 주세요`] : ["done", 0, "적을 성과가 없어요"],
   };

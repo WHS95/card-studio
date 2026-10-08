@@ -111,7 +111,7 @@ export const RULE_LABEL: Record<keyof ContentRules, { label: string; note: strin
   templateOnly: { label: "정한 틀만 쓰기", note: "서비스 기본 틀과 다른 템플릿이면 경고" },
   coverQuestion: { label: "표지는 질문형", note: "표지 제목이 '?'로 끝나지 않으면 경고" },
   ctaComment: { label: "마지막 장 댓글 유도", note: "마지막 장 글에 '댓글'이 없으면 경고" },
-  uxWriting: { label: "문구 규칙 (UX 라이팅)", note: "해요체·쉬운 말·강요·과장 없이 — 장 글과 캡션을 자동으로 살펴 경고 (기본 켜짐, docs/WRITING.md)" },
+  uxWriting: { label: "문구 규칙 (UX 라이팅)", note: "장 글과 캡션이 해요체·쉬운 말로 쓰였는지, 강요·과장은 없는지 살펴 경고 (기본 켜짐)" },
 };
 /** 승인 체크리스트 기본 항목 (모든 서비스 공통, 뺄 수 없다) */
 export const DEFAULT_CHECKS = [

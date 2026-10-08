@@ -18,7 +18,7 @@ import { checkPost } from "./check";
 import { fullCaption, slideFile } from "./exporter";
 import { zip } from "./zip";
 import { SAFE } from "./render/kit";
-import { NEXT_STATUS, POST_STATUS, type Photo, type Post, type PostData, type PostStatus } from "./types";
+import { NEXT_STATUS, POST_STATUS, STATUS_LABEL, type Photo, type Post, type PostData, type PostStatus } from "./types";
 
 // MCP 도구: 화면과 같은 규칙(ops.ts)으로만 고친다. 삭제·인스타 업로드 도구는 일부러 없다.
 // 파일은 card-studio/exports/ 안에만 쓴다. 이 Mac 파일 가져오기는 내용(앞 바이트)으로 사진·영상만 받는다.
@@ -61,7 +61,7 @@ async function thumb(file: string, video: boolean): Promise<Content | null> {
 const PLAN_TOOLS: Tool[] = [
   {
     name: "generate_video",
-    description: `카드에 넣을 AI 영상 만들기 (Google Veo, 'AI 연동'의 Gemini 키 필요, 요금 발생). 시작만 하고 job 번호를 돌려준다 → get_video_job 으로 10초쯤마다 확인 (보통 1~3분). 결과는 이 서비스에 올린 영상(photo)으로 저장 — update_post 로 data.photos 에 넣고 video:true 사진 칸에서 고른다.
+    description: `카드에 넣을 AI 영상 만들기 (Google Veo, 설정 · AI 의 Gemini 키 필요, 요금 발생). 시작만 하고 job 번호를 돌려준다 → get_video_job 으로 10초쯤마다 확인 (보통 1~3분). 결과는 이 서비스에 올린 영상(photo)으로 저장 — update_post 로 data.photos 에 넣고 video:true 사진 칸에서 고른다.
 mode: ${VEO_MODES.map((m) => `${m.id}=${m.label}(${m.note})`).join(" · ")}.
 · image: firstFrame · frames: firstFrame+lastFrame · reference: references(1~3) · extend: extendFrom(이 스튜디오에서 Veo 로 만든 영상 주소, 2일 안). 사진 주소는 이 서비스에 올린 /uploads/<ws>/…jpg|png.
 model: ${VEO_MODELS.map((m) => m.id).join(" · ")} (기본 lite; frames·reference·extend 는 lite 불가라 fast 로 바뀜, 8초로 맞춤). aspect 9:16(기본)|16:9, duration 4|6|8, resolution 720p|1080p(1080p 는 8초). 실제 사람·브랜드를 흉내 내지 않는다.`,
@@ -194,7 +194,7 @@ model: ${VEO_MODELS.map((m) => m.id).join(" · ")} (기본 lite; frames·referen
   },
   {
     name: "add_research",
-    description: "자료 더하기 (최대 20). 각 {title(120), url(https, 실제로 연 출처만), summary(2000, 카드에 쓸 핵심 사실), memo, tags[], confidence(high=공식·학술 원문을 직접 확인 | medium=2차 요약·블로그(기본) | check=원문 대조 전)}. 웹에서 찾은 내용은 반드시 출처 주소를 붙인다.",
+    description: "자료 더하기 (최대 20). 각 {title(120), url(https, 실제로 연 출처만), summary(2000, 카드에 쓸 핵심 사실), memo, tags[], confidence(high=공식·학술 원문을 직접 확인 | medium=2차 요약·블로그(기본) | check=원문 대조 전)}. 웹에서 찾은 내용은 꼭 출처 주소를 붙인다.",
     inputSchema: obj({ ws: str, items: { type: "array", items: obj({ title: str, url: str, summary: str, memo: str, tags: { type: "array", items: str }, confidence: { type: "string", enum: ["high", "medium", "check"] } }, ["title"]) } }, ["ws", "items"]),
     run: async (a) => { const out = []; for (const x of (a.items as Json[]).slice(0, 20)) out.push(await addResearch(String(a.ws), { ...x, by: "mcp" } as never)); return out; },
   },
@@ -302,7 +302,7 @@ export const TOOLS: Tool[] = [
       if (typeof a.filePath === "string" && a.filePath) photo = await importFile(ws, a.filePath);
       else if (typeof a.url === "string" && /^https:\/\/[^\s"'<>]+$/.test(a.url) && (a.save === true || /(^|\.)wikimedia\.org$/.test(new URL(a.url).hostname))) photo = { ...(await importUrl(ws, a.url, UA)), source: new URL(a.url).hostname.includes("wikimedia") ? "Wikimedia" : new URL(a.url).hostname };
       else if (typeof a.url === "string" && /^https:\/\/[^\s"'<>]+$/.test(a.url)) photo = { url: a.url.replace(/fm=webp/, "fm=jpg"), credit: "", source: new URL(a.url).hostname.includes("unsplash") ? "Unsplash" : new URL(a.url).hostname, kind: "image" };
-      else throw new OpError("url(https) 이나 filePath 중 하나가 필요해요");
+      else throw new OpError("url(https)이나 filePath 중 하나를 넣어 주세요");
       photo.credit = String(a.credit ?? photo.credit).slice(0, 60);
       if (a.source) photo.source = String(a.source).slice(0, 40);
       if (!a.postId) return { photo };
@@ -322,7 +322,7 @@ export const TOOLS: Tool[] = [
       const { p, w } = await postWs(String(a.id));
       const d = need(p.data, "내용이 없는 게시물이에요");
       const i = Number(a.n) - 1;
-      if (!(i >= 0 && i < d.slides.length)) throw new OpError(`장은 1~${d.slides.length}이에요`);
+      if (!(i >= 0 && i < d.slides.length)) throw new OpError(`n 은 1~${d.slides.length} 사이로 넣어 주세요`);
       const f = await slideFile(w, p, i);
       const dir = dirOf(p); await mkdir(dir, { recursive: true });
       const file = join(dir, f.name); await writeFile(file, f.data);
@@ -368,7 +368,7 @@ export const TOOLS: Tool[] = [
       await writeFile(join(dir, cap.name), cap.data);
       const z = join(dir, `${w.id}-D${p.day}-${p.slot.replace(":", "")}.zip`);
       await writeFile(z, zip([...files, cap]));
-      return { dir, files: [...files.map((f) => join(dir, f.name)), join(dir, cap.name)], zip: z, status: p.status, note: p.status === "approved" ? "승인된 게시물이에요" : "아직 승인 전이에요 — 업로드 전에 사람 검수가 필요해요" };
+      return { dir, files: [...files.map((f) => join(dir, f.name)), join(dir, cap.name)], zip: z, status: p.status, note: p.status === "approved" ? "승인된 게시물이에요" : "아직 승인 전이에요. 올리기 전에 사람이 검수해요" };
     },
   },
   ...PLAN_TOOLS,
@@ -402,7 +402,7 @@ async function wsOf(on: On, a: Json) {
 async function guard(name: string, a: Json, actor: Actor) {
   if (actor.kind === "admin") return;
   const g = GUARD[name];
-  if (g === "admin" || (name === "add_media" && a.filePath)) throw new OpError("이 도구(또는 Mac 파일 가져오기)는 운영자만 써요");
+  if (g === "admin" || (name === "add_media" && a.filePath)) throw new OpError("이 도구(또는 Mac 파일 가져오기)는 운영자만 쓸 수 있어요");
   if (!g) return; // list_workspaces·list_templates·validate_post·create_workspace 는 안에서 걸러진다
   if (name === "check_writing" && !a.id) return; // 글 하나만 검사 — 서비스 데이터를 읽지 않는다
   const w = await getWorkspace(await wsOf(g.on, a));
@@ -426,7 +426,7 @@ const ACT: Record<string, (a: Json, r: unknown) => [string, string[]] | null> = 
   schedule_ideas: (_a, r) => [`주제 ${(r as unknown[]).length}개를 제작에 넣었어요`, (r as { day: number; slot: string; title: string }[]).map((p) => `D${p.day} ${p.slot} · ${p.title}`)],
   create_post: (_a, r) => ["게시물을 만들었어요", [`${(r as { post: Post }).post.title}`]],
   update_post: (_a, r) => ["게시물을 고쳤어요", [`D${(r as Post).day} ${(r as Post).slot} · ${(r as Post).title}`]],
-  set_status: (a, r) => [`상태를 ${a.status}(으)로 바꿨어요`, [(r as Post).title]],
+  set_status: (a, r) => [`'${STATUS_LABEL[a.status as PostStatus] ?? a.status}' 상태로 바꿨어요`, [(r as Post).title]],
   update_brief: (a) => ["브리프를 고쳤어요", Object.keys((a.brief as Json) ?? {}).concat(a.pillars ? ["기둥"] : [])],
   update_workspace: () => ["서비스 설정을 고쳤어요", []],
   set_metrics: (a) => ["성과를 적었어요", [`도달 ${a.reach ?? "-"} · 저장 ${a.saves ?? "-"} · 댓글 ${a.comments ?? "-"}`]],
@@ -456,6 +456,6 @@ export async function callTool(name: string, args: Json, actor: Actor = { kind: 
   } catch (e) {
     if (e instanceof OpError) return { content: [{ type: "text", text: e.message }], isError: true };
     console.error(e);
-    return { content: [{ type: "text", text: "처리하지 못했어요 (서버 로그 확인)" }], isError: true };
+    return { content: [{ type: "text", text: "처리하지 못했어요. 서버 로그를 확인해 주세요" }], isError: true };
   }
 }

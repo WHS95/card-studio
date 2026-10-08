@@ -32,7 +32,7 @@ export default async function ResearchPage({ params, searchParams }: PageProps<"
   return (
     <ServiceShell ws={w} step="research" ctx="2단계 자료 조사">
         <div className="stg-head">
-          <div className="col stg-head-t"><h1>자료 조사</h1><span className="small muted">숫자·사실은 출처와 함께. 높음 = 공식·학술 원문 확인 · 보통 = 2차 요약·블로그 · 확인 필요 = 원문 대조 전 (승인 체크에 표시돼요)</span></div>
+          <div className="col stg-head-t"><h1>자료 조사</h1><span className="small muted">숫자·사실은 출처와 함께 적어요. 높음 = 공식·학술 원문을 확인함 · 보통 = 2차 요약·블로그 · 확인 필요 = 아직 원문과 맞춰 보지 않음 (승인 전 확인에 보여요)</span></div>
           {canEdit && <details className="stg-new" open={!all.length || undefined}>
             <summary className="btn primary">+ 자료 더하기</summary>
             <div className="cols2 stg-new-body">
@@ -85,7 +85,7 @@ export default async function ResearchPage({ params, searchParams }: PageProps<"
                 <div className="stg-card-t">
                   <b className="stg-title">{r.title}</b>
                   <span className={`pill${r.confidence === "check" ? " dark" : ""}`}>{CONF_LABEL[r.confidence ?? "medium"]}</span>
-                  <span className="small muted stg-right">아이디어 {used}</span>
+                  <span className="small muted stg-right">주제 {used}</span>
                 </div>
                 {r.url && <a className="small stg-url" href={r.url} target="_blank" rel="noreferrer">{r.url}</a>}
                 {r.summary && <p className="stg-text">{r.summary}</p>}
@@ -98,7 +98,7 @@ export default async function ResearchPage({ params, searchParams }: PageProps<"
                   </form>}
                   <form action={createIdeaAction}>
                     <input type="hidden" name="ws" value={w.id} /><input type="hidden" name="title" value={r.title.slice(0, 80)} /><input type="hidden" name="research" value={r.id} /><input type="hidden" name="angle" value={r.summary.slice(0, 1000)} /><input type="hidden" name="from" value="research" />
-                    <button className="btn">이 자료로 주제</button>
+                    <button className="btn">이 자료로 주제 더하기</button>
                   </form>
                   {canEdit && <details className="stg-edit"><summary className="btn">고치기</summary>
                     <form action={updateResearchAction} className="panel stg-edit-body">
@@ -120,7 +120,7 @@ export default async function ResearchPage({ params, searchParams }: PageProps<"
               </article>
             );
           })}
-          {!list.length && <p className="hint">{all.length ? "찾는 자료가 없어요" : "아직 자료가 없어요. 직접 더하거나 AI·MCP로 조사해 보세요."}</p>}
+          {!list.length && <p className="hint">{all.length ? "조건에 맞는 자료가 없어요. 거르기를 바꿔 보세요." : "'+ 자료 더하기'에서 직접 더하거나 AI·MCP로 조사해 보세요."}</p>}
         </div>
     </ServiceShell>
   );

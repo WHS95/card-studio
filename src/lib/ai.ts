@@ -239,7 +239,7 @@ export async function draftPostStream(w: Workspace, p: DraftInput, extra: string
   const finish = async (d: PostData, note?: string) => {
     // 문구 규칙에서 꼭 고칠 것이 있으면 한 번 다듬는다 (못 고치면 그대로)
     if (fixList(lintPost((k) => t.kinds.find((x) => x.kind === k), d))) {
-      emit({ t: "polish", reason: "문구 규칙에 맞게 다듬는 중" });
+      emit({ t: "polish", reason: "문구를 다듬고 있어요" });
       const better = await polishWriting(t, d, p.current, actor);
       if (better) d = better;
     }

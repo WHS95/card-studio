@@ -32,7 +32,7 @@ export default async function Templates({ searchParams }: PageProps<"/templates"
     <WideShell active="templates">
       <div className="w-pagehead">
         <h1>템플릿</h1>
-        <p className="small muted">서비스 테마로 그린 샘플이에요. 서비스를 고르면 그 색·워드마크로 보여요. 장 종류와 조절 항목은 카드 아래에. 사진은 추상 샘플 그림이라 실제 게시물에는 직접 찍은 사진이나 출처를 밝힌 무료 사진을 써요.</p>
+        <p className="small muted">서비스 테마로 그린 샘플이에요. 서비스를 고르면 그 색·워드마크로 보여요. 장 종류와 조절 항목은 카드 아래에 있어요. 사진은 추상 샘플 그림이라 실제 게시물에는 직접 찍은 사진이나 출처를 밝힌 무료 사진을 써요.</p>
       </div>
       {typeof q.error === "string" && <p className="err">{q.error}</p>}
       <div className="row">
@@ -51,7 +51,7 @@ export default async function Templates({ searchParams }: PageProps<"/templates"
           <article key={t.id} className="sect w-tpl" id={t.id}>
             <div className="w-tpl-head">
               <b className="w-tpl-name">{t.name}</b>
-              <span className="small muted">{sz.w}×{sz.h}{reel ? " · 릴스" : ""} · 최대 {t.maxSlides}장</span>
+              <span className="small muted">{sz.w}×{sz.h}{reel ? " · 릴스" : ""} · {t.maxSlides}장까지</span>
               {all.length > 0 && (
                 <form action={startFromTemplateAction} className="row w-tpl-go">
                   <input type="hidden" name="template" value={t.id} />
@@ -85,7 +85,7 @@ export default async function Templates({ searchParams }: PageProps<"/templates"
                   <tbody>{t.kinds.map((k) => (
                     <tr key={k.kind}>
                       <td><b>{k.label}</b>{k.fixed ? " (첫 장)" : ""}</td>
-                      <td>{k.fields.filter((f) => f.type === "text" || f.type === "photo" || f.type === "items").map((f) => f.type === "photo" ? `${f.label}${f.video ? "(영상 가능)" : ""}` : f.label).join(" · ")}</td>
+                      <td>{k.fields.filter((f) => f.type === "text" || f.type === "photo" || f.type === "items").map((f) => f.type === "photo" ? `${f.label}${f.video ? "(영상도)" : ""}` : f.label).join(" · ")}</td>
                       <td>{[...controls(k.fields), ...(k.fields.some((f) => f.type === "photo" && f.tune?.includes("h")) ? ["사진 높이"] : []), ...(k.fields.some((f) => f.type === "photo" && f.tune?.includes("y")) ? ["사진 위치"] : [])].join(" · ") || "—"}</td>
                     </tr>
                   ))}</tbody>
@@ -98,13 +98,13 @@ export default async function Templates({ searchParams }: PageProps<"/templates"
       <section className="sect" id="video">
         <h2>영상으로 만드는 세 가지</h2>
         <ol className="guide-steps">
-          <li><b>릴스 자막형</b> — 9:16 한 편. 위 판(로고·자막) + 아래 영상, 또는 영상 가득 + 자막. 자막마다 시작 초를 적으면 그 시간에 바뀌어요 (최대 90초).</li>
-          <li><b>캐러셀 안 영상 장</b> — 영상 가능한 사진 칸에 직접 올린 영상을 고르면 그 장은 MP4 가 돼요 (3~60초):
+          <li><b>릴스 자막형</b> — 9:16 한 편. 위 판(로고·자막) + 아래 영상, 또는 영상 가득 + 자막. 자막마다 시작 초를 적으면 그 시간에 바뀌어요 (90초까지).</li>
+          <li><b>캐러셀 안 영상 장</b> — 영상을 넣을 수 있는 사진 칸에서 직접 올린 영상을 고르면 그 장은 MP4 가 돼요 (3~60초):
             <span className="muted"> {TEMPLATES.filter((t) => formatOf(t) === "feed").map((t) => `${t.name}(${t.kinds.filter((k) => k.fields.some((f) => f.type === "photo" && f.video)).map((k) => k.label).join("·")})`).join(" · ")}</span></li>
-          <li><b>캐러셀 → 릴스</b> — 저장한 카드뉴스를 편집기의 &apos;릴스로 (MP4)&apos;로 받으면 장마다 3초씩 9:16 영상이 돼요 (영상 장은 그 길이 그대로, 소리 없음 — 음악은 인스타에서).</li>
+          <li><b>캐러셀 → 릴스</b> — 저장한 카드뉴스를 편집기의 &apos;릴스로 (MP4)&apos;로 받으면 장마다 3초씩 9:16 영상이 돼요 (영상 장은 원래 길이대로 들어가고 소리는 빠져요 — 음악은 인스타에서 넣어요).</li>
         </ol>
       </section>
-      {!all.length && <p className="hint">서비스를 먼저 만들면 그 서비스에 바로 만들 수 있어요.</p>}
+      {!all.length && <p className="hint">서비스를 만들면 여기서 바로 게시물을 시작할 수 있어요.</p>}
     </WideShell>
   );
 }

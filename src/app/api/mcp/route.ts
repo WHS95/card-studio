@@ -35,11 +35,11 @@ async function handle(m: Msg, actor: Actor, via: "mcp" | "ai") {
 export async function POST(req: Request) {
   if (badOrigin(req)) return new Response("forbidden", { status: 403 });
   const actor = await actorFromBearer(bearer(req));
-  if (!actor) return Response.json({ jsonrpc: "2.0", id: null, error: { code: -32001, message: "로그인이 필요해요 (토큰이 없거나 만료)" } }, {
+  if (!actor) return Response.json({ jsonrpc: "2.0", id: null, error: { code: -32001, message: "토큰이 없거나 만료됐어요. 앱을 다시 연결해 주세요" } }, {
     status: 401, headers: { "WWW-Authenticate": `Bearer resource_metadata="${baseUrl(req)}/.well-known/oauth-protected-resource"` },
   });
   const body = (await req.json().catch(() => null)) as Msg | Msg[] | null;
-  if (!body) return Response.json({ jsonrpc: "2.0", id: null, error: { code: -32700, message: "JSON 이 아니에요" } }, { status: 400 });
+  if (!body) return Response.json({ jsonrpc: "2.0", id: null, error: { code: -32700, message: "요청이 JSON 형식이 아니에요" } }, { status: 400 });
   const list = Array.isArray(body) ? body : [body];
   // 스튜디오 AI 패널이 이 Mac 의 Claude Code·Codex 로 부를 때(운영자 토큰 + 표시) 작업 기록을 'AI' 로
   const via = req.headers.get("x-studio-via") === "ai" && actor.kind === "admin" ? "ai" : "mcp";

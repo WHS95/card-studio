@@ -23,28 +23,28 @@ import { AI_VIA, type AiTier, type AiVia } from "@/lib/types";
 async function gateWs(ws: string, perm: Perm) {
   await requireAuth();
   const a = await wsAccess(ws, perm);
-  if (!a) throw new OpError("이 일은 권한이 없어요");
+  if (!a) throw new OpError("이 일을 할 권한이 없어요. 서비스 소유자에게 내 역할을 확인해 주세요");
   return a;
 }
 async function gatePost(id: string, perm: Perm) {
   const p = await getPost(id);
-  if (!p) throw new OpError("게시물을 찾지 못했어요");
+  if (!p) throw new OpError("게시물을 찾지 못했어요. 화면을 새로 고쳐 주세요");
   return { ...(await gateWs(p.workspace, perm)), post: p };
 }
 /** 아이디어·자료는 그 서비스 것인지까지 */
 async function gateOwned(kind: "idea" | "research", id: string, ws: string) {
   const x = kind === "idea" ? await getIdea(id) : await getResearch(id);
-  if (!x || x.workspace !== ws) throw new OpError("찾지 못했어요");
+  if (!x || x.workspace !== ws) throw new OpError("항목을 찾지 못했어요. 화면을 새로 고쳐 주세요");
   return gateWs(ws, "edit");
 }
 
-const msg = (e: unknown) => (e instanceof OpError ? e.message : (console.error(e), "잠시 뒤 다시 해 주세요"));
+const msg = (e: unknown) => (e instanceof OpError ? e.message : (console.error(e), "잘 되지 않았어요. 잠시 뒤 다시 해 주세요"));
 
 export async function loginAction(_p: { error?: string } | undefined, fd: FormData) {
   const id = String(fd.get("id") ?? ""), pw = String(fd.get("password") ?? "");
   // 운영자(환경 변수) 먼저, 아니면 계정(이메일)
   if (checkLogin(id, pw)) await setSession();
-  else if (!(id.includes("@") && (await loginUser(id, pw)))) return { error: "아이디나 비밀번호가 맞지 않아요" };
+  else if (!(id.includes("@") && (await loginUser(id, pw)))) return { error: "아이디나 비밀번호가 맞지 않아요. 다시 확인해 주세요" };
   // 로그인 뒤 돌아갈 곳 (AI 앱 연결 동의 화면 등, 이 사이트 안 주소만)
   const next = String(fd.get("next") ?? "");
   if (next.startsWith("/") && !next.startsWith("//")) redirect(next);
@@ -100,7 +100,7 @@ export type SaveState = { ok?: boolean; error?: string } | undefined;
 export async function savePostAction(_p: SaveState, fd: FormData): Promise<SaveState> {
   await requireAuth();
   let data: unknown;
-  try { data = JSON.parse(String(fd.get("data") ?? "")); } catch { return { error: "형식이 맞지 않아요" }; }
+  try { data = JSON.parse(String(fd.get("data") ?? "")); } catch { return { error: "저장할 내용의 형식이 맞지 않아요. 화면을 새로 고친 뒤 다시 해 주세요" }; }
   try {
     await gatePost(String(fd.get("id")), "edit");
     const p = await savePost(String(fd.get("id")), { data, template: String(fd.get("template") ?? ""), title: String(fd.get("title") ?? ""), category: String(fd.get("category") ?? "") });
@@ -139,7 +139,7 @@ export async function saveBriefAction(_p: SaveState, fd: FormData): Promise<Save
     await setPillars(ws, body.pillars ?? []);
     revalidatePath(`/w/${ws}`, "layout");
     return { ok: true };
-  } catch (e) { return { error: e instanceof SyntaxError ? "형식이 맞지 않아요" : msg(e) }; }
+  } catch (e) { return { error: e instanceof SyntaxError ? "저장할 내용의 형식이 맞지 않아요. 화면을 새로 고친 뒤 다시 해 주세요" : msg(e) }; }
 }
 
 export async function createIdeaAction(fd: FormData) {
@@ -336,13 +336,13 @@ export async function memberAction(_p: MemberState, fd: FormData): Promise<Membe
   const ws = String(fd.get("ws")), op = String(fd.get("op"));
   try {
     await gateWs(ws, "manage");
-    let out: MemberState = { ok: "바꿨어요" };
+    let out: MemberState = { ok: "역할을 바꿨어요" };
     if (op === "add") {
       const r = await addMember(ws, { email: fd.get("email"), name: fd.get("name"), role: fd.get("role") });
-      out = r.tempPassword ? { ok: `${r.email} 계정을 만들고 더했어요`, temp: { email: r.email, password: r.tempPassword } } : { ok: `${r.email} 님을 더했어요 (이미 있는 계정)` };
+      out = r.tempPassword ? { ok: `${r.email} 계정을 만들고 더했어요`, temp: { email: r.email, password: r.tempPassword } } : { ok: `${r.email} 계정을 더했어요. 이미 있던 계정이라 비밀번호는 그대로예요` };
     } else if (op === "role") await setMemberRole(ws, String(fd.get("user")), fd.get("role"));
-    else if (op === "remove") { await removeMember(ws, String(fd.get("user"))); out = { ok: "서비스에서 뺐어요 (계정은 남아요)" }; }
-    else if (op === "reset") { const u = String(fd.get("user")); out = { ok: "비밀번호를 초기화했어요", temp: { email: String(fd.get("email") ?? ""), password: await resetMemberPassword(ws, u) } }; }
+    else if (op === "remove") { await removeMember(ws, String(fd.get("user"))); out = { ok: "서비스에서 뺐어요. 계정은 그대로 남아요" }; }
+    else if (op === "reset") { const u = String(fd.get("user")); out = { ok: "임시 비밀번호를 새로 만들었어요", temp: { email: String(fd.get("email") ?? ""), password: await resetMemberPassword(ws, u) } }; }
     else throw new OpError("모르는 동작이에요");
     revalidatePath(`/w/${ws}/members`);
     return out;
@@ -366,12 +366,12 @@ export async function integrationAction(_p: KeyState, fd: FormData): Promise<Key
   const actor = await requireAuth();
   if (actor.kind !== "admin") return { error: "운영자만 바꿀 수 있어요" };
   const provider = String(fd.get("provider")) as Provider;
-  if (provider !== "anthropic" && provider !== "gemini" && provider !== "openai") return { error: "모르는 연동이에요" };
+  if (provider !== "anthropic" && provider !== "gemini" && provider !== "openai") return { error: "알 수 없는 연결이에요" };
   try {
     if (fd.get("op") === "test") return { ok: provider === "gemini" ? await testGemini() : await testVia(provider, actor) };
     const v = String(fd.get("key") ?? "").trim();
     const shape = { gemini: /^[A-Za-z0-9_-]{20,}$/, anthropic: /^sk-ant-[A-Za-z0-9_-]{20,}$/, openai: /^sk-[A-Za-z0-9_-]{20,}$/ }[provider];
-    if (v && !shape.test(v)) return { error: "키 모양이 맞지 않아요" };
+    if (v && !shape.test(v)) return { error: "키 모양이 맞지 않아요. 복사한 키 전체를 다시 붙여 넣어 주세요" };
     await setKey(provider, fd.get("op") === "remove" ? "" : v);
     revalidatePath("/settings");
     return { ok: fd.get("op") === "remove" ? "지웠어요" : "저장했어요. '연결 확인'을 눌러 보세요" };
@@ -427,7 +427,7 @@ export async function aiConfigAction(_p: KeyState, fd: FormData): Promise<KeySta
   if (actor.kind !== "admin") return { error: "운영자만 바꿀 수 있어요" };
   try {
     const op = String(fd.get("op") ?? "");
-    if (op.startsWith("test:")) { const v = op.slice(5) as AiVia; if (!AI_VIA.includes(v)) return { error: "모르는 연결이에요" }; return { ok: await testVia(v, actor) }; }
+    if (op.startsWith("test:")) { const v = op.slice(5) as AiVia; if (!AI_VIA.includes(v)) return { error: "알 수 없는 연결이에요" }; return { ok: await testVia(v, actor) }; }
     const tiers: Record<string, unknown> = {};
     for (const k of ["judge", "write", "polish"]) tiers[k] = { via: fd.get(`${k}.via`), model: fd.get(`${k}.model`), effort: fd.get(`${k}.effort`) };
     await saveAiConfig({ enabled: AI_VIA.filter((v) => fd.get(`on.${v}`) === "on"), tiers });

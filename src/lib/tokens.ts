@@ -17,7 +17,7 @@ const PAT_MAX = 10;
 export async function createPat(userId: string, name: string) {
   const token = fresh("cs_pat");
   await mutate((db) => {
-    if (db.tokens.filter((t) => t.userId === userId && t.kind === "pat").length >= PAT_MAX) throw new OpError(`개인 토큰은 ${PAT_MAX}개까지예요`);
+    if (db.tokens.filter((t) => t.userId === userId && t.kind === "pat").length >= PAT_MAX) throw new OpError(`개인 토큰은 ${PAT_MAX}개까지 만들 수 있어요. 안 쓰는 토큰을 끊고 다시 만들어 주세요`);
     db.tokens.push({ id: newId(), userId, name: name.trim().slice(0, 40) || "개인 토큰", hash: sha(token), kind: "pat", createdAt: new Date().toISOString() });
   });
   return token;

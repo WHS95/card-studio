@@ -36,7 +36,7 @@ export default async function Ideas({ params, searchParams }: PageProps<"/w/[ws]
   return (
     <ServiceShell ws={w} step="ideas" ctx="3단계 주제 (검수 대기 → 승인 → 제작)">
         <div className="stg-head">
-          <div className="col stg-head-t"><h1>주제</h1><span className="small muted">새로 낸 주제는 누가 냈든 검수 대기에서 시작해요. 소유자·검수자가 승인한 주제만 제작에 넣을 수 있어요.</span></div>
+          <div className="col stg-head-t"><h1>주제</h1><span className="small muted">새 주제는 누가 냈든 검수 대기에서 시작해요. 소유자·검수자가 승인하면 제작에 넣을 수 있어요.</span></div>
           {canEdit && <details className="stg-new" open={!ideas.length || undefined}>
             <summary className="btn primary">+ 새 주제</summary>
             <div className="cols2 stg-new-body">
@@ -48,11 +48,11 @@ export default async function Ideas({ params, searchParams }: PageProps<"/w/[ws]
                   <label className="fld" style={{ flex: 1, minWidth: 120 }}>기둥
                     <select name="pillar" className="input" defaultValue={pillar ?? ""}><option value="">없음</option>{pillars.map((p) => <option key={p.name}>{p.name}</option>)}</select>
                   </label>
-                  <label className="fld" style={{ flex: 1, minWidth: 120 }}>템플릿 <em>비우면 기둥 기본</em>
-                    <select name="template" className="input" defaultValue=""><option value="">기둥 기본</option>{TEMPLATES.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}</select>
+                  <label className="fld" style={{ flex: 1, minWidth: 120 }}>템플릿 <em>비우면 기둥의 기본 틀</em>
+                    <select name="template" className="input" defaultValue=""><option value="">기둥 기본 틀</option>{TEMPLATES.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}</select>
                   </label>
                 </div>
-                <label className="fld">각도·메모 <em>어떤 이야기로, 누구에게</em><textarea name="angle" className="input" rows={2} maxLength={1000} /></label>
+                <label className="fld">이야기 방향·메모 <em>어떤 이야기로, 누구에게</em><textarea name="angle" className="input" rows={2} maxLength={1000} /></label>
                 {research.length > 0 && (
                   <details><summary className="small">자료 연결 ({research.length})</summary>
                     <div className="list stg-scroll">
@@ -85,7 +85,7 @@ export default async function Ideas({ params, searchParams }: PageProps<"/w/[ws]
           </details>}
         </div>
         {typeof q.error === "string" && <p className="err">{q.error}</p>}
-        {!pillars.length && <p className="hint">콘텐츠 기둥이 아직 없어요. <Link href={`/w/${w.id}/brief`}>1 목적</Link>에서 기둥을 정하면 기둥별로 모으고 예시 주제를 바로 꺼내 쓸 수 있어요.</p>}
+        {!pillars.length && <p className="hint"><Link href={`/w/${w.id}/brief`}>1 목적</Link>에서 콘텐츠 기둥을 정하면 주제를 기둥별로 모으고 예시 주제를 바로 꺼내 쓸 수 있어요.</p>}
 
         <div className="stg-filters">
           <div className="stg-chips" aria-label="상태">
@@ -123,7 +123,7 @@ export default async function Ideas({ params, searchParams }: PageProps<"/w/[ws]
                   {post ? <Link className="btn" href={`/w/${w.id}/p/${post.id}`}>D{post.day} {post.slot} · {STATUS_LABEL[post.status]} →</Link> : i.status === "approved" && canEdit && (
                     <form action={scheduleIdeaAction} className="row">
                       <input type="hidden" name="ws" value={w.id} /><input type="hidden" name="id" value={i.id} />
-                      <button className="btn">이것만 제작에</button>
+                      <button className="btn">이 주제만 제작에 넣기</button>
                     </form>
                   )}
                   {!post && (canEdit || canApprove) && <form action={updateIdeaAction} className="row">
@@ -139,7 +139,7 @@ export default async function Ideas({ params, searchParams }: PageProps<"/w/[ws]
                         <label className="fld" style={{ flex: 1, minWidth: 120 }}>기둥<select name="pillar" className="input" defaultValue={i.pillar}><option value="">없음</option>{pillars.map((p) => <option key={p.name}>{p.name}</option>)}</select></label>
                         <label className="fld" style={{ flex: 1, minWidth: 120 }}>템플릿<select name="template" className="input" defaultValue={i.template}>{TEMPLATES.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}</select></label>
                       </div>
-                      <label className="fld">각도·메모<textarea name="angle" className="input" rows={3} maxLength={1000} defaultValue={i.angle} /></label>
+                      <label className="fld">이야기 방향·메모<textarea name="angle" className="input" rows={3} maxLength={1000} defaultValue={i.angle} /></label>
                       {research.length > 0 && <div className="fld">자료 연결<div className="list stg-scroll">
                         {research.slice(0, 80).map((r) => <label key={r.id} className="row small"><input type="checkbox" name="research" value={r.id} defaultChecked={i.research.includes(r.id)} />{r.title}</label>)}
                       </div></div>}
@@ -150,7 +150,7 @@ export default async function Ideas({ params, searchParams }: PageProps<"/w/[ws]
               </article>
             );
           })}
-          {!shown.length && <p className="hint">{status === "review" ? "검수할 주제가 없어요." : status === "approved" ? "승인한 주제가 없어요." : "주제가 없어요. '+ 새 주제'에서 더하거나 기둥 예시를 눌러 꺼내 보세요."}</p>}
+          {!shown.length && <p className="hint">{status === "review" ? "검수할 주제가 없어요." : status === "approved" ? "승인한 주제가 없어요. 검수 대기에서 승인하면 여기에 모여요." : "주제가 없어요. '+ 새 주제'에서 더하거나 기둥 예시를 눌러 꺼내 보세요."}</p>}
         </div>
     </ServiceShell>
   );

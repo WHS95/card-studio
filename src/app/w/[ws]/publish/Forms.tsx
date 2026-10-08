@@ -26,7 +26,7 @@ export function UnpostForm({ id }: { id: string }) {
 
 export function CopyCaption({ text }: { text: string }) {
   const [done, setDone] = useState("");
-  return <button type="button" className="btn" onClick={async () => { setDone((await copyText(text)) ? "복사했어요" : "복사가 막혔어요"); setTimeout(() => setDone(""), 2000); }}>{done || "캡션 복사"}</button>;
+  return <button type="button" className="btn" onClick={async () => { setDone((await copyText(text)) ? "복사했어요" : "복사가 막혀 있어요"); setTimeout(() => setDone(""), 2000); }}>{done || "캡션 복사"}</button>;
 }
 
 /** 승인된 게시물 하나를 골라 장마다 n초씩 릴스 MP4 (GET /api/posts/[id]/reel?secs=) */

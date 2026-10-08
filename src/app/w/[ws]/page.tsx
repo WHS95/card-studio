@@ -43,10 +43,10 @@ export default async function Calendar({ params, searchParams }: PageProps<"/w/[
     </div>
   );
   const head = archive
-    ? { t: "제작 · 보관함", s: "뺀 게시물은 지우지 않고 여기 모여요. 원래 칸이 비어 있으면 그 칸으로, 아니면 고른 칸으로 되살려요. 게시된 것은 뺄 수 없어요." }
+    ? { t: "제작 · 보관함", s: "보관함으로 뺀 게시물이 지워지지 않고 여기 모여요. 원래 칸이나 비어 있는 첫 칸으로 되살릴 수 있어요. 게시한 게시물은 뺄 수 없어요." }
     : grid
-      ? { t: "제작 · 그리드", s: "프로필에서 보일 순서(새 글이 왼쪽 위). 표지는 3:4로 잘려 좌우 약 34px이 가려져요." }
-      : { t: "제작", s: "만들 게시물 목록이에요. 줄을 누르면 편집기, 승인한 주제는 3 주제 탭에서 여기로 넣어요. ⚠ = 규칙 경고" };
+      ? { t: "제작 · 그리드", s: "프로필에서 보일 순서예요(새 글이 왼쪽 위). 표지는 3:4로 잘려 좌우 약 34px이 가려져요." }
+      : { t: "제작", s: "만들 게시물 목록이에요. 줄을 누르면 편집기가 열려요. 승인한 주제는 3 주제 탭에서 여기로 넣어요." };
   return (
     <ServiceShell ws={w} step="make" ctx={archive ? "제작 · 보관함" : grid ? "제작 · 그리드" : "제작 · 목록"}>
       <div className="mk-head"><h1>{head.t}</h1><p>{head.s}</p></div>
@@ -60,7 +60,7 @@ export default async function Calendar({ params, searchParams }: PageProps<"/w/[
       {typeof q.ok === "string" && <p className="ok">주제 {q.ok}개를 제작 목록에 넣었어요. 줄을 눌러 글을 채워 주세요.</p>}
       {typeof q.error === "string" && <p className="err">{q.error}</p>}
       {!archive && !grid && mix.length > 0 && (
-        <div className="mk-mix"><b>기둥 비중 (목표 대비)</b>{mix.map((m) => <span key={m.name}>{m.name} {m.now}/{m.target}%</span>)}</div>
+        <div className="mk-mix"><b>기둥 비중 (지금/목표)</b>{mix.map((m) => <span key={m.name}>{m.name} {m.now}/{m.target}%</span>)}</div>
       )}
       {archive ? (
         <>
@@ -73,7 +73,7 @@ export default async function Calendar({ params, searchParams }: PageProps<"/w/[
                 : <span className="mk-thumb" aria-hidden />}
               <div className="mk-row-main">
                 <Link href={`/w/${w.id}/p/${p.id}`} className="mk-row-title">{p.title || "제목 없음"}</Link>
-                <span className="small muted">원래 D{p.day} {p.slot} · {STATUS_LABEL[p.status]}{p.archivedAt ? ` · ${md(new Date(p.archivedAt).toLocaleDateString("en-CA", { timeZone: "Asia/Seoul" }))} 보관함으로` : ""}</span>
+                <span className="small muted">원래 D{p.day} {p.slot} · {STATUS_LABEL[p.status]}{p.archivedAt ? ` · ${md(new Date(p.archivedAt).toLocaleDateString("en-CA", { timeZone: "Asia/Seoul" }))}에 뺌` : ""}</span>
               </div>
               <label className="mk-spot">칸
                 <select name="spot" className="input" defaultValue="">
@@ -84,7 +84,7 @@ export default async function Calendar({ params, searchParams }: PageProps<"/w/[
               <button className="btn primary">되살리기</button>
             </form>
           ))}
-          {!archived.length && <p className="hint">보관함이 비었어요. 편집기 아래 &apos;게시물 관리&apos;에서 뺄 수 있어요.</p>}
+          {!archived.length && <p className="hint">보관함이 비어 있어요. 편집기 아래 &apos;게시물 관리&apos;에서 게시물을 뺄 수 있어요.</p>}
           <p className="small muted" style={{ margin: 0 }}>보류한 주제는 3 주제 탭의 &apos;보류&apos;에 있어요.</p>
         </>
       ) : grid ? <Grid ws={w.id} posts={posts.filter((p) => p.data && p.status !== "skip" && (!filter || p.status === filter))} /> : (
@@ -117,9 +117,9 @@ export default async function Calendar({ params, searchParams }: PageProps<"/w/[
                 </Link>
               );
             })}
-            {!posts.some((p) => !filter || p.status === filter) && <p className="hint">{filter ? `${STATUS_LABEL[filter]} 게시물이 없어요.` : "아직 게시물이 없어요. 3 주제에서 승인한 주제를 넣거나 '+ 새 게시물'로 시작해요."}</p>}
+            {!posts.some((p) => !filter || p.status === filter) && <p className="hint">{filter ? `${STATUS_LABEL[filter]} 게시물이 없어요.` : "게시물이 없어요. 3 주제에서 승인한 주제를 넣거나 '+ 새 게시물'로 시작해요."}</p>}
           </div>
-          <p className="small muted" style={{ margin: 0 }}>순서 = 올릴 차례(일차·시간). 순서는 편집기 아래 &apos;게시물 관리 · 다른 자리로 옮기기&apos;에서 바꿔요.</p>
+          <p className="small muted" style={{ margin: 0 }}>위에서부터 올릴 차례(일차·시간)예요. 순서는 편집기 아래 &apos;게시물 관리 · 다른 칸으로 옮기기&apos;에서 바꿔요.</p>
         </>
       )}
     </ServiceShell>
@@ -140,7 +140,7 @@ function Grid({ ws, posts }: { ws: string; posts: Awaited<ReturnType<typeof list
           </Link>
         ))}
       </div>
-      {list.length ? <p className="small muted" style={{ margin: 0 }}>최대 30개 · 건너뜀 제외</p> : <p className="hint">내용이 있는 게시물이 아직 없어요</p>}
+      {list.length ? <p className="small muted" style={{ margin: 0 }}>30개까지 · 건너뛴 게시물은 빼고 보여요</p> : <p className="hint">글을 채운 게시물이 여기 보여요</p>}
     </>
   );
 }

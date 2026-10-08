@@ -23,7 +23,7 @@ export async function searchPhotos(query: string, count = 8): Promise<FoundPhoto
     prop: "imageinfo", iiprop: "url|size|mime|extmetadata", iiurlwidth: "1600", iiextmetadatafilter: "Artist|LicenseShortName|ImageDescription|ObjectName",
   }).forEach(([k, v]) => u.searchParams.set(k, v));
   const r = await fetch(u, { headers: { "User-Agent": UA }, signal: AbortSignal.timeout(20_000) }).catch(() => null);
-  if (!r?.ok) throw new OpError("사진을 찾지 못했어요 (위키미디어 공용에 닿지 않아요). 잠시 뒤 다시 해 주세요");
+  if (!r?.ok) throw new OpError("위키미디어 공용에 연결하지 못해 사진을 찾지 못했어요. 잠시 뒤 다시 해 주세요");
   const j = (await r.json()) as { query?: { pages?: Record<string, { index?: number; title: string; imageinfo?: { thumburl?: string; url: string; descriptionurl: string; width: number; height: number; mime: string; extmetadata?: Record<string, { value?: string }> }[] }> } };
   const pages = Object.values(j.query?.pages ?? {}).sort((a, b) => (a.index ?? 0) - (b.index ?? 0));
   const out: FoundPhoto[] = [];

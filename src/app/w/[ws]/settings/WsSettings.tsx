@@ -27,7 +27,7 @@ export default function WsSettings({ w, admin }: { w: W; admin: boolean }) {
     <>
       <div className="pghead">
         <h1>서비스 설정</h1>
-        <p>자동 저장돼요 · <span aria-live="polite">{pending ? "저장하는 중" : st?.error ? <span className="err" style={{ display: "inline" }}>저장 못 함: {st.error}</span> : "저장됨"}</span>. 카드 색·워드마크는 4 템플릿 탭, 브리프·규칙은 1 목적 탭에 있어요.</p>
+        <p>칸을 떠나면 저장돼요 · <span aria-live="polite">{pending ? "저장하는 중…" : st?.error ? <span className="err" style={{ display: "inline" }}>저장하지 못했어요: {st.error}</span> : "저장돼 있어요"}</span>. 카드 색·워드마크는 4 템플릿 탭, 브리프·규칙은 1 목적 탭에 있어요.</p>
       </div>
       <form ref={form} className="set-form" onSubmit={(e) => { e.preventDefault(); save(true); }}
         onFocus={() => { if (last.current === null && form.current) last.current = snap(new FormData(form.current)); }}
@@ -44,9 +44,9 @@ export default function WsSettings({ w, admin }: { w: W; admin: boolean }) {
           <div className="set-g3">
             <label className="fld">1일차<input name="startDate" type="date" className="input" defaultValue={w.startDate ?? ""} /></label>
             <label className="fld"><span>일수 <em>1~365 · 모자라면 저절로 늘어나요</em></span><input name="days" type="number" min={1} max={365} className="input" defaultValue={w.days} /></label>
-            <label className="fld"><span>시간대 <em>쉼표로 · 6개까지</em></span><input name="slots" className="input" defaultValue={w.slots.join(", ")} /></label>
+            <label className="fld"><span>시간대 <em>쉼표로 나눠서 · 6개까지</em></span><input name="slots" className="input" defaultValue={w.slots.join(", ")} /></label>
           </div>
-          <label className="fld"><span>카테고리 <em>기둥 이름이 먼저 · 20개까지</em></span><input name="categories" className="input" defaultValue={w.categories.join(", ")} /></label>
+          <label className="fld"><span>카테고리 <em>기둥 이름이 앞에 와요 · 20개까지</em></span><input name="categories" className="input" defaultValue={w.categories.join(", ")} /></label>
         </section>
         <section className="sect"><h2>성과</h2>
           <div className="fld">
@@ -57,7 +57,7 @@ export default function WsSettings({ w, admin }: { w: W; admin: boolean }) {
         <section className="sect"><h2>요금제 · 운영자만</h2>
           <div className="set-inline">
             <select name="plan" className="input" style={{ width: "auto", minWidth: 90 }} defaultValue={w.plan} disabled={!admin} aria-label="요금제"><option value="free">무료</option><option value="pro">프로</option><option value="agency">에이전시</option></select>
-            <span className="small muted">{admin ? "결제 연결 전이라 운영자가 바꿔요" : "운영자에게 요청해 주세요"}</span>
+            <span className="small muted">{admin ? "결제 연결 전이라 운영자가 바꿔요" : "요금제는 운영자에게 말하면 바꿀 수 있어요"}</span>
           </div>
         </section>
         <button type="submit" className="sr" tabIndex={-1}>저장</button>

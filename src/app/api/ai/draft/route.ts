@@ -10,11 +10,11 @@ import type { PostData } from "@/lib/types";
 export async function POST(req: Request) {
   const b = (await req.json().catch(() => null)) as { post?: string; template?: string; title?: string; category?: string; current?: PostData | null; extra?: string } | null;
   const post = b?.post ? await getPost(String(b.post)) : null;
-  if (!b || !post) return new Response("bad", { status: 400 });
+  if (!b || !post) return new Response("요청 형식이 맞지 않아요. 화면을 새로 고친 뒤 다시 해 주세요", { status: 400 });
   const a = await wsAccess(post.workspace, "edit");
-  if (!a) return new Response("이 일은 권한이 없어요", { status: 403 });
+  if (!a) return new Response("AI 초안은 편집 권한이 있는 사람만 쓸 수 있어요", { status: 403 });
   try { if (await countsAgainstPlan("write", a.actor)) await countAi(a.ws.id, a.actor.kind === "admin"); }
-  catch (e) { return new Response(e instanceof OpError ? e.message : "잠시 뒤 다시 해 주세요", { status: 429 }); }
+  catch (e) { return new Response(e instanceof OpError ? e.message : "잘 되지 않았어요. 잠시 뒤 다시 해 주세요", { status: 429 }); }
 
   const enc = new TextEncoder();
   const stream = new ReadableStream<Uint8Array>({

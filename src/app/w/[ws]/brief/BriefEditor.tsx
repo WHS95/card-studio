@@ -51,7 +51,7 @@ export default function BriefEditor({ ws, brief: b0, pillars: p0, presets, goals
   const first = useRef(true);
   const rules: ContentRules = { ...NO_RULES, ...b.rules };
   const total = pillars.reduce((a, p) => a + p.share, 0);
-  const sumErr = pillars.length > 0 && total !== 100 ? `기둥 비중 합이 ${total}%예요. 100%가 되면 저장돼요` : "";
+  const sumErr = pillars.length > 0 && total !== 100 ? `기둥 비중 합이 ${total}%예요. 100%로 맞추면 저장돼요` : "";
   const checks = b.checklist ?? [];
   // 자동 저장: 고치고 0.9초 뒤 (기둥 비중 합이 100이 아니면 기다린다)
   useEffect(() => {
@@ -81,7 +81,7 @@ export default function BriefEditor({ ws, brief: b0, pillars: p0, presets, goals
   };
   const even = () => setPillars((ps) => ps.map((p, i) => ({ ...p, share: Math.floor(100 / ps.length) + (i < 100 % ps.length ? 1 : 0) })));
   const hidden = (Object.keys(EXTRA_LABEL) as Extra[]).filter((k) => !extra.includes(k));
-  const status = !canEdit ? "보기만 할 수 있어요" : pending ? "저장하는 중…" : st?.ok ? `저장됨 · ${st.at}` : "고치면 자동 저장";
+  const status = !canEdit ? "보기만 할 수 있어요" : pending ? "저장하는 중…" : st?.ok ? `${st.at}에 저장했어요` : "고치면 바로 저장돼요";
   const err = sumErr || st?.error;
 
   const extraRow = (k: Extra) => {
@@ -94,9 +94,9 @@ export default function BriefEditor({ ws, brief: b0, pillars: p0, presets, goals
           </select>
         </Dl>);
       case "link": return <Dl key={k} label="프로필 링크"><input className="stg-in" value={b.link} placeholder="https://" onChange={(e) => set({ link: e.target.value })} /></Dl>;
-      case "keywords": return <ListInput key={k} label="꼭 넣을 말" value={b.keywords} onChange={(v) => set({ keywords: v })} placeholder="쉼표로 (최대 20개)" />;
-      case "hashtags": return <ListInput key={k} label="기본 해시태그" value={b.hashtags} onChange={(v) => set({ hashtags: v })} placeholder="#태그, #태그" hint="편집기에서 한 번에 넣어요 (최대 30)" />;
-      case "references": return <ListInput key={k} label="참고·경쟁 계정" value={b.references} onChange={(v) => set({ references: v })} placeholder="@account (최대 10)" />;
+      case "keywords": return <ListInput key={k} label="꼭 넣을 말" value={b.keywords} onChange={(v) => set({ keywords: v })} placeholder="쉼표로 나눠서, 20개까지" />;
+      case "hashtags": return <ListInput key={k} label="기본 해시태그" value={b.hashtags} onChange={(v) => set({ hashtags: v })} placeholder="#태그, #태그" hint="편집기에서 한 번에 넣어요 · 30개까지" />;
+      case "references": return <ListInput key={k} label="참고·경쟁 계정" value={b.references} onChange={(v) => set({ references: v })} placeholder="@account, 10개까지" />;
       case "cta": return <Dl key={k} label="기본 행동 유도 (CTA)" hint={`${b.cta.length}/60`}><input className="stg-in" maxLength={60} value={b.cta} placeholder="예: 프로필 링크에서 이번 주 모임 보기" onChange={(e) => set({ cta: e.target.value })} /></Dl>;
     }
   };
@@ -105,9 +105,9 @@ export default function BriefEditor({ ws, brief: b0, pillars: p0, presets, goals
     <>
       <div className="col">
         <h1>목적</h1>
-        <span className="small muted" role="status" aria-live="polite">누구에게 무엇을 위해 만드는지. 항목을 누르면 바로 고치고, 자동으로 저장돼요 · {err && canEdit ? <span className="err">{err}</span> : status}</span>
+        <span className="small muted" role="status" aria-live="polite">누구에게 무엇을 위해 만드는지 적어요. 항목을 누르면 바로 고칠 수 있어요 · {err && canEdit ? <span className="err">{err}</span> : status}</span>
       </div>
-      {isNew && <p className="hint">새 서비스를 만들었어요. 브리프를 채우면 아이디어·초안·캡션(AI·MCP)이 이 내용을 바탕으로 만들어져요. 나중에 채워도 돼요.</p>}
+      {isNew && <p className="hint">새 서비스를 만들었어요. 브리프를 채우면 AI·MCP 가 이 내용으로 아이디어·초안·캡션을 써요. 나중에 채워도 돼요.</p>}
 
       <form className="stg-brief" onSubmit={(e) => e.preventDefault()}>
         <fieldset className="stg-fs" disabled={!canEdit}>
@@ -149,7 +149,7 @@ export default function BriefEditor({ ws, brief: b0, pillars: p0, presets, goals
                       </label>
                     </div>
                     <label className="fld">설명<input className="input" maxLength={200} value={p.description} onChange={(e) => setP(i, { description: e.target.value })} /></label>
-                    <label className="fld">예시 주제 <em>한 줄에 하나 (최대 5개) · 주제 화면에서 바로 꺼내 써요</em>
+                    <label className="fld">예시 주제 <em>한 줄에 하나, 5개까지 · 주제 화면에서 바로 꺼내 써요</em>
                       <textarea className="input" rows={2} value={p.examples.join("\n")} onChange={(e) => setP(i, { examples: e.target.value.split("\n").slice(0, 5) })} /></label>
                     <div className="row">
                       <button type="button" className="btn" onClick={() => setOpenP(null)}>닫기</button>
@@ -158,7 +158,7 @@ export default function BriefEditor({ ws, brief: b0, pillars: p0, presets, goals
                   </div>}
                 </div>
               ))}
-              {!pillars.length && <p className="small muted stg-p">아직 기둥이 없어요. 업종을 고르거나 직접 더해요. 3~5개를 권해요.</p>}
+              {!pillars.length && <p className="small muted stg-p">업종을 고르거나 직접 더해서 기둥을 만들어요. 3~5개가 알맞아요.</p>}
               <p className="small muted stg-p stg-sum">
                 <span className={sumErr ? "err" : undefined}>합 {total}%</span> · 기둥 이름 = 게시물 카테고리
                 {pillars.length > 1 && canEdit && <button type="button" className="stg-link" onClick={even}>똑같이 나누기</button>}
@@ -168,24 +168,24 @@ export default function BriefEditor({ ws, brief: b0, pillars: p0, presets, goals
           </section>
 
           <section className="doc">
-            <h2>콘텐츠 규칙 · 어기면 편집기에 경고 (저장은 돼요)</h2>
+            <h2>콘텐츠 규칙 · 어기면 편집기에서 알려 줘요 (저장은 돼요)</h2>
             <div className="dl stg-dl"><span>켜 둔 규칙 {Object.values(rules).filter(Boolean).length}</span>
               {(Object.keys(RULE_LABEL) as (keyof ContentRules)[]).map((k) => (
                 <label key={k} className="stg-rule">
                   <input type="checkbox" role="switch" checked={rules[k]} onChange={(e) => set({ rules: { ...rules, [k]: e.target.checked } })} />
-                  <span><b>{RULE_LABEL[k].label}</b><br /><span className="small muted">{k === "templateOnly" ? `기본 틀(${defaultTemplateName})과 다르면 경고 · 기본 틀은 4 템플릿 탭에서` : RULE_LABEL[k].note}</span></span>
+                  <span><b>{RULE_LABEL[k].label}</b><br /><span className="small muted">{k === "templateOnly" ? `기본 틀(${defaultTemplateName})과 다르면 알려 줘요 · 기본 틀은 4 템플릿 탭에서 바꿔요` : RULE_LABEL[k].note}</span></span>
                 </label>
               ))}
             </div>
           </section>
 
           <section className="doc">
-            <h2>승인 체크리스트 · 모두 체크해야 승인</h2>
-            <div className="dl stg-dl"><span>항목 {DEFAULT_CHECKS.length + checks.length} <em>· 기본 항목은 모든 서비스 공통이라 뺄 수 없어요 · 더하는 것은 {CHECKS_MAX}개까지</em></span>
+            <h2>승인 체크리스트 · 모두 체크하면 승인할 수 있어요</h2>
+            <div className="dl stg-dl"><span>항목 {DEFAULT_CHECKS.length + checks.length} <em>· 기본 항목은 모든 서비스에 늘 들어가요 · {CHECKS_MAX}개까지 더할 수 있어요</em></span>
               <ul className="stg-ul">
                 {DEFAULT_CHECKS.map((c) => <li key={c}>{c} <span className="small muted">· 기본</span></li>)}
                 {checks.map((c, i) => (
-                  <li key={i}>{c} <span className="small muted">· 이 서비스가 더함</span>
+                  <li key={i}>{c} <span className="small muted">· 이 서비스에서 더함</span>
                     {canEdit && <button type="button" className="stg-link" aria-label={`'${c}' 빼기`} onClick={() => set({ checklist: checks.filter((_, j) => j !== i) })}>빼기</button>}</li>
                 ))}
               </ul>
@@ -194,7 +194,7 @@ export default function BriefEditor({ ws, brief: b0, pillars: p0, presets, goals
                   onKeyDown={(e) => { if (e.key === "Enter" && newCheck.trim() && checks.length < CHECKS_MAX) { e.preventDefault(); set({ checklist: [...checks, newCheck.trim()] }); setNewCheck(""); } }} />
                 <button type="button" className="btn" disabled={!newCheck.trim() || checks.length >= CHECKS_MAX} onClick={() => { set({ checklist: [...checks, newCheck.trim()] }); setNewCheck(""); }}>더하기</button>
               </div>}
-              <p className="small muted stg-p">스튜디오가 알 수 있는 것(인스타 마진·규칙 경고·&apos;확인 필요&apos; 자료)은 승인 창 위에 자동으로 보여 줘요.</p>
+              <p className="small muted stg-p">스튜디오가 확인할 수 있는 것(인스타 마진·규칙 경고·&apos;확인 필요&apos; 자료)은 승인 창 위에 보여 줘요.</p>
             </div>
             {canEdit && !addingCheck && <AddRow label="체크리스트 항목 추가" disabled={checks.length >= CHECKS_MAX} onClick={() => setAddingCheck(true)} />}
           </section>

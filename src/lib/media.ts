@@ -41,11 +41,11 @@ export const ffmpeg = (args: string[], timeoutMs?: number) => run(FFMPEG, args, 
 /** 영상 정보: 길이(초)·가로·세로·소리 있음 */
 export async function probe(file: string) {
   const r = await run(FFPROBE, ["-v", "error", "-print_format", "json", "-show_format", "-show_streams", file], 60_000);
-  if (r.code !== 0) throw new OpError("영상을 읽지 못했어요");
+  if (r.code !== 0) throw new OpError("영상을 읽지 못했어요. 파일이 열리는지 확인해 주세요");
   const j = JSON.parse(r.out) as { format?: { duration?: string }; streams?: { codec_type: string; width?: number; height?: number }[] };
   const v = j.streams?.find((s) => s.codec_type === "video");
   const duration = Number(j.format?.duration);
-  if (!v || !Number.isFinite(duration) || duration <= 0) throw new OpError("영상 트랙이 없어요");
+  if (!v || !Number.isFinite(duration) || duration <= 0) throw new OpError("영상이 들어 있지 않은 파일이에요");
   return { duration: Math.round(duration * 100) / 100, width: v.width ?? 0, height: v.height ?? 0, audio: !!j.streams?.some((s) => s.codec_type === "audio") };
 }
 
@@ -64,7 +64,7 @@ export async function saveUpload(ws: string, body: ReadableStream<Uint8Array>): 
       const { done, value } = await reader.read();
       if (done) break;
       size += value.byteLength;
-      if (size > VIDEO_MAX) { await reader.cancel(); throw new OpError("300MB 이하만 올릴 수 있어요"); }
+      if (size > VIDEO_MAX) { await reader.cancel(); throw new OpError("영상은 300MB 이하만 올릴 수 있어요"); }
       if (!out.write(value)) await new Promise<void>((r) => out.once("drain", () => r()));
     }
     await new Promise<void>((r, j) => out.end((e?: Error | null) => (e ? j(e) : r())));
@@ -81,19 +81,19 @@ export async function importFile(ws: string, path: string): Promise<Photo> {
   const { stat } = await import("node:fs/promises");
   const st = await stat(path).catch(() => null);
   if (!st?.isFile()) throw new OpError("파일을 찾지 못했어요");
-  if (st.size > VIDEO_MAX) throw new OpError("300MB 이하만 올릴 수 있어요");
+  if (st.size > VIDEO_MAX) throw new OpError("영상은 300MB 이하만 올릴 수 있어요");
   const { Readable } = await import("node:stream");
   return saveUpload(ws, Readable.toWeb(createReadStream(path)) as ReadableStream<Uint8Array>);
 }
 
 /** 바깥 사진 주소를 이 서버로 받아 두기 (위키미디어처럼 바로 걸 수 없는 곳) — 사진만, 8MB */
 export async function importUrl(ws: string, url: string, ua: string): Promise<Photo> {
-  if (!/^https:\/\/[^\s"'<>]+$/.test(url)) throw new OpError("https 사진 주소만 받아요");
+  if (!/^https:\/\/[^\s"'<>]+$/.test(url)) throw new OpError("https:// 로 시작하는 사진 주소를 넣어 주세요");
   const r = await fetch(url, { headers: { "User-Agent": ua }, signal: AbortSignal.timeout(60_000) }).catch(() => null);
-  if (!r?.ok || !r.body) throw new OpError("사진을 받아 오지 못했어요");
-  if (Number(r.headers.get("content-length") ?? 0) > IMAGE_MAX) throw new OpError("사진은 8MB 이하만 돼요");
+  if (!r?.ok || !r.body) throw new OpError("사진을 받아 오지 못했어요. 주소를 다시 확인해 주세요");
+  if (Number(r.headers.get("content-length") ?? 0) > IMAGE_MAX) throw new OpError("사진은 8MB 이하만 올릴 수 있어요");
   const p = await saveUpload(ws, r.body);
-  if (p.kind !== "image") throw new OpError("사진(JPG·PNG)만 받아요");
+  if (p.kind !== "image") throw new OpError("JPG·PNG 사진만 넣을 수 있어요");
   return p;
 }
 
@@ -104,8 +104,8 @@ async function finishUpload(ws: string, tmp: string, id: string, size: number): 
   await fh.close();
   const kind = sniff(head);
   const fail = async (m: string) => { await rm(tmp, { force: true }); throw new OpError(m); };
-  if (!kind) return fail("JPG·PNG 사진이나 MP4·MOV 영상만 돼요");
-  if (kind !== "mp4" && size > IMAGE_MAX) return fail("사진은 8MB 이하만 돼요");
+  if (!kind) return fail("JPG·PNG 사진이나 MP4·MOV 영상을 올려 주세요");
+  if (kind !== "mp4" && size > IMAGE_MAX) return fail("사진은 8MB 이하만 올릴 수 있어요");
   const dir = join(UPLOADS, ws);
   if (kind !== "mp4") {
     await rename(tmp, join(dir, `${id}.${kind}`));
@@ -113,7 +113,7 @@ async function finishUpload(ws: string, tmp: string, id: string, size: number): 
   }
   let info;
   try { info = await probe(tmp); } catch (e) { await rm(tmp, { force: true }); throw e; }
-  if (info.duration < 3) return fail("3초 이상인 영상만 돼요");
+  if (info.duration < 3) return fail("3초 이상인 영상을 올려 주세요");
   const video = join(dir, `${id}.mp4`), poster = join(dir, `${id}0.jpg`);
   await rename(tmp, video);
   const r = await ffmpeg(["-y", "-v", "error", "-ss", String(Math.min(1, info.duration / 2)), "-i", video, "-frames:v", "1", "-vf", "scale=1080:-2", "-q:v", "3", poster], 120_000);

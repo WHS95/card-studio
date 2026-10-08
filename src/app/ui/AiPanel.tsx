@@ -78,7 +78,7 @@ export default function AiPanel({ ws, ctx, ready, canChat, who, admin, cards }: 
     setTurns(next); setText("");
     start(async () => {
       const r = await aiChatAction({ ws, ctx, history: next.filter((x) => !x.error).map(({ role, text }) => ({ role, text })) });
-      setTurns((x) => [...x, r?.ok ? { role: "assistant", text: r.ok.text || "(답이 비었어요)" } : { role: "assistant", text: r?.error ?? "잠시 뒤 다시 해 주세요", error: true }]);
+      setTurns((x) => [...x, r?.ok ? { role: "assistant", text: r.ok.text || "(AI가 빈 답을 보냈어요. 다시 물어봐 주세요)" } : { role: "assistant", text: r?.error ?? "답을 받지 못했어요. 잠시 뒤 다시 보내 주세요", error: true }]);
       router.refresh();
     });
   };
@@ -90,7 +90,7 @@ export default function AiPanel({ ws, ctx, ready, canChat, who, admin, cards }: 
         <span className="ai-grip" aria-hidden />
         <Icon name="spark" size={16} /><b>AI</b><span className="ai-who">{who}</span>
         <button type="button" className="linkbtn" onClick={() => setTurns([])} disabled={!turns.length}><Icon name="plus" size={14} />새 대화</button>
-        <button type="button" className="tool ai-close" aria-label="AI 닫기" onClick={() => setAi(true)}><Icon name="close" size={16} /></button>
+        <button type="button" className="tool ai-close" aria-label="AI 패널 닫기" onClick={() => setAi(true)}><Icon name="close" size={16} /></button>
       </div>
       <div className="ai-feed">
         {[...cards].reverse().map((c) => (
@@ -101,27 +101,27 @@ export default function AiPanel({ ws, ctx, ready, canChat, who, admin, cards }: 
             <span className="ai-time">{time(c.at)}</span>
           </div>
         ))}
-        {!cards.length && !turns.length && <p className="small muted" style={{ margin: 0 }}>AI 나 내 Claude·ChatGPT(MCP)가 이 서비스에서 한 일이 여기 카드로 쌓여요.</p>}
+        {!cards.length && !turns.length && <p className="small muted" style={{ margin: 0 }}>AI나 내 Claude·ChatGPT(MCP)가 이 서비스에서 한 일이 여기 카드로 쌓여요.</p>}
         {turns.map((t, i) => <div key={i} className={`bubble ${t.role === "user" ? "me" : ""}${t.error ? " err-b" : ""}`}>{t.text}</div>)}
         {pending && <div className="bubble">작업하는 중… (도구를 쓰면 몇십 초 걸려요)</div>}
         <div ref={end} />
       </div>
       {ready && canChat ? (
         <div className="ai-box">
-          <label htmlFor="ai-in" className="ai-lab">AI에게 메시지 · ⌘Enter 보내기</label>
+          <label htmlFor="ai-in" className="ai-lab">AI에게 메시지 · ⌘Enter로 보내요</label>
           <textarea id="ai-in" className="input" rows={2} value={text} placeholder="예: 승인된 주제 3개로 초안 써 줘" disabled={pending}
             onChange={(e) => setText(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); send(); } }} />
           <div className="ai-row">
-            <span className="ai-lab">한 일은 위 카드로 남아요 · 승인은 사람이</span>
+            <span className="ai-lab">한 일은 위 카드로 남아요 · 승인은 사람이 해요</span>
             <button type="button" className="send" aria-label="보내기" disabled={pending || !text.trim()} onClick={send}><Icon name="send" /></button>
           </div>
         </div>
       ) : (
         <div className="ai-box ai-off">
-          <b>AI가 연결되지 않았어요</b>
-          <p className="ai-lab">{admin ? "설정 · AI 에서 이 Mac 의 Claude Code·Codex(구독) 또는 API 키를 연결하면 여기서 대화로 작업해요." : "운영자가 API 키를 연결하면 여기서 대화로 작업해요."} 내 Claude·ChatGPT 에 이 스튜디오를 붙여(MCP) 작업한 기록도 위에 카드로 보여요.</p>
+          <b>AI 연결 전이에요</b>
+          <p className="ai-lab">{admin ? "설정 · AI 에서 이 Mac 의 Claude Code·Codex(구독)나 API 키를 연결하면 여기서 대화로 작업할 수 있어요." : "운영자가 API 키를 연결하면 여기서 대화로 작업할 수 있어요."} 내 Claude·ChatGPT 에 이 스튜디오를 붙여(MCP) 작업한 기록도 위에 카드로 보여요.</p>
           <div className="ai-off-row">
-            {admin && <Link className="btn primary" href="/settings">설정에서 연결</Link>}
+            {admin && <Link className="btn primary" href="/settings">설정에서 연결하기</Link>}
             <details className="ai-ask">
               <summary className="btn">내 AI 구독으로 하기</summary>
               <AskAi label="이 요청으로 내 Claude·ChatGPT 열기" prompt={`카드뉴스 스튜디오의 '${ws}' 서비스에서 ${ctx} 작업을 도와줘. get_flow 로 지금 할 일부터 봐 줘.`} />

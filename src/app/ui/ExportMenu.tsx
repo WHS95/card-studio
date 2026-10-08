@@ -28,7 +28,7 @@ export default function ExportMenu({ ws }: { ws: string }) {
             <b>서비스 백업 (JSON)</b><span>브리프·기둥·게시물·주제·자료 전부</span>
           </a>
           <Link role="menuitem" href={`/w/${ws}/review`} className="xmenu-it" onClick={() => setOpen(false)}>
-            <b>게시물 ZIP</b><span>6 검수 탭에서 골라서 · PNG·MP4·caption.txt</span>
+            <b>게시물 ZIP</b><span>6 검수 탭에서 골라 내려받아요 · PNG·MP4·caption.txt</span>
           </Link>
         </div>
       )}

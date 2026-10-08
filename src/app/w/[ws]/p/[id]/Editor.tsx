@@ -141,7 +141,7 @@ export default function Editor({ ws, post, empty }: { ws: Ws; post: Post; empty:
         while ((i = buf.indexOf("\n")) >= 0) { const l = buf.slice(0, i); buf = buf.slice(i + 1); if (l.trim()) handle(JSON.parse(l)); }
       }
       if (buf.trim()) handle(JSON.parse(buf));
-      if (!final) throw new Error("AI 답이 끊겼어요. 다시 해 주세요");
+      if (!final) throw new Error("AI 답이 중간에 끊겼어요. '다시 쓰기'를 눌러 주세요");
       const fin: PostData = final;
       setData(fin); setSel(0); setDrafting(null); setDirty(true);
       setDraftNote({ kind: "ok", text: `초안 ${fin.slides.length}장을 넣었어요`, sub: note || "사실·숫자를 확인하고 저장해 주세요" });
@@ -174,7 +174,7 @@ export default function Editor({ ws, post, empty }: { ws: Ws; post: Post; empty:
     const click = (e: MouseEvent) => {
       const a = (e.target as HTMLElement)?.closest?.("a[href]") as HTMLAnchorElement | null;
       if (!a || a.target === "_blank" || a.href.includes("/api/") || e.metaKey || e.ctrlKey) return;
-      if (!confirm("저장하지 않은 고침이 있어요. 나갈까요?")) { e.preventDefault(); e.stopPropagation(); }
+      if (!confirm("저장하지 않은 고침은 사라져요. 나갈까요?")) { e.preventDefault(); e.stopPropagation(); }
     };
     window.addEventListener("beforeunload", h);
     document.addEventListener("click", click, true);
@@ -228,11 +228,11 @@ export default function Editor({ ws, post, empty }: { ws: Ws; post: Post; empty:
   const fullCaption = data.caption + (credits.length ? `\n\n사진: ${credits.join(", ")}` : "");
   const tagCount = tags(data.caption).length;
   const [copied, setCopied] = useState(false);
-  const copy = async () => { setCopied((await copyText(fullCaption)) ? true : (alert("이 브라우저에서는 복사가 막혀 있어요. 캡션 칸에서 직접 선택해 복사해 주세요."), false)); setTimeout(() => setCopied(false), 1500); };
+  const copy = async () => { setCopied((await copyText(fullCaption)) ? true : (alert("이 브라우저에서는 복사가 막혀 있어요. 캡션 칸에서 글을 골라 직접 복사해 주세요."), false)); setTimeout(() => setCopied(false), 1500); };
 
   const switchTemplate = (id: string) => {
     if (id === template) return;
-    if (!confirm("템플릿을 바꾸면 지금 장 내용이 새 틀의 기본 문구로 바뀌어요. 사진과 캡션은 그대로예요. (⌘Z로 되돌릴 수 없어요)")) return;
+    if (!confirm("템플릿을 바꾸면 장 글이 새 틀의 기본 문구로 바뀌고, ⌘Z로 되돌릴 수 없어요. 사진과 캡션은 그대로예요. 바꿀까요?")) return;
     const next = templateOf(id).draft({ title, category, handle: ws.handle });
     setTemplate(id);
     setData({ ...next, photos: data.photos, caption: data.caption });
@@ -301,7 +301,7 @@ export default function Editor({ ws, post, empty }: { ws: Ws; post: Post; empty:
       </div>
       {(err || state?.error || (state?.ok && !dirty) || !ws.canEdit) && (
         <div className="ed-msgs">
-          {!ws.canEdit && <span className="small muted">검수자는 보고 승인만 해요 (고치기는 편집자·소유자)</span>}
+          {!ws.canEdit && <span className="small muted">검수자는 보고 승인할 수 있어요. 고치기는 편집자·소유자가 해요</span>}
           {err ? <span className="err">{err}</span> : state?.error ? <span className="err">{state.error}</span> : state?.ok && !dirty ? <span className="small">저장했어요</span> : null}
         </div>
       )}
@@ -313,7 +313,7 @@ export default function Editor({ ws, post, empty }: { ws: Ws; post: Post; empty:
             <Icon name="warn" size={16} />
             <b>규칙 경고 {warns.length}</b>
             <span className="ed-warn-t">{warns.map((w) => w.text).join(" · ")}</span>
-            <span className="ed-warn-r">저장은 돼요 · 승인 창에도 떠요</span>
+            <span className="ed-warn-r">저장할 수 있어요 · 검수 화면에도 보여요</span>
           </div>
         )}
 
@@ -326,7 +326,7 @@ export default function Editor({ ws, post, empty }: { ws: Ws; post: Post; empty:
               <button key={n} type="button" className="ed-slide" aria-current={n === cur ? "true" : undefined} onClick={() => setSel(n)} title={`${n + 1}장 고치기`}>
                 <span className="ed-sthumb" data-fmt={fmt}>{imgs[n] ? <img src={imgs[n]} alt="" /> : null}{videoAt(n) && <i className="play">▶</i>}</span>
                 <span className="ed-sinfo">
-                  <b>{n + 1} {kk?.label ?? "없는 종류"}</b>
+                  <b>{n + 1} {kk?.label ?? "이 틀에 없는 장"}</b>
                   <span>{drafting ? "✓ 다 씀" : why.length ? `⚠ ${why.join(" · ")}` : c && !err ? "✓" : ""}</span>
                 </span>
               </button>
@@ -351,7 +351,7 @@ export default function Editor({ ws, post, empty }: { ws: Ws; post: Post; empty:
         </nav>
 
         <fieldset className="ed-mid" disabled={!ws.canEdit || !!drafting}>
-          {drafting ? <TypingCard d={drafting} kindOf={kindOf} /> : !k ? <section className="ed-card ed-fields"><p className="err">{cur + 1}번째 장: 이 템플릿에 없는 종류예요</p></section> : (
+          {drafting ? <TypingCard d={drafting} kindOf={kindOf} /> : !k ? <section className="ed-card ed-fields"><p className="err">{cur + 1}장은 이 템플릿에 없는 종류예요. 원래 템플릿으로 돌리면 고칠 수 있어요</p></section> : (
             <section className="ed-card ed-fields" aria-label={`${cur + 1}장 칸`}>
               <h2>{cur + 1}장 · {k.label}{vid && <span className="badge">영상</span>}</h2>
               {k.fields.map((f) => <FieldInput key={`${cur}-${f.key}`} f={f} v={s[f.key]} photos={data.photos} onChange={(v) => setSlide(cur, { [f.key]: v })} />)}
@@ -371,7 +371,7 @@ export default function Editor({ ws, post, empty }: { ws: Ws; post: Post; empty:
                   <button type="button" className="btn" disabled={data.slides.length >= t.maxSlides} onClick={() => duplicate(cur)}>복제</button>
                   <button type="button" className="btn" disabled={data.slides.length <= 1} onClick={() => remove(cur)}>빼기</button>
                 </div>
-              ) : <p className="ed-note">이 장은 자리가 정해져 있어요 (옮기기·빼기 없음)</p>}
+              ) : <p className="ed-note">이 장은 자리가 정해져 있어서 옮기거나 뺄 수 없어요</p>}
             </section>
           )}
 
@@ -417,8 +417,8 @@ export default function Editor({ ws, post, empty }: { ws: Ws; post: Post; empty:
               <button type="button" className="btn" onClick={() => setOpen(cur)}>크게 보기</button>
             </div>
             <p className="ed-margin">
-              {drafting ? (drafting.slides.length < draftTotal(drafting) ? `${drafting.slides.length + 1}장은 글이 다 써지면 그려져요 · 다 쓴 장을 누르면 그 장을 크게` : "장을 다 썼어요 · 캡션을 쓰는 중")
-                : err ? <span className="err">미리보기를 멈췄어요: {err}</span>
+              {drafting ? (drafting.slides.length < draftTotal(drafting) ? `${drafting.slides.length + 1}장은 글을 다 쓰면 그려져요 · 다 쓴 장은 눌러서 크게 볼 수 있어요` : "장을 다 썼어요 · 캡션을 쓰고 있어요")
+                : err ? <span className="err">고칠 곳이 있어서 미리보기를 멈췄어요: {err}</span>
                 : !checks ? "인스타 마진: 계산 중"
                 : <>인스타 마진: {checks.map((c, i) => <span key={i} className={c.ok ? undefined : "ed-bad"}>{i > 0 ? " · " : ""}{c.n} {c.ok ? "✓" : `밖 ${c.outside}`}</span>)}</>}
             </p>
@@ -432,13 +432,13 @@ export default function Editor({ ws, post, empty }: { ws: Ws; post: Post; empty:
               : <textarea className="input" aria-label="캡션" rows={8} readOnly={!ws.canEdit} value={data.caption} maxLength={2200} onChange={(e) => edit((d) => { d.caption = e.target.value; return d; })} />}
             <p className="ed-note">
               {data.caption.length}/2200 · 해시태그 <b className={tagCount > HASHTAG_MAX ? "ed-bad" : undefined}>{tagCount}/{HASHTAG_MAX}</b>
-              {firstPart && <> · &apos;더 보기&apos; 전: {firstPart.slice(0, 125)}{moreCut ? "…" : ""}</>} · 사진 출처는 끝에 자동
+              {firstPart && <> · &apos;더 보기&apos; 전: {firstPart.slice(0, 125)}{moreCut ? "…" : ""}</>} · 사진 출처는 끝에 자동으로 붙어요
             </p>
-            {tagCount > HASHTAG_MAX && <p className="err">인스타는 해시태그 {HASHTAG_MAX}개까지만 받아요</p>}
+            {tagCount > HASHTAG_MAX && <p className="err">인스타는 해시태그를 {HASHTAG_MAX}개까지 받아요. {tagCount - HASHTAG_MAX}개를 빼 주세요</p>}
             {ws.hashtags.length > 0 && ws.canEdit && <div className="ed-row">
               <button type="button" className="btn" onClick={() => edit((d) => { const have = new Set(tags(d.caption)); const add = ws.hashtags.filter((h) => !have.has(h)); if (add.length) d.caption = `${d.caption.trimEnd()}${d.caption.trim() ? "\n\n" : ""}${add.join(" ")}`.slice(0, 2200); return d; })}>기본 해시태그 넣기</button>
               {ws.cta && <button type="button" className="btn" onClick={() => edit((d) => { if (!d.caption.includes(ws.cta)) d.caption = `${d.caption.trimEnd()}${d.caption.trim() ? "\n\n" : ""}${ws.cta}`.slice(0, 2200); return d; })}>기본 CTA 넣기</button>}
-              <span className="ed-note">브리프에서 정한 값</span>
+              <span className="ed-note">목적 탭에서 정한 값이에요</span>
             </div>}
           </section>
 
@@ -450,7 +450,7 @@ export default function Editor({ ws, post, empty }: { ws: Ws; post: Post; empty:
                 : <button type="button" className="btn" disabled>이 장 {vid ? "MP4" : "PNG"}</button>}
               {saved ? <a className="btn" href={`/api/posts/${post.id}/zip`}>전체 ZIP</a> : <button type="button" className="btn" disabled>전체 ZIP</button>}
               {fmt === "feed" && (saved
-                ? <a className="btn" href={`/api/posts/${post.id}/reel?secs=3`} title="장마다 3초, 9:16 MP4 (소리 없음 — 인스타에서 음악을 골라요). 장 수만큼 시간이 걸려요">릴스 MP4로</a>
+                ? <a className="btn" href={`/api/posts/${post.id}/reel?secs=3`} title="장마다 3초씩 9:16 MP4로 만들어요. 음악은 인스타에서 골라요. 장이 많을수록 오래 걸려요">릴스 MP4로</a>
                 : <button type="button" className="btn" disabled>릴스 MP4로</button>)}
             </div>
             {!saved && <p className="ed-note">저장한 뒤 내려받을 수 있어요</p>}
@@ -473,7 +473,7 @@ export default function Editor({ ws, post, empty }: { ws: Ws; post: Post; empty:
 }
 
 const WARN_SHORT: Record<string, string> = { photoEvery: "사진", coverQuestion: "질문", ctaComment: "댓글", uxWriting: "문구" };
-const STATUS_BTN: Record<string, string> = { approved: "승인하기", posted: "게시 표시", draft: "초안으로", skip: "건너뛰기" };
+const STATUS_BTN: Record<string, string> = { approved: "승인하기", posted: "게시 표시", draft: "초안으로 돌리기", skip: "건너뛰기" };
 
 /** 상태 바꾸기: 저장 안 된 고침이 있으면 막는다 (화면과 다른 버전이 승인되지 않게) */
 function StatusBar({ post, dirty, canEdit, canApprove, wsId }: { post: Post; dirty: boolean; canEdit: boolean; canApprove: boolean; wsId: string }) {
@@ -485,7 +485,7 @@ function StatusBar({ post, dirty, canEdit, canApprove, wsId }: { post: Post; dir
   return (
     <form action={act} className="ed-status">
       <input type="hidden" name="id" value={post.id} />
-      {block && next.length > 0 && <span className="small muted">저장한 뒤 상태를 바꿔요</span>}
+      {block && next.length > 0 && <span className="small muted">저장하면 상태를 바꿀 수 있어요</span>}
       {st?.error && <span className="err">{st.error}</span>}
       {post.status === "approved" && <input name="postedUrl" className="input posted-url" required pattern="https://(www\.)?instagram\.com/(p|reel)/.+" placeholder="게시 링크 (https://www.instagram.com/p/…)" />}
       {post.postedUrl && <a href={post.postedUrl} target="_blank" rel="noreferrer" className="small">게시물 보기</a>}
@@ -505,12 +505,12 @@ function AiDraft({ ws, postId, busy, onDraft }: { ws: Ws; postId: string; busy: 
   // 스튜디오에 AI 연결이 없으면: 내 Claude·ChatGPT 구독(커넥터)에서 초안을 쓰게
   if (!ws.ai) return ws.canEdit ? (
     <div className="block">
-      <div className="bh"><strong>AI 초안</strong><span className="small muted">다 되면 이 화면을 새로 고침하세요</span></div>
+      <div className="bh"><strong>AI 초안</strong><span className="small muted">다 쓰면 이 화면을 새로 고침해 주세요</span></div>
       <AskAi label="내 Claude·ChatGPT 구독으로 초안 쓰기" prompt={`카드뉴스 스튜디오 게시물 ${postId} 를 get_post 로 읽고, 그 서비스 브리프(get_brief)와 메모·자료에 맞춰 템플릿 칸 정의(list_templates)대로 장 글과 캡션을 써서 update_post 로 넣어 줘. 글자 수 제한을 지키고, 사진 칸은 그대로 두고, 넣은 뒤 check_safe_zone 으로 확인해 줘.`} />
     </div>
   ) : null;
   const go = () => {
-    if (!confirm("AI가 장 글과 캡션을 새로 써요. 장마다 써지는 모습이 보이고, 다 쓰면 ⌘Z 로 원래 글로 되돌릴 수 있어요. 할까요?")) return;
+    if (!confirm("AI가 장 글과 캡션을 새로 써요. 다 쓴 뒤에도 ⌘Z로 원래 글로 되돌릴 수 있어요. 쓸까요?")) return;
     onDraft(extra);
   };
   return (
@@ -518,7 +518,7 @@ function AiDraft({ ws, postId, busy, onDraft }: { ws: Ws; postId: string; busy: 
       <div className="bh"><strong>AI 초안</strong><span className="small muted">브리프 · 기획 제목 · 메모(자료 출처)를 바탕으로 장마다 써요</span></div>
       <div className="row">
         <input className="input" style={{ flex: 1, minWidth: 200 }} value={extra} maxLength={500} onChange={(e) => setExtra(e.target.value)} placeholder="덧붙일 요청 (예: 5장으로, 숫자 위주로)" />
-        <button type="button" className="btn" onClick={go} disabled={busy}>{busy ? "쓰는 중" : "AI로 채우기"}</button>
+        <button type="button" className="btn" onClick={go} disabled={busy}>{busy ? "쓰는 중" : "AI로 초안 쓰기"}</button>
       </div>
     </div>
   );

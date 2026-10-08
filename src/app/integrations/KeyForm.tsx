@@ -12,7 +12,7 @@ export default function KeyForm({ provider, name, use, get, placeholder, status 
       <input type="hidden" name="provider" value={provider} />
       <div className="bh">
         <strong>{name}</strong>
-        <span className={`tag${status.connected ? " dark" : ""}`}>{status.connected ? `연결됨 · …${status.tail}${status.from === "env" ? " (.env.local)" : ""}` : "연결 안 됨"}</span>
+        <span className={`tag${status.connected ? " dark" : ""}`}>{status.connected ? `연결됨 · …${status.tail}${status.from === "env" ? " (.env.local)" : ""}` : "연결 전"}</span>
       </div>
       <span className="small muted">{use}</span>
       <div className="row">

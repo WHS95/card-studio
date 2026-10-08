@@ -16,10 +16,10 @@ export default function ReviewList({ ws, rows, cur }: { ws: string; rows: Review
     <div className="mk-list">
       <div className="mk-pickbar">
         <label className="mk-pickall"><input type="checkbox" checked={all} onChange={() => setPicked(all ? [] : rows.map((r) => r.id))} disabled={!rows.length} />전체</label>
-        <span className="small muted">{picked.length ? `${picked.length}개 골랐어요` : "체크해서 골라 내려받기"}</span>
+        <span className="small muted">{picked.length ? `${picked.length}개 골랐어요` : "내려받을 게시물을 체크해요"}</span>
         {picked.length
-          ? <a className="btn primary" href={href} download>선택한 {picked.length}개 내려받기 (ZIP)</a>
-          : <button type="button" className="btn" disabled>선택한 것 내려받기 (ZIP)</button>}
+          ? <a className="btn primary" href={href} download>고른 {picked.length}개 ZIP으로 내려받기</a>
+          : <button type="button" className="btn" disabled>고른 게시물 ZIP으로 내려받기</button>}
       </div>
       {rows.map((p) => (
         <div key={p.id} className="mk-row mk-pick mk-pickrow" aria-current={p.id === cur ? "true" : undefined}>

@@ -37,11 +37,11 @@ export function DraftBar({ d }: { d: Drafting }) {
     <div className="ed-draftbar" role="status" aria-live="polite">
       <Icon name="spark" size={16} />
       <b>{label}</b>
-      <span className="ed-note">생성됨 {done} · 전체 {d.total || "…"}</span>
+      <span className="ed-note">다 쓴 장 {done} · 전체 {d.total || "…"}</span>
       <span className="ed-segs" aria-hidden>
         {Array.from({ length: Math.max(total, 1) }, (_, i) => <i key={i} data-s={i < done ? "done" : i === done && d.phase === "write" ? "cur" : "wait"} />)}
       </span>
-      <span className="ed-note ed-draftbar-r">글이 다 써진 장부터 미리보기가 그려져요 · 저장은 다 끝난 뒤 사람이</span>
+      <span className="ed-note ed-draftbar-r">다 쓴 장부터 미리보기가 그려져요 · 저장은 다 끝난 뒤 직접 해요</span>
     </div>
   );
 }
@@ -95,7 +95,7 @@ export function TypingCard({ d, kindOf }: { d: Drafting; kindOf: (k: string) => 
           </div>
         );
       })}
-      <p className="ed-note">쓰는 동안은 고칠 수 없어요 · 다 쓰면 장마다 바로 고칠 수 있어요</p>
+      <p className="ed-note">다 쓰면 장마다 바로 고칠 수 있어요</p>
     </section>
   );
 }

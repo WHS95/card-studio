@@ -35,7 +35,7 @@ export default function ConnectApps({ mcpUrl, local, rows }: { mcpUrl: string; l
       <section className="sect">
         <h2>연결 주소</h2>
         <div className="row"><input className="input w-grow" readOnly value={mcpUrl} aria-label="MCP 연결 주소" /><button type="button" className="btn" onClick={() => copy("url", mcpUrl)}>{copied === "url" ? "복사했어요" : "복사"}</button></div>
-        <p className="small muted w-m0">{local ? "이 Mac 안에서만 닿아요. Claude.ai·ChatGPT 커넥터는 https 공개 주소가 생기면 써요." : "이 주소를 Claude.ai·ChatGPT 커넥터에 넣으면 이 스튜디오 로그인·동의 뒤 연결돼요."}</p>
+        <p className="small muted w-m0">{local ? "이 Mac 안에서만 닿아요. Claude.ai·ChatGPT 커넥터는 https 공개 주소가 생기면 쓸 수 있어요." : "이 주소를 Claude.ai·ChatGPT 커넥터에 넣으면 이 스튜디오 로그인·동의 뒤 연결돼요."}</p>
       </section>
       <section className="sect">
         <h2>앱별 연결 방법</h2>
@@ -54,9 +54,9 @@ export default function ConnectApps({ mcpUrl, local, rows }: { mcpUrl: string; l
               <ol className="guide-steps small">
                 <li>이 스튜디오를 https 주소로 배포하면, 위 연결 주소가 그 주소로 바뀌어요.</li>
                 <li>Claude: 설정 › 커넥터 › 사용자 지정 커넥터 추가 › URL › 연결 → 이 스튜디오 로그인·동의 (Pro·Max 는 여러 개, 무료는 1개)</li>
-                <li>ChatGPT: 개발자 모드 › 앱 만들기 › MCP URL · OAuth → 로그인·동의 (요금제마다 쓰기 허용이 달라요)</li>
+                <li>ChatGPT: 개발자 모드 › 앱 만들기 › MCP URL · OAuth → 로그인·동의 (요금제마다 쓸 수 있는지가 달라요)</li>
               </ol>
-              {local && <span className="small muted">지금처럼 이 컴퓨터(127.0.0.1)에서만 돌 때는 웹 앱이 닿지 못해요.</span>}
+              {local && <span className="small muted">지금은 이 컴퓨터(127.0.0.1)에서만 돌아요. 웹 앱은 https 주소로 배포한 뒤에 닿아요.</span>}
             </>
           )}
         </div>
@@ -77,15 +77,15 @@ export default function ConnectApps({ mcpUrl, local, rows }: { mcpUrl: string; l
           <form key={r.id} action={act} className="w-line">
             <input type="hidden" name="op" value="revoke" /><input type="hidden" name="id" value={r.id} />
             <b className="w-line-main">{r.kind === "oauth" ? `${r.client ?? r.name} (OAuth)` : r.name}</b>
-            <span className="small muted" suppressHydrationWarning>만듦 {md(r.createdAt)}{r.lastUsedAt ? ` · 마지막 사용 ${ago(r.lastUsedAt)}` : " · 아직 안 씀"}</span>
+            <span className="small muted" suppressHydrationWarning>만듦 {md(r.createdAt)}{r.lastUsedAt ? ` · 마지막으로 씀 ${ago(r.lastUsedAt)}` : " · 아직 안 씀"}</span>
             <button className="btn" disabled={pending}>연결 끊기</button>
           </form>
         ))}
-        {!rows.length && <p className="small muted w-m0">아직 연결이 없어요</p>}
+        {!rows.length && <p className="small muted w-m0">아직 연결한 앱이 없어요</p>}
         {copied === "fail" && <p className="err">이 브라우저에서는 복사가 막혀 있어요. 글을 길게 눌러(또는 드래그해) 직접 복사해 주세요.</p>}
         {st?.error && <p className="err">{st.error}</p>}
         {st?.ok && <p className="ok">{st.ok}</p>}
-        <p className="small muted w-m0">토큰은 내 권한으로 돌아요. 끊으면 그 앱은 바로 못 써요. 토큰은 10개까지.</p>
+        <p className="small muted w-m0">토큰은 내 권한 안에서 일해요. 연결을 끊으면 그 앱은 바로 멈춰요. 토큰은 10개까지 만들 수 있어요.</p>
       </section>
     </>
   );

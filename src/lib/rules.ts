@@ -12,7 +12,7 @@ const texts = (v: unknown): string[] => (typeof v === "string" ? [v] : Array.isA
 export function ruleWarnings(rules: ContentRules | undefined, defaultTemplate: string, template: string, data: PostData | null): RuleWarning[] {
   const r = { ...NO_RULES, ...rules };
   const out: RuleWarning[] = [];
-  if (r.templateOnly && template !== defaultTemplate) out.push({ rule: "templateOnly", text: `서비스 기본 틀(${templateOf(defaultTemplate).name})과 다른 템플릿이에요` });
+  if (r.templateOnly && template !== defaultTemplate) out.push({ rule: "templateOnly", text: `서비스 기본 틀이 아닌 템플릿이에요 (기본 틀: ${templateOf(defaultTemplate).name})` });
   if (!data) return out;
   const t = templateOf(template);
   if (r.photoEvery) {
@@ -20,7 +20,7 @@ export function ruleWarnings(rules: ContentRules | undefined, defaultTemplate: s
       const k = t.kinds.find((x) => x.kind === s.kind);
       const photos = (k?.fields ?? []).filter((f) => f.type === "photo");
       const main = photos.find((f) => f.key === "photo") ?? photos[0];
-      if (!main) out.push({ rule: "photoEvery", slide: i + 1, text: `${i + 1}장(${k?.label ?? s.kind})은 사진 칸이 없는 장이에요` });
+      if (!main) out.push({ rule: "photoEvery", slide: i + 1, text: `${i + 1}장(${k?.label ?? s.kind})은 사진 칸이 없는 장이에요. 사진 칸이 있는 장으로 바꿔 보세요` });
       else if (typeof s[main.key] !== "number") out.push({ rule: "photoEvery", slide: i + 1, text: `${i + 1}장 사진 칸이 비었어요` });
     });
   }
@@ -29,11 +29,11 @@ export function ruleWarnings(rules: ContentRules | undefined, defaultTemplate: s
     const k = t.kinds.find((x) => x.kind === s.kind);
     const key = (k?.fields ?? []).filter((f) => f.type === "text").map((f) => f.key).find((x) => ["title", "hook", "big"].includes(x)) ?? "title";
     const title = plain(String(s[key] ?? ""));
-    if (title && !/[?？]$/.test(title)) out.push({ rule: "coverQuestion", slide: 1, text: "표지 제목이 질문(?)으로 끝나지 않아요" });
+    if (title && !/[?？]$/.test(title)) out.push({ rule: "coverQuestion", slide: 1, text: "표지 제목을 질문(?)으로 끝내 보세요" });
   }
   if (r.ctaComment && data.slides.length) {
     const last = data.slides[data.slides.length - 1];
-    if (!texts(last).some((x) => x.includes("댓글"))) out.push({ rule: "ctaComment", slide: data.slides.length, text: "마지막 장에 '댓글' 유도가 없어요" });
+    if (!texts(last).some((x) => x.includes("댓글"))) out.push({ rule: "ctaComment", slide: data.slides.length, text: "마지막 장에 '댓글'을 남겨 달라는 말을 넣어 보세요" });
   }
   if (r.uxWriting) {
     for (const spot of lintPost((k) => t.kinds.find((x) => x.kind === k), data))

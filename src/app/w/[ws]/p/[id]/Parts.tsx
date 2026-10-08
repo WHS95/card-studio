@@ -105,8 +105,8 @@ function upload(ws: string, file: File, onProgress: (p: number) => void): Promis
     const x = new XMLHttpRequest();
     x.open("PUT", `/api/upload/${ws}`);
     x.upload.onprogress = (e) => e.lengthComputable && onProgress(Math.round((e.loaded / e.total) * 100));
-    x.onload = () => { try { resolve(JSON.parse(x.responseText)); } catch { resolve({ error: "올리지 못했어요" }); } };
-    x.onerror = () => resolve({ error: "올리지 못했어요" });
+    x.onload = () => { try { resolve(JSON.parse(x.responseText)); } catch { resolve({ error: "파일을 올리지 못했어요. 다시 올려 주세요" }); } };
+    x.onerror = () => resolve({ error: "파일을 올리지 못했어요. 인터넷 연결을 확인하고 다시 올려 주세요" });
     x.send(file);
   });
 }
@@ -120,9 +120,9 @@ export function Media({ ws, photos, onChange, veo = false }: { ws: string; photo
   const full = photos.length >= PHOTOS_MAX;
   const add = () => {
     let u: URL;
-    try { u = new URL(url); } catch { return setMsg("주소가 맞지 않아요"); }
-    if (u.protocol !== "https:") return setMsg("https 주소만 돼요");
-    if (/unsplash\.com\/photos\//.test(url)) return setMsg("Unsplash는 사진 페이지가 아니라 이미지 주소(images.unsplash.com/…)를 넣어 주세요");
+    try { u = new URL(url); } catch { return setMsg("주소 모양이 맞지 않아요. https:// 로 시작하는 주소를 넣어 주세요"); }
+    if (u.protocol !== "https:") return setMsg("https:// 로 시작하는 주소를 넣어 주세요");
+    if (/unsplash\.com\/photos\//.test(url)) return setMsg("Unsplash는 사진 페이지 주소 말고 이미지 주소(images.unsplash.com/…)를 넣어 주세요");
     const src = /unsplash\.com/.test(u.hostname) ? "Unsplash" : u.hostname;
     onChange([...photos, { url: url.replace(/fm=webp/, "fm=jpg"), credit: credit.trim().slice(0, 60), source: src, kind: "image" }]);
     setUrl(""); setCredit(""); setMsg("");
@@ -132,7 +132,7 @@ export function Media({ ws, photos, onChange, veo = false }: { ws: string; photo
     for (const file of Array.from(files ?? []).slice(0, PHOTOS_MAX - photos.length)) {
       setMsg(`${file.name} 올리는 중 0%`);
       const r = await upload(ws, file, (p) => setMsg(`${file.name} 올리는 중 ${p}%${p === 100 ? " · 확인 중" : ""}`));
-      if (r.error || !r.photo) return setMsg(r.error ?? "올리지 못했어요");
+      if (r.error || !r.photo) return setMsg(r.error ?? "파일을 올리지 못했어요. 다시 올려 주세요");
       list = [...list, r.photo];
       onChange(list);
     }
@@ -153,7 +153,7 @@ export function Media({ ws, photos, onChange, veo = false }: { ws: string; photo
       <input className="input" aria-label="무료 사진 주소" placeholder="무료 사진 주소 (images.unsplash.com/…)" value={url} onChange={(e) => setUrl(e.target.value)} disabled={full} />
       <div className="ed-row ed-nowrap">
         <input className="input" aria-label="출처" placeholder="출처 (사진가)" value={credit} onChange={(e) => setCredit(e.target.value)} disabled={full} />
-        <button type="button" className="btn" onClick={add} disabled={full || !url}>더하기</button>
+        <button type="button" className="btn" onClick={add} disabled={full || !url}>사진 더하기</button>
       </div>
       <div className="ed-row">
         <label className="btn" style={full ? { opacity: .4 } : undefined}>직접 올리기 (사진 8MB · 영상 300MB)<input type="file" accept="image/jpeg,image/png,video/mp4,video/quicktime" multiple hidden disabled={full} onChange={(e) => { pick(e.target.files); e.target.value = ""; }} /></label>
@@ -171,7 +171,7 @@ const VEO_MODES = [
   ["text", "글로만", "설명만으로 만들어요"],
   ["image", "첫 장면 사진", "올린 사진에서 시작해 움직여요"],
   ["frames", "처음·끝 사진", "두 사진 사이를 이어 움직여요 · 8초 · Fast·기본"],
-  ["reference", "참고 사진", "제품·인물·장소 모습을 유지해요 (최대 3장) · 8초 · Fast·기본"],
+  ["reference", "참고 사진", "제품·인물·장소 모습을 유지해요 (3장까지) · 8초 · Fast·기본"],
   ["extend", "이어 붙이기", "Veo 로 만든 영상 뒤에 7초 더 · 만든 지 2일 안 · 720p · Fast·기본"],
 ] as const;
 type VeoMode = (typeof VEO_MODES)[number][0];
@@ -202,7 +202,7 @@ function VeoBox({ ws, enabled, photos, full, onDone }: { ws: string; enabled: bo
   };
   const label = (u: string) => `${photos.findIndex((p) => p.url === u) + 1}번`;
   const ready = prompt.trim().length >= 5 && (mode === "text" || (mode === "image" && first) || (mode === "frames" && first && last) || (mode === "reference" && refs.length > 0) || (mode === "extend" && ext));
-  if (!enabled) return <p className="small muted" style={{ margin: 0 }}>AI 영상(Veo): 운영자가 &apos;AI 연동&apos;에서 Gemini 키를 넣으면 여기서 글로 영상을 만들 수 있어요.</p>;
+  if (!enabled) return <p className="small muted" style={{ margin: 0 }}>AI 영상(Veo): 운영자가 &apos;설정 · AI&apos;에서 Gemini 키를 넣으면 여기서 글로 영상을 만들 수 있어요.</p>;
   const go = async () => {
     setState({ busy: true, msg: "시작하는 중" });
     const body = { prompt, mode, model, aspect, duration, firstFrame: first || undefined, lastFrame: last || undefined, references: mode === "reference" ? refs : undefined, extendFrom: mode === "extend" ? ext : undefined };
@@ -217,7 +217,7 @@ function VeoBox({ ws, enabled, photos, full, onDone }: { ws: string; enabled: bo
       if (s.status === "running") { setState({ busy: true, msg: s.message }); continue; }
       if (s.status === "error") return setState({ busy: false, msg: s.message, err: true });
       onDone(s.photo);
-      return setState({ busy: false, msg: "영상을 더했어요. 영상 가능한 사진 칸에서 골라 쓰세요 (캡션 출처에 'AI 생성'이 붙어요)" });
+      return setState({ busy: false, msg: "영상을 더했어요. 영상을 넣을 수 있는 칸에서 골라 쓸 수 있어요 (캡션 출처에 'AI 생성'이 붙어요)" });
     }
   };
   const photoSelect = (value: string, set: (v: string) => void, title: string) => (
@@ -240,7 +240,7 @@ function VeoBox({ ws, enabled, photos, full, onDone }: { ws: string; enabled: bo
           </div>) : <p className="small muted" style={{ margin: 0 }}>먼저 위 &apos;직접 올리기&apos;로 사진을 올려 주세요.</p>)}
         {mode === "extend" && (extOk === null ? <span className="small">확인하는 중</span> : extOk.length ? (
           <label className="fld">이어 붙일 영상<select className="input" value={ext} onChange={(e) => setExt(e.target.value)}>{extOk.map((u) => <option key={u} value={u}>{label(u)} 영상 (Veo)</option>)}</select></label>
-        ) : <p className="small muted" style={{ margin: 0 }}>이어 붙일 수 있는 영상이 없어요. 이 게시물에서 Veo 로 만든 지 2일 안의 영상만 돼요.</p>)}
+        ) : <p className="small muted" style={{ margin: 0 }}>이 게시물에서 Veo로 만든 지 2일이 안 된 영상을 이어 붙일 수 있어요. 지금은 그런 영상이 없어요.</p>)}
         <label className="fld">{mode === "extend" ? "이어서 무슨 일이 일어나는지" : "어떤 영상인지"} <em>장면·움직임·카메라·분위기를 구체적으로 (영어도 돼요)</em>
           <textarea className="input" rows={3} maxLength={1500} value={prompt} onChange={(e) => setPrompt(e.target.value)} placeholder="예: 아침 햇살이 드는 카페 카운터에서 바리스타가 핸드드립을 내리는 손, 김이 피어오름, 천천히 다가가는 카메라" /></label>
         <div className="row">
@@ -252,7 +252,7 @@ function VeoBox({ ws, enabled, photos, full, onDone }: { ws: string; enabled: bo
           <button type="button" className="btn primary" disabled={state.busy || full || !ready} onClick={go}>{state.busy ? "만드는 중…" : "영상 만들기"}</button>
           {state.msg && <span className={state.err ? "err" : "small"}>{state.msg}</span>}
         </div>
-        <span className="small muted">요금이 나가는 기능이에요 (요금제의 한 달 영상 수로 막아요). 실제 사람·브랜드를 흉내 내지 말고, 인스타에 올릴 땐 &apos;AI 정보&apos; 표시를 켜요.</span>
+        <span className="small muted">요금이 드는 기능이라 요금제의 한 달 영상 수만큼 만들 수 있어요. 실제 사람·브랜드는 흉내 내지 않아요. 인스타에 올릴 땐 &apos;AI 정보&apos; 표시를 켜요.</span>
       </div>
     </div>
   );

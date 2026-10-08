@@ -8,7 +8,7 @@ import { setStatusAction } from "../../../actions";
 export default function ApproveForm({ id, required, added = [], editHref }: { id: string; required: string[]; added?: string[]; editHref: string }) {
   const [got, setGot] = useState<string[]>([]);
   const [st, act, pending] = useActionState(setStatusAction, undefined);
-  if (st?.ok) return <p className="ok" style={{ marginTop: 8 }}>승인했어요. 왼쪽 목록에서 골라 내려받아 올려 주세요.</p>;
+  if (st?.ok) return <p className="ok" style={{ marginTop: 8 }}>승인했어요. &apos;승인됨&apos;에서 골라 내려받을 수 있어요.</p>;
   return (
     <form action={act} className="col" style={{ gap: 0 }}>
       <input type="hidden" name="id" value={id} /><input type="hidden" name="status" value="approved" />
@@ -21,7 +21,7 @@ export default function ApproveForm({ id, required, added = [], editHref }: { id
       ))}
       <div className="row" style={{ justifyContent: "flex-end", marginTop: 8 }}>
         <Link className="btn" href={editHref}>편집기에서 고치기</Link>
-        <button className="btn primary" disabled={pending || got.length < required.length}>{pending ? "승인하는 중" : "승인"}</button>
+        <button className="btn primary" disabled={pending || got.length < required.length}>{pending ? "승인하는 중" : "승인하기"}</button>
       </div>
       {st?.error && <p className="err">{st.error}</p>}
     </form>

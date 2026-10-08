@@ -85,15 +85,15 @@ function run(cmd: string, args: string[], o: { input?: string; timeout?: number;
 /** 연결마다 상태 (설정 화면) */
 export async function viaStatus(actor: Actor | null) {
   const cli = async (v: "claude-code" | "codex") => {
-    if (!localCliAllowed(actor)) return { ok: false, note: "운영자 본인이 이 Mac 에서 쓸 때만" };
+    if (!localCliAllowed(actor)) return { ok: false, note: "운영자 본인이 이 Mac 에서만 쓸 수 있어요" };
     const r = await run(BIN[v], ["--version"], { timeout: 10_000 });
     return r.code === 0 ? { ok: true, note: r.out.trim().split("\n")[0].slice(0, 60) } : { ok: false, note: "이 Mac 에서 찾지 못했어요" };
   };
   return {
     "claude-code": await cli("claude-code"),
     codex: await cli("codex"),
-    anthropic: getKey("anthropic") ? { ok: true, note: `키 …${getKey("anthropic")!.slice(-4)}` } : { ok: false, note: "키 없음" },
-    openai: getKey("openai") ? { ok: true, note: `키 …${getKey("openai")!.slice(-4)}` } : { ok: false, note: "키 없음" },
+    anthropic: getKey("anthropic") ? { ok: true, note: `키 …${getKey("anthropic")!.slice(-4)}` } : { ok: false, note: "키가 없어요" },
+    openai: getKey("openai") ? { ok: true, note: `키 …${getKey("openai")!.slice(-4)}` } : { ok: false, note: "키가 없어요" },
   } satisfies Record<AiVia, { ok: boolean; note: string }>;
 }
 
@@ -121,9 +121,9 @@ const anthropic = () => {
 };
 const anthropicErr = (e: unknown): never => {
   if (e instanceof OpError) throw e;
-  if (e instanceof Anthropic.AuthenticationError) throw new OpError("Anthropic API 키가 맞지 않아요");
+  if (e instanceof Anthropic.AuthenticationError) throw new OpError("Anthropic API 키가 맞지 않아요. 설정 · AI 에서 키를 확인해 주세요");
   if (e instanceof Anthropic.RateLimitError) throw new OpError("AI 사용량이 많아요. 잠시 뒤 다시 해 주세요");
-  if (e instanceof Anthropic.APIError) throw new OpError(`AI 호출이 실패했어요 (${e.status})`);
+  if (e instanceof Anthropic.APIError) throw new OpError(`AI 를 부르지 못했어요 (${e.status}). 잠시 뒤 다시 해 주세요`);
   throw e;
 };
 
@@ -149,9 +149,9 @@ async function askAnthropic(t: TierSetting, q: Ask) {
 async function openaiFetch(path: string, body?: unknown) {
   const key = getKey("openai") ?? (() => { throw new OpError(NO_AI); })();
   const r = await fetch(`https://api.openai.com/v1${path}`, { method: body ? "POST" : "GET", headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" }, body: body ? JSON.stringify(body) : undefined });
-  if (r.status === 401) throw new OpError("OpenAI API 키가 맞지 않아요");
+  if (r.status === 401) throw new OpError("OpenAI API 키가 맞지 않아요. 설정 · AI 에서 키를 확인해 주세요");
   if (r.status === 429) throw new OpError("AI 사용량이 많아요. 잠시 뒤 다시 해 주세요");
-  if (!r.ok) throw new OpError(`OpenAI 호출이 실패했어요 (${r.status})`);
+  if (!r.ok) throw new OpError(`OpenAI 를 부르지 못했어요 (${r.status}). 잠시 뒤 다시 해 주세요`);
   return r.json() as Promise<Record<string, unknown>>;
 }
 const openaiText = (j: Record<string, unknown>) => String(j.output_text ?? ((j.output as { type: string; content?: { type: string; text?: string }[] }[] | undefined) ?? []).flatMap((o) => o.content ?? []).filter((c) => c.type === "output_text").map((c) => c.text).join(""));
@@ -166,10 +166,10 @@ async function askClaudeCode(t: TierSetting, q: Ask, extra: string[] = [], timeo
   const args = ["-p", "--output-format", "json", "--model", t.model || "claude-sonnet-5-5", "--append-system-prompt", q.system,
     "--tools", q.webSearch ? "WebSearch,WebFetch" : "", ...(q.webSearch ? ["--allowedTools", "WebSearch WebFetch"] : []), ...extra];
   const r = await run(BIN["claude-code"], args, { input: q.prompt, timeout });
-  if (r.code !== 0) throw new OpError(`Claude Code 실행이 실패했어요${r.err ? ` (${r.err.trim().split("\n").pop()?.slice(0, 120)})` : ""}. 터미널에서 claude 로그인을 확인해 주세요`);
+  if (r.code !== 0) throw new OpError(`Claude Code 를 실행하지 못했어요${r.err ? ` (${r.err.trim().split("\n").pop()?.slice(0, 120)})` : ""}. 터미널에서 claude 로그인을 확인해 주세요`);
   try {
     const j = JSON.parse(r.out);
-    if (j.subtype === "error_max_turns") throw new OpError(`할 일이 많아 ${j.num_turns ?? ""}단계에서 멈췄어요. 위 카드가 지금까지 한 일이에요 — '이어서 해 줘'라고 보내면 남은 일을 해요`);
+    if (j.subtype === "error_max_turns") throw new OpError(`할 일이 많아 ${j.num_turns ?? ""}단계에서 멈췄어요. 위 카드가 지금까지 한 일이에요. '이어서 해 줘'라고 보내면 남은 일을 해요`);
     if (j.is_error) throw new OpError(`Claude Code: ${String(j.result ?? "오류").slice(0, 160)}`);
     return String(j.result ?? "");
   }
@@ -181,7 +181,7 @@ async function askCodex(t: TierSetting, q: Ask, extra: string[] = [], timeout = 
   try {
     const args = ["exec", "--skip-git-repo-check", "--output-last-message", out, ...(t.model ? ["-m", t.model] : []), ...(q.webSearch ? ["--search"] : []), ...extra, "-"];
     const r = await run(BIN.codex, args, { input: `${q.system}\n\n${q.prompt}`, timeout });
-    if (r.code !== 0) throw new OpError(`Codex 실행이 실패했어요${r.err ? ` (${r.err.trim().split("\n").pop()?.slice(0, 120)})` : ""}. 터미널에서 codex 로그인을 확인해 주세요`);
+    if (r.code !== 0) throw new OpError(`Codex 를 실행하지 못했어요${r.err ? ` (${r.err.trim().split("\n").pop()?.slice(0, 120)})` : ""}. 터미널에서 codex 로그인을 확인해 주세요`);
     return await readFile(out, "utf8").catch(() => r.out);
   } finally { await rm(dir, { recursive: true, force: true }); }
 }
@@ -223,7 +223,7 @@ function streamClaudeCode(t: TierSetting, q: Ask, onText: OnText, signal?: Abort
     p.on("close", (code: number | null) => {
       clearTimeout(timer);
       if (signal?.aborted) return reject(new OpError("멈췄어요"));
-      if (!result || code !== 0 || result.is_error) return reject(new OpError(`Claude Code 실행이 실패했어요${result?.result ? ` (${String(result.result).slice(0, 120)})` : err ? ` (${err.trim().split("\n").pop()?.slice(0, 120)})` : ""}. 터미널에서 claude 로그인을 확인해 주세요`));
+      if (!result || code !== 0 || result.is_error) return reject(new OpError(`Claude Code 를 실행하지 못했어요${result?.result ? ` (${String(result.result).slice(0, 120)})` : err ? ` (${err.trim().split("\n").pop()?.slice(0, 120)})` : ""}. 터미널에서 claude 로그인을 확인해 주세요`));
       const text = String(result.result ?? sent);
       if (!sent && text) onText(text); // 조각을 못 받는 버전이면 한 번에
       resolve(text);
@@ -251,9 +251,9 @@ async function streamOpenAI(t: TierSetting, q: Ask, onText: OnText, signal?: Abo
   const key = getKey("openai") ?? (() => { throw new OpError(NO_AI); })();
   const r = await fetch("https://api.openai.com/v1/responses", { method: "POST", signal, headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
     body: JSON.stringify({ model: t.model, instructions: q.system, input: q.prompt, reasoning: { effort: t.effort }, stream: true }) }).catch((e) => { if (signal?.aborted) throw new OpError("멈췄어요"); throw e; });
-  if (r.status === 401) throw new OpError("OpenAI API 키가 맞지 않아요");
+  if (r.status === 401) throw new OpError("OpenAI API 키가 맞지 않아요. 설정 · AI 에서 키를 확인해 주세요");
   if (r.status === 429) throw new OpError("AI 사용량이 많아요. 잠시 뒤 다시 해 주세요");
-  if (!r.ok || !r.body) throw new OpError(`OpenAI 호출이 실패했어요 (${r.status})`);
+  if (!r.ok || !r.body) throw new OpError(`OpenAI 를 부르지 못했어요 (${r.status}). 잠시 뒤 다시 해 주세요`);
   const reader = r.body.getReader(), dec = new TextDecoder();
   let buf = "", text = "";
   for (;;) {
@@ -324,7 +324,7 @@ export async function chat(actor: Actor, ctx: string, history: ChatTurn[], tools
   const system = CHAT_SYSTEM(ctx);
   const turns = history.slice(-12);
   if (t.via === "claude-code" || t.via === "codex") {
-    if (!mcp) throw new OpError("이 Mac 의 MCP 토큰(STUDIO_MCP_TOKEN)이 없어 구독 연결로는 도구를 쓸 수 없어요");
+    if (!mcp) throw new OpError("이 Mac 에 MCP 토큰(STUDIO_MCP_TOKEN)이 없어서 구독 연결로 도구를 쓰지 못해요. .env.local 에 넣어 주세요");
     const prompt = turns.map((x) => `${x.role === "user" ? "사용자" : "도우미"}: ${x.text}`).join("\n\n") + "\n\n도우미:";
     if (t.via === "claude-code") {
       const cfg = JSON.stringify({ mcpServers: { "card-studio": { type: "http", url: mcp.url, headers: { Authorization: `Bearer ${mcp.token}`, "X-Studio-Via": "ai" } } } });

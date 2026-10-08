@@ -90,7 +90,7 @@ export async function requireWs(wsId: string, perm: Perm = "view") {
   const ws = await getWorkspace(wsId);
   const role = ws && roleIn(actor, ws);
   if (!ws || !role) notFound();
-  if (!can(role, perm)) redirect(`/w/${ws.id}?error=${encodeURIComponent("이 일은 권한이 없어요")}`);
+  if (!can(role, perm)) redirect(`/w/${ws.id}?error=${encodeURIComponent("이 일을 할 권한이 없어요. 소유자가 역할을 바꿔 줄 수 있어요")}`);
   return { actor, ws, role };
 }
 /** API·server action 용: 권한이 없으면 null (호출한 쪽이 401/403 으로) */

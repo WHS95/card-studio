@@ -4,7 +4,7 @@ import type { Template } from "../fields";
 export const interview: Template = {
   id: "interview",
   name: "인터뷰 카드",
-  description: "사람 한 명을 질문 3개와 추천템으로 소개",
+  description: "사람 한 명을 질문 3개와 추천 목록으로 소개",
   maxSlides: 8,
   kinds: [
     { kind: "cover", label: "표지", fixed: true, fields: [
@@ -26,7 +26,7 @@ export const interview: Template = {
         { key: "name", label: "이름", type: "text", max: 18 },
         { key: "why", label: "이유", type: "text", max: 36, optional: true },
       ] },
-    ], blank: () => ({ kind: "picks", small: "", big: "추천 꿀템", items: [{ photo: null, name: "", why: "" }] }) },
+    ], blank: () => ({ kind: "picks", small: "", big: "이걸 추천해요", items: [{ photo: null, name: "", why: "" }] }) },
     { kind: "follow", label: "팔로우", fields: [
       { key: "photo", label: "사진", type: "photo", video: true, tune: ["y"] },
       { key: "title", label: "계정", type: "text", max: 30 },

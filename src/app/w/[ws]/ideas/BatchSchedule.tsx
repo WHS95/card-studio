@@ -24,8 +24,8 @@ export default function BatchSchedule({ ws, action, items }: {
         );
       })}
       <div className="blackbar">
-        <span style={{ flex: "1 1 240px" }}><b>{order.length}개 선택</b> · 고른 순서대로 목록 끝에</span>
-        <button className="btn" disabled={!order.length}>제작에 차례로 넣기</button>
+        <span style={{ flex: "1 1 240px" }}><b>{order.length}개 골랐어요</b></span>
+        <button className="btn" disabled={!order.length}>고른 순서대로 제작에 넣기</button>
       </div>
     </form>
   );

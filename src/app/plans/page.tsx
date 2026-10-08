@@ -14,7 +14,7 @@ export default async function Plans() {
     <WideShell active="plans">
       <div className="w-pagehead w-1100">
         <h1>요금제</h1>
-        <p className="small muted">모든 요금제에서 템플릿 전부 · 영상 장 · 릴스 · 마진 계산 · MCP</p>
+        <p className="small muted">모든 요금제에서 템플릿 전부 · 영상 장 · 릴스 · 마진 계산 · MCP 를 써요.</p>
       </div>
       <div className="w-plans">
         {Object.values(PLANS).map((p) => (
