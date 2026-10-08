@@ -44,6 +44,8 @@ export async function flowOf(w: Workspace) {
   // 지금 할 일: 막히는 것부터
   const order: StepKey[] = ["brief", "ideas", "review", "publish", "insights", "make", "research"];
   const now = order.map((k) => steps.find((s) => s.key === k)).filter((s): s is Step => !!s).find((s) => s.state === "todo" || (s.state === "doing" && s.key !== "research")) ?? null;
-  return { steps, now, counts: { done: steps.filter((s) => s.state === "done").length, doing: steps.filter((s) => s.state === "doing").length, todo: steps.filter((s) => s.state === "todo").length } };
+  // 초안이 검수를 기다리면 '지금 할 일'은 제작 목록의 초안만 보이게
+  const nowLink = now && now.key === "make" && drafts ? { ...now, href: `${now.href}?s=draft` } : now;
+  return { steps, now: nowLink, counts: { done: steps.filter((s) => s.state === "done").length, doing: steps.filter((s) => s.state === "doing").length, todo: steps.filter((s) => s.state === "todo").length } };
 }
 export type Flow = Awaited<ReturnType<typeof flowOf>>;

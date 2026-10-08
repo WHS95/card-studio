@@ -152,7 +152,7 @@ export async function setStatus(id: string, status: PostStatus, postedUrl?: stri
   return (await updatePost(id, patch))!;
 }
 
-/** AI 종합 피드백을 게시물에 남긴다 — 고친 때(updatedAt)는 그대로 둬서 '이 버전에 받은 것'인지 알 수 있게 */
+/** AI 종합 피드백을 게시물에 남긴다 (고친 때 updatedAt 은 그대로 — 어느 글에 대한 것인지는 r.for 지문으로) */
 export function saveAiReview(id: string, r: AiReview) {
   return mutate((db) => { const p = db.posts.find((x) => x.id === id) ?? fail("게시물을 찾지 못했어요"); p.aiReview = r; return r; });
 }

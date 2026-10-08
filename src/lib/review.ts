@@ -1,13 +1,17 @@
 import "server-only";
+import { createHash } from "node:crypto";
 import { getPost, getWorkspace, readDb } from "./store";
 import { checklistOf, OpError } from "./ops";
 import { checkPost } from "./check";
 import { validatePost } from "./fields";
 import { templateOf } from "./templates";
-import { DEFAULT_CHECKS } from "./types";
+import { DEFAULT_CHECKS, type Post } from "./types";
 
 // 편집기 '검수' 창의 자동 확인 (돈이 들지 않는 것만): 칸 검사 · 인스타 마진 · 콘텐츠 규칙(문구 규칙 포함) · '확인 필요' 자료 · 샘플 그림 · 사진 출처 · 캡션·해시태그.
 // AI 종합 피드백(ai.ts reviewPost)은 이 결과를 받아 되풀이하지 않고, 사람이 누를 때만 부른다.
+
+/** AI 피드백이 어느 글에 대한 것인지: 템플릿 + 장 글·사진·캡션의 지문 (상태만 바꿔도 바뀌는 updatedAt 대신) */
+export const contentKey = (p: Pick<Post, "template" | "data">) => createHash("sha256").update(JSON.stringify({ t: p.template, d: p.data })).digest("hex").slice(0, 16);
 
 export type AutoItem = { ok: boolean; text: string; href?: string };
 
@@ -39,7 +43,7 @@ export async function autoReview(postId: string) {
   const research = db.research.filter((r) => rids.has(r.id)).map((r) => ({ title: r.title, summary: r.summary, url: r.url, confidence: r.confidence ?? "medium" }));
   return {
     items, required: cl.required, added: cl.required.filter((c) => !(DEFAULT_CHECKS as readonly string[]).includes(c)),
-    research, review: cl.review, aiReview: p.aiReview && p.aiReview.for === p.updatedAt ? p.aiReview : null, oldAi: p.aiReview && p.aiReview.for !== p.updatedAt ? p.aiReview : null,
+    research, review: cl.review, aiReview: p.aiReview && p.aiReview.for === contentKey(p) ? p.aiReview : null, oldAi: p.aiReview && p.aiReview.for !== contentKey(p) ? p.aiReview : null,
   };
 }
 export type AutoReview = Awaited<ReturnType<typeof autoReview>>;

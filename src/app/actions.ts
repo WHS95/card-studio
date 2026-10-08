@@ -13,7 +13,7 @@ import { baseUrl } from "@/lib/baseurl";
 import { headers } from "next/headers";
 import { testGemini } from "@/lib/veo";
 import { draftPostData, researchTopic, reviewPost, suggestIdeas, type IdeaSuggestion } from "@/lib/ai";
-import { autoReview, type AutoReview } from "@/lib/review";
+import { autoReview, contentKey, type AutoReview } from "@/lib/review";
 import { chat, countsAgainstPlan, saveAiConfig, testVia, type ChatTurn } from "@/lib/llm";
 import { callTool, TOOLS } from "@/lib/mcp";
 import { AI_VIA, type AiTier, type AiVia } from "@/lib/types";
@@ -268,7 +268,7 @@ export async function aiReviewAction(id: string): Promise<AiState<AiReview>> {
     const auto = await autoReview(id);
     await countFor(w.id, actor, "judge");
     const fb = await reviewPost(w, post, auto.items.map((x) => `${x.ok ? "통과" : "확인"}: ${x.text}`), auto.research, actor);
-    const r: AiReview = { ...fb, by: actor.name, at: new Date().toISOString(), for: post.updatedAt };
+    const r: AiReview = { ...fb, by: actor.name, at: new Date().toISOString(), for: contentKey(post) };
     await saveAiReview(id, r);
     return { ok: r };
   } catch (e) { return { error: msg(e) }; }
