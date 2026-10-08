@@ -127,7 +127,7 @@ model: ${VEO_MODELS.map((m) => m.id).join(" · ")} (기본 lite; frames·referen
   },
   {
     name: "get_brief",
-    description: "서비스 브리프(무엇을·누구에게·말투·꼭 넣을 말·쓰지 않을 말·기본 해시태그·CTA)와 콘텐츠 기둥(이름·비중·기본 템플릿·예시 주제). 아이디어·초안·캡션을 쓰기 전에 먼저 읽는다. text 는 AI 가 읽기 좋은 요약.",
+    description: "서비스 브리프(무엇을·누구에게·말투·꼭 넣을 말·쓰지 않을 말·기본 해시태그·행동 유도 문구)와 콘텐츠 기둥(이름·비중·기본 템플릿·예시 주제). 아이디어·초안·캡션을 쓰기 전에 먼저 읽는다. text 는 AI 가 읽기 좋은 요약.",
     inputSchema: obj({ ws: str }, ["ws"]),
     run: async (a) => {
       const w = need(await getWorkspace(String(a.ws)), "서비스를 찾지 못했어요");

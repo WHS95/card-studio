@@ -17,7 +17,7 @@ const VIA_TITLE: Record<AiVia, string> = { "claude-code": "Claude 구독 · 이 
 const ICON: Record<AiTier, string> = { judge: "brain", write: "pen", polish: "brush" };
 
 type PresetKind = "best" | "save" | "max";
-const PRESETS: [PresetKind, string, string][] = [["best", "최적 (기본)", "판단은 강한 모델, 쓰기·다듬기는 빠른 모델"], ["save", "절약", "판단만 강한 모델, 나머지는 한 단계씩 낮게"], ["max", "최대 품질", "모두 강한 모델 · 시간과 사용량이 더 들어요"]];
+const PRESETS: [PresetKind, string, string][] = [["best", "균형 (기본)", "판단은 강한 모델, 쓰기·다듬기는 빠른 모델"], ["save", "절약", "판단만 강한 모델, 나머지는 한 단계씩 낮게"], ["max", "최대 품질", "모두 강한 모델 · 시간과 사용량이 더 들어요"]];
 const PLAN: Record<PresetKind, [number, string][]> = { best: [[1, "high"], [2, "medium"], [3, "low"]], save: [[1, "medium"], [3, "low"], [3, "low"]], max: [[0, "high"], [1, "high"], [2, "medium"]] };
 
 /** AI 연결 + 작업별 모델 (운영자) */

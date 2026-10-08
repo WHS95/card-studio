@@ -440,7 +440,7 @@ export default function Editor({ ws, post, empty }: { ws: Ws; post: Post; empty:
             {tagCount > HASHTAG_MAX && <p className="err">인스타는 해시태그를 {HASHTAG_MAX}개까지 받아요. {tagCount - HASHTAG_MAX}개를 빼 주세요</p>}
             {ws.hashtags.length > 0 && ws.canEdit && <div className="ed-row">
               <button type="button" className="btn" onClick={() => edit((d) => { const have = new Set(tags(d.caption)); const add = ws.hashtags.filter((h) => !have.has(h)); if (add.length) d.caption = `${d.caption.trimEnd()}${d.caption.trim() ? "\n\n" : ""}${add.join(" ")}`.slice(0, 2200); return d; })}>기본 해시태그 넣기</button>
-              {ws.cta && <button type="button" className="btn" onClick={() => edit((d) => { if (!d.caption.includes(ws.cta)) d.caption = `${d.caption.trimEnd()}${d.caption.trim() ? "\n\n" : ""}${ws.cta}`.slice(0, 2200); return d; })}>기본 CTA 넣기</button>}
+              {ws.cta && <button type="button" className="btn" onClick={() => edit((d) => { if (!d.caption.includes(ws.cta)) d.caption = `${d.caption.trimEnd()}${d.caption.trim() ? "\n\n" : ""}${ws.cta}`.slice(0, 2200); return d; })}>기본 행동 유도 문구 넣기</button>}
               <span className="ed-note">목적 탭에서 정한 값이에요</span>
             </div>}
           </section>

@@ -30,7 +30,7 @@ function AddRow({ label, onClick, disabled }: { label: string; onClick: () => vo
 }
 
 type Extra = "industry" | "link" | "keywords" | "hashtags" | "references" | "cta";
-const EXTRA_LABEL: Record<Extra, string> = { industry: "업종", keywords: "꼭 넣을 말", hashtags: "기본 해시태그", references: "참고·경쟁 계정", cta: "기본 행동 유도 (CTA)", link: "프로필 링크" };
+const EXTRA_LABEL: Record<Extra, string> = { industry: "업종", keywords: "꼭 넣을 말", hashtags: "기본 해시태그", references: "참고·경쟁 계정", cta: "기본 행동 유도 문구", link: "프로필 링크" };
 
 export default function BriefEditor({ ws, brief: b0, pillars: p0, presets, goals, templates, defaultTemplateName, isNew, canEdit }: {
   ws: string; brief: Brief; pillars: Pillar[]; presets: Preset[]; goals: string[]; templates: { id: string; name: string }[]; defaultTemplateName: string; isNew: boolean; canEdit: boolean;
@@ -97,7 +97,7 @@ export default function BriefEditor({ ws, brief: b0, pillars: p0, presets, goals
       case "keywords": return <ListInput key={k} label="꼭 넣을 말" value={b.keywords} onChange={(v) => set({ keywords: v })} placeholder="쉼표로 나눠서, 20개까지" />;
       case "hashtags": return <ListInput key={k} label="기본 해시태그" value={b.hashtags} onChange={(v) => set({ hashtags: v })} placeholder="#태그, #태그" hint="편집기에서 한 번에 넣어요 · 30개까지" />;
       case "references": return <ListInput key={k} label="참고·경쟁 계정" value={b.references} onChange={(v) => set({ references: v })} placeholder="@account, 10개까지" />;
-      case "cta": return <Dl key={k} label="기본 행동 유도 (CTA)" hint={`${b.cta.length}/60`}><input className="stg-in" maxLength={60} value={b.cta} placeholder="예: 프로필 링크에서 이번 주 모임 보기" onChange={(e) => set({ cta: e.target.value })} /></Dl>;
+      case "cta": return <Dl key={k} label="기본 행동 유도 문구" hint={`${b.cta.length}/60`}><input className="stg-in" maxLength={60} value={b.cta} placeholder="예: 프로필 링크에서 이번 주 모임 보기" onChange={(e) => set({ cta: e.target.value })} /></Dl>;
     }
   };
 
