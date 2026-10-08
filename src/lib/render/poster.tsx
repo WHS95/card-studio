@@ -62,21 +62,26 @@ function Items({ c, s }: SlideProps) {
   const dark = isDark(s, "items"), hl = hlMode(c, pick(s, "items", "hl"), ink(c, dark));
   const items = (Array.isArray(s.items) ? s.items : []) as { label: string; sub: string; photo: unknown }[];
   const top = str(s, "top"), bottom = str(s, "bottom");
-  // 항목이 많으면 그림을 낮게 (5개 = 3줄)
-  const ph = items.length > 4 ? 84 : items.length > 2 ? 170 : 300;
-  const cw = Math.floor((x1 - x0 - 30) / 2);
+  // 항목 수에 맞춰 안전 영역 아래까지 채운다 (매거진 목록과 같은 방식): 남는 높이를 그림 높이로 나누고, 그림이 없으면 글을 키워 줄 사이를 고르게
+  const k = Math.max(1, items.length), rows = Math.ceil(k / 2), cw = Math.floor((x1 - x0 - 30) / 2);
+  const gridTop = y0 + 190, gridBottom = y1 - (bottom ? 120 : 0), avail = gridBottom - gridTop;
+  const withPics = items.some((it) => has(it.photo));
+  const lab = withPics ? (k <= 2 ? 36 : 30) : k <= 2 ? 60 : k <= 4 ? 50 : 42;
+  const textH = 40 + Math.round(lab * 1.25) * 2 + (items.some((it) => it.sub) ? 34 : 0) + 18; // 번호 + 이름 두 줄까지 + 설명
+  const rowGap = withPics ? (k > 4 ? 14 : 22) : 22;
+  const ph = Math.max(70, Math.min(520, Math.floor((avail - rows * textH - rowGap * (rows - 1)) / rows) - 6));
   return (
     <>
       <div style={{ position: "absolute", left: x0, width: x1 - x0, top: y0, display: "flex", flexDirection: "column", alignItems: "center", gap: 16 }}>
         {top && <Rich c={c} text={top} size={32} weight={800} color={ink(c, dark)} align="center" hl={hl} />}
         <TapeOn c={c} text={str(s, "tape")} dark={dark} size={56} />
       </div>
-      <div style={{ position: "absolute", left: x0, width: x1 - x0, top: y0 + 190, display: "flex", flexWrap: "wrap", columnGap: 30, rowGap: items.length > 4 ? 14 : 22 }}>
+      <div style={{ position: "absolute", left: x0, width: x1 - x0, top: gridTop, height: avail, display: "flex", flexWrap: "wrap", columnGap: 30, rowGap, alignContent: withPics ? "flex-start" : "space-around" }}>
         {items.map((it, i) => (
           <div key={i} style={{ display: "flex", flexDirection: "column", width: cw, gap: 6 }}>
-            <span style={{ display: "flex", fontSize: 26, fontWeight: 500, ...(hl === "fill" ? { alignSelf: "flex-start", padding: "0 10px", borderRadius: 8, background: c.theme.accent, color: c.theme.onAccent } : { color: c.theme.accent }) }}>({String(i + 1).padStart(2, "0")})</span>
-            <span style={{ fontSize: 30, fontWeight: 800, color: ink(c, dark), lineHeight: 1.25, wordBreak: "break-all" }}>{it.label}</span>
-            {it.sub && <span style={{ fontSize: 22, fontWeight: 500, color: dark ? hexA(c.theme.light, 0.7) : c.theme.muted, wordBreak: "break-all" }}>{it.sub}</span>}
+            <span style={{ display: "flex", fontSize: Math.round(lab * 0.8), fontWeight: 500, ...(hl === "fill" ? { alignSelf: "flex-start", padding: "0 10px", borderRadius: 8, background: c.theme.accent, color: c.theme.onAccent } : { color: c.theme.accent }) }}>({String(i + 1).padStart(2, "0")})</span>
+            <span style={{ fontSize: lab, fontWeight: 800, color: ink(c, dark), lineHeight: 1.25, wordBreak: "break-all" }}>{it.label}</span>
+            {it.sub && <span style={{ fontSize: Math.round(lab * 0.72), fontWeight: 500, color: dark ? hexA(c.theme.light, 0.7) : c.theme.muted, wordBreak: "break-all" }}>{it.sub}</span>}
             {has(it.photo) && <div style={{ display: "flex", position: "relative", width: cw, height: ph, marginTop: 6 }}><Pic src={photoOf(c, it.photo)} x={0} y={0} w={cw} h={ph} radius={12} /></div>}
           </div>
         ))}
