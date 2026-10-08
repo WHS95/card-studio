@@ -76,7 +76,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
         </div>
       )}
       {!list.length && <p className="hint">{fav ? "서비스 카드의 별을 누르면 여기 모여요." : "'새 서비스'를 눌러 첫 서비스를 만들어 보세요."}</p>}
-      <p className="small muted w-m0">{fav ? "별을 누른 서비스만 모여요." : "카드를 누르면 '할 일'이 있는 단계로 열려요. 진행 띠는 6단계(목적·자료 조사·주제·템플릿·제작·검수)이고, 진한 칸은 마친 단계예요."}</p>
+      <p className="small muted w-m0">{fav ? "별을 누른 서비스만 모여요." : "카드를 누르면 '할 일'이 있는 단계로 열려요. 진행 띠는 5단계(목적·자료 조사·주제·템플릿·제작)이고, 진한 칸은 마친 단계예요."}</p>
     </WideShell>
   );
 }

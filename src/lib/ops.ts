@@ -6,7 +6,7 @@ import { hashPassword, tempPassword, verifyPassword } from "./auth";
 import { templateOf } from "./templates";
 import { validatePost } from "./fields";
 import { ruleWarnings, ruleLine } from "./rules";
-import { CHECKS_MAX, CONFIDENCE, DEFAULT_CHECKS, IDEA_STATUS, NEXT_STATUS, NO_RULES, POST_STATUS, type Activity, type Brief, type Confidence, type ContentRules, type Idea, type IdeaStatus, type Metrics, type Role, type User, ROLES, type PlanId, type Pillar, type Post, type PostData, type PostStatus, type Research, type Theme, type Workspace } from "./types";
+import { CHECKS_MAX, CONFIDENCE, DEFAULT_CHECKS, IDEA_STATUS, NEXT_STATUS, NO_RULES, POST_STATUS, type Activity, type AiReview, type Brief, type Confidence, type ContentRules, type Idea, type IdeaStatus, type Metrics, type Role, type User, ROLES, type PlanId, type Pillar, type Post, type PostData, type PostStatus, type Research, type Theme, type Workspace } from "./types";
 
 // 화면(server action)과 MCP 가 같이 쓰는 규칙 한 곳. 틀리면 OpError(사용자에게 보여 줄 문구).
 
@@ -150,6 +150,11 @@ export async function setStatus(id: string, status: PostStatus, postedUrl?: stri
   // 게시 취소(posted → approved)면 게시 링크도 지운다
   else if (cur.status === "posted") { patch.postedUrl = ""; patch.postedAt = undefined; }
   return (await updatePost(id, patch))!;
+}
+
+/** AI 종합 피드백을 게시물에 남긴다 — 고친 때(updatedAt)는 그대로 둬서 '이 버전에 받은 것'인지 알 수 있게 */
+export function saveAiReview(id: string, r: AiReview) {
+  return mutate((db) => { const p = db.posts.find((x) => x.id === id) ?? fail("게시물을 찾지 못했어요"); p.aiReview = r; return r; });
 }
 
 /** 승인 전 확인: 사람이 체크할 항목 + 스튜디오가 알 수 있는 것(규칙 경고 · '확인 필요' 자료). 인스타 마진은 편집기가 따로 그린다 */

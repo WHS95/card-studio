@@ -75,9 +75,13 @@ export type Post = {
   archivedAt?: string; // 보관함으로 뺀 때 (달력 칸에서 빠지고 칸이 빈다, 되살릴 수 있다)
   metrics?: Metrics; // 게시 뒤 인스타 인사이트에서 옮겨 적는 성과
   review?: Review; // 승인할 때 체크한 기록 (승인 뒤 글을 고치면 지워진다)
+  aiReview?: AiReview; // 편집기 '검수'에서 받은 AI 종합 피드백 (마지막 한 번)
   postedAt?: string; // 게시로 표시한 때 (성과 적을 차례 계산)
   updatedAt: string;
 };
+
+/** AI 종합 피드백 (편집기 '검수'). for = 받을 때 게시물의 updatedAt — 그 뒤에 고치면 '예전 버전에 받은 것'으로 보인다. fix.slide 0 = 캡션·전체 */
+export type AiReview = { by: string; at: string; for: string; verdict: "ready" | "fix"; summary: string; good: string[]; fix: { slide: number; what: string; how: string }[] };
 
 /** 승인 체크 기록: 누가 · 언제 · 무엇을 체크했나 (체크리스트 문구 그대로) */
 export type Review = { by: string; at: string; checks: string[] };

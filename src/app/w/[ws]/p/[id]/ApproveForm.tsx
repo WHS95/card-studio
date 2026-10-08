@@ -1,14 +1,13 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import Link from "next/link";
-import { setStatusAction } from "../../../actions";
+import { setStatusAction } from "../../../../actions";
 
-/** 사람이 확인할 것: 모두 체크해야 '승인'이 켜진다. added = 서비스가 더한 항목(표시만 다르게, 값은 그대로) */
-export default function ApproveForm({ id, required, added = [], editHref }: { id: string; required: string[]; added?: string[]; editHref: string }) {
+/** 사람이 확인할 것: 모두 체크해야 '승인하기'가 켜진다. added = 서비스가 더한 항목(표시만 다르게, 값은 그대로) */
+export default function ApproveForm({ id, required, added = [] }: { id: string; required: string[]; added?: string[] }) {
   const [got, setGot] = useState<string[]>([]);
   const [st, act, pending] = useActionState(setStatusAction, undefined);
-  if (st?.ok) return <p className="ok" style={{ marginTop: 8 }}>승인했어요. &apos;승인됨&apos;에서 골라 내려받을 수 있어요.</p>;
+  if (st?.ok) return <p className="ok" style={{ marginTop: 8 }}>승인했어요. 제작 목록의 &apos;승인&apos;에서 골라 ZIP으로 내려받을 수 있어요.</p>;
   return (
     <form action={act} className="col" style={{ gap: 0 }}>
       <input type="hidden" name="id" value={id} /><input type="hidden" name="status" value="approved" />
@@ -20,7 +19,7 @@ export default function ApproveForm({ id, required, added = [], editHref }: { id
         </label>
       ))}
       <div className="row" style={{ justifyContent: "flex-end", marginTop: 8 }}>
-        <Link className="btn" href={editHref}>편집기에서 고치기</Link>
+        <span className="small muted" style={{ marginRight: "auto" }}>누가 언제 체크했는지 남아요</span>
         <button className="btn primary" disabled={pending || got.length < required.length}>{pending ? "승인하는 중" : "승인하기"}</button>
       </div>
       {st?.error && <p className="err">{st.error}</p>}

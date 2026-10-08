@@ -16,7 +16,7 @@
 - 문구 규칙(UX 라이팅): `src/lib/writing.ts`·`docs/WRITING.md` — 해요체·쉬운 말·강요·과장 없이. AI 요청·MCP 안내문에 규칙, 편집기 '⚠ 문구' 경고, MCP `check_writing`. 새 문구를 넣을 때도 지킨다.
 - 로그인 `src/lib/auth.ts`: 운영자(환경 변수) + 계정(이메일·scrypt) + 역할(소유자·편집자·검수자). 화면은 `requireWs`, API·action 은 `wsAccess`.
 - MCP 는 토큰 주인 권한으로 돈다(`mcp.ts` GUARD). 토큰은 sha256 만 저장(`src/lib/tokens.ts`). OAuth 2.1(동적 등록·PKCE)은 `/oauth/*`.
-- 단계(`src/lib/flow.ts`): 목적·자료 조사·주제·템플릿·제작(목록)·검수(골라서 ZIP) — 위 탭 상태와 '지금 할 일'. 발행·성과는 `LATER` 로 잠시 닫음(화면은 `LaterPage.tsx`). 화면 틀 `src/app/ui/Shell.tsx`.
+- 단계(`src/lib/flow.ts`): 목적·자료 조사·주제·템플릿·제작(목록·골라서 ZIP) — 위 탭 상태와 '지금 할 일'. 검수는 편집기의 '검수' 창(`p/[id]/ReviewPanel.tsx`: 자동 확인 `src/lib/review.ts` · AI 종합 피드백 `ai.ts reviewPost` · 승인 체크리스트). 검수·발행·성과 탭은 `LATER` 로 닫음(발행·성과 화면은 `LaterPage.tsx`). 화면 틀 `src/app/ui/Shell.tsx`.
 - 주제는 review → approved(소유자·검수자) → 달력. 초안 → 승인은 승인 체크리스트(`DEFAULT_CHECKS` + 서비스 항목)를 모두 체크해야(`Post.review` 기록). 콘텐츠 규칙(`src/lib/rules.ts`)은 경고만.
 - 성과 제안(`ops.insights`): 성과 적은 게시물 7편부터, 기둥 비중 ±10%p · 후속편 — 적용은 사람이.
 - AI(`src/lib/llm.ts`): Claude Code·Codex(구독 — 운영자 본인·로컬만, 토큰을 받지 않음) · Anthropic·OpenAI API 키, 작업 등급별 모델. AI 패널은 MCP 도구로 일하고 `logActivity` 로 기록. 패널 Claude Code 는 `--tools ""`로 스튜디오 MCP 만 쓴다. 편집기 AI 초안은 `/api/ai/draft`(NDJSON)로 장마다 흘려 받아 흐린 칸 → 글 → 미리보기 순으로 보여 준다(`askStream`·`draftPostStream`). 사진은 `search_photos`(위키미디어 공용, 자유 라이선스).

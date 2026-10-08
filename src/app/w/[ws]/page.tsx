@@ -8,7 +8,7 @@ import { templateOf } from "@/lib/templates";
 import { createPostAction, postToolAction } from "../../actions";
 import { ServiceShell } from "../../ui/Shell";
 import ConfirmButton from "../../ui/ConfirmButton";
-import Icon from "../../ui/Icon";
+import MakeList from "./MakeList";
 
 const dateOf = (start: string, day: number) => { const d = new Date(`${start}T00:00:00+09:00`); d.setDate(d.getDate() + day - 1); return d.toLocaleDateString("en-CA", { timeZone: "Asia/Seoul" }); };
 /** 2026-10-01 → 10/1 */
@@ -47,7 +47,7 @@ export default async function Calendar({ params, searchParams }: PageProps<"/w/[
     ? { t: "제작 · 보관함", s: "보관함으로 뺀 게시물이 지워지지 않고 여기 모여요. 원래 칸이나 비어 있는 첫 칸으로 되살리거나, 필요 없으면 완전히 지울 수 있어요. 게시한 게시물은 뺄 수 없어요." }
     : grid
       ? { t: "제작 · 그리드", s: "프로필에서 보일 순서예요(새 글이 왼쪽 위). 표지는 3:4로 잘려 좌우 약 34px이 가려져요." }
-      : { t: "제작", s: "만들 게시물 목록이에요. 줄을 누르면 편집기가 열려요. 승인한 주제는 3 주제 탭에서 여기로 넣어요." };
+      : { t: "제작", s: "만들 게시물 목록이에요. 줄을 누르면 편집기가 열리고, 다 만들면 편집기의 '검수'에서 피드백을 받고 승인해요. 체크한 게시물은 ZIP으로 내려받아요." };
   return (
     <ServiceShell ws={w} step="make" ctx={archive ? "제작 · 보관함" : grid ? "제작 · 그리드" : "제작 · 목록"}>
       <div className="mk-head"><h1>{head.t}</h1><p>{head.s}</p></div>
@@ -97,30 +97,13 @@ export default async function Calendar({ params, searchParams }: PageProps<"/w/[
               <span className="small muted">빈 기획 게시물을 만들고 편집기로 가요</span>
             </form>
           )}
-          <div className="mk-plist">
-            {posts.filter((p) => !filter || p.status === filter).map((p) => {
-              const n = warns[p.id];
-              const when = `D${p.day}${w.startDate ? ` · ${md(dateOf(w.startDate, p.day))}` : ""} ${p.slot}`;
-              return (
-                <Link key={p.id} href={`/w/${w.id}/p/${p.id}`} className="mk-row mk-prow" data-s={p.status}>
-                  {p.data
-                    // eslint-disable-next-line @next/next/no-img-element
-                    ? <img className="mk-thumb" src={`/api/posts/${p.id}/slide/1?png=1&v=${encodeURIComponent(p.updatedAt)}`} alt="" loading="lazy" />
-                    : <span className="mk-thumb mk-thumb-empty" aria-hidden>기획</span>}
-                  <span className="mk-row-main">
-                    <b className="mk-row-title">{p.title || "제목 없음"}</b>
-                    <span className="small muted">{[p.category, templateOf(p.template).name, p.data ? `${p.data.slides.length}장` : "글 없음", p.data?.photos.some((x) => x.kind === "video") ? "영상" : ""].filter(Boolean).join(" · ")}</span>
-                  </span>
-                  <span className="mk-pmeta">
-                    {n ? <span className="mk-flag" title={`규칙 경고 ${n}`}><Icon name="warn" size={14} />경고 {n}</span> : null}
-                    <span className="mk-when small muted">{when}</span>
-                    <span className="mk-pill" data-s={p.status}>{STATUS_LABEL[p.status]}</span>
-                  </span>
-                </Link>
-              );
-            })}
-            {!posts.some((p) => !filter || p.status === filter) && <p className="hint">{filter ? `${STATUS_LABEL[filter]} 게시물이 없어요.` : "게시물이 없어요. 3 주제에서 승인한 주제를 넣거나 '+ 새 게시물'로 시작해요."}</p>}
-          </div>
+          <MakeList ws={w.id} empty={filter ? `${STATUS_LABEL[filter]} 게시물이 없어요.` : "게시물이 없어요. 3 주제에서 승인한 주제를 넣거나 '+ 새 게시물'로 시작해요."}
+            rows={posts.filter((p) => !filter || p.status === filter).map((p) => ({
+              id: p.id, title: p.title || "제목 없음", status: p.status, label: STATUS_LABEL[p.status], warn: warns[p.id],
+              thumb: p.data ? `/api/posts/${p.id}/slide/1?png=1&v=${encodeURIComponent(p.updatedAt)}` : null,
+              meta: [p.category, templateOf(p.template).name, p.data ? `${p.data.slides.length}장` : "글 없음", p.data?.photos.some((x) => x.kind === "video") ? "영상" : ""].filter(Boolean).join(" · "),
+              when: `D${p.day}${w.startDate ? ` · ${md(dateOf(w.startDate, p.day))}` : ""} ${p.slot}`,
+            }))} />
           <p className="small muted" style={{ margin: 0 }}>위에서부터 올릴 차례(일차·시간)예요. 순서는 편집기 아래 &apos;게시물 관리 · 다른 칸으로 옮기기&apos;에서 바꿔요.</p>
         </>
       )}

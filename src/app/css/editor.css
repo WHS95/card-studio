@@ -210,3 +210,20 @@ fieldset.ed-mid { border: 0; padding: 0; margin: 0; min-inline-size: 0; }
 @media (prefers-reduced-motion: reduce) {
   .ed-skel::after, .ed-caret, .ed-spin, .ed-toast { animation: none; }
 }
+
+/* ── 검수 창 (자동 확인 · AI 종합 피드백 · 승인) ── */
+dialog.ed-rv { width: min(640px, calc(100vw - 32px)); max-height: calc(100vh - 48px); overflow-y: auto; display: flex; flex-direction: column; gap: 6px; }
+dialog.ed-rv:not([open]) { display: none; }
+.ed-rv-head { display: flex; gap: 12px; align-items: flex-start; justify-content: space-between; }
+.ed-rv-head h2 { margin: 0; font-size: 18px; overflow-wrap: anywhere; }
+.ed-rv-wait { margin: 0; padding: 6px 0; }
+.ed-rv-ai { display: flex; flex-direction: column; gap: 8px; }
+.ed-rv-verdict { display: flex; gap: 8px; align-items: flex-start; flex-wrap: wrap; margin: 0; font-size: 14px; line-height: 1.5; }
+.ed-rv-verdict > svg { flex-shrink: 0; margin-top: 2px; }
+.ed-rv-verdict > span { flex: 1 1 100%; padding-left: 24px; }
+.ed-rv-good { margin: 0; padding-left: 40px; font-size: 14px; line-height: 1.6; }
+.ed-rv-fix { display: flex; gap: 12px; align-items: flex-start; width: 100%; text-align: left; padding: 10px 12px; border: 1px solid var(--line2); border-radius: 12px; background: #fff; color: var(--ink); font: inherit; cursor: pointer; }
+.ed-rv-fix:hover { border-color: var(--ink); }
+.ed-rv-fix > span:last-child { display: flex; flex-direction: column; gap: 4px; min-width: 0; font-size: 14px; line-height: 1.5; overflow-wrap: anywhere; }
+.ed-rv-n { flex-shrink: 0; min-width: 40px; padding: 2px 8px; border-radius: 999px; background: #f2f2f2; font-size: 12px; font-weight: 800; text-align: center; }
+@media (max-width: 640px) { dialog.ed-rv { padding: 16px; } }

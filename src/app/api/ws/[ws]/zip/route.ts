@@ -3,7 +3,7 @@ import { getPost } from "@/lib/store";
 import { fullCaption, slideFile } from "@/lib/exporter";
 import { zip } from "@/lib/zip";
 
-// 6 검수에서 고른 게시물들을 ZIP 하나로: 게시물마다 폴더(D3-1230-제목/) 안에 장(PNG·MP4) + caption.txt. ?ids=a,b,c (30개까지)
+// 5 제작 목록에서 고른 게시물들을 ZIP 하나로: 게시물마다 폴더(D3-1230-제목/) 안에 장(PNG·MP4) + caption.txt. ?ids=a,b,c (30개까지)
 export async function GET(req: Request, ctx: RouteContext<"/api/ws/[ws]/zip">) {
   const { ws } = await ctx.params;
   const a = await wsAccess(ws, "view");

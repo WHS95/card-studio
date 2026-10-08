@@ -2,9 +2,9 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import { checkLogin, clearSession, loginUser, requireAuth, setSession, setUserSession, wsAccess, type Perm } from "@/lib/auth";
-import { addMember, changePassword, removeMember, resetMemberPassword, setMemberRole, setPlan, countAi, addResearch, applyShareSuggestion, archivePost, createIdea, createPostIn, dismissSuggestion, duplicatePost, followUpIdea, insights, movePost, nextEmptySlot, restorePost, scheduleIdeas, setDisplayName, setMetrics, createWorkspace, ensureSlot, tailDay, OpError, removeResearch, removeIdea, removePost, savePost, scheduleIdea, setPillars, setStatus, toggleFavorite, updateBrief, updateIdea, updateResearch, updateWorkspace } from "@/lib/ops";
-import { type PostData, type PostStatus } from "@/lib/types";
+import { can, checkLogin, clearSession, loginUser, requireAuth, setSession, setUserSession, wsAccess, type Perm } from "@/lib/auth";
+import { addMember, changePassword, removeMember, resetMemberPassword, setMemberRole, setPlan, countAi, addResearch, applyShareSuggestion, archivePost, createIdea, createPostIn, dismissSuggestion, duplicatePost, followUpIdea, insights, movePost, nextEmptySlot, restorePost, scheduleIdeas, setDisplayName, setMetrics, createWorkspace, ensureSlot, tailDay, OpError, removeResearch, removeIdea, removePost, savePost, saveAiReview, scheduleIdea, setPillars, setStatus, toggleFavorite, updateBrief, updateIdea, updateResearch, updateWorkspace } from "@/lib/ops";
+import { type AiReview, type PostData, type PostStatus } from "@/lib/types";
 import { getIdea, getPost, getResearch, listIdeas } from "@/lib/store";
 import { templateOf } from "@/lib/templates";
 import { setKey, type Provider } from "@/lib/secrets";
@@ -12,7 +12,8 @@ import { createPat, getClient, issueCode, revokeToken } from "@/lib/tokens";
 import { baseUrl } from "@/lib/baseurl";
 import { headers } from "next/headers";
 import { testGemini } from "@/lib/veo";
-import { draftPostData, researchTopic, suggestIdeas, type IdeaSuggestion } from "@/lib/ai";
+import { draftPostData, researchTopic, reviewPost, suggestIdeas, type IdeaSuggestion } from "@/lib/ai";
+import { autoReview, type AutoReview } from "@/lib/review";
 import { chat, countsAgainstPlan, saveAiConfig, testVia, type ChatTurn } from "@/lib/llm";
 import { callTool, TOOLS } from "@/lib/mcp";
 import { AI_VIA, type AiTier, type AiVia } from "@/lib/types";
@@ -250,6 +251,29 @@ export async function aiIdeasAction(_p: AiState<IdeaSuggestion[]>, fd: FormData)
   } catch (e) { return { error: msg(e) }; }
 }
 
+// ── 검수 (편집기 '검수' 창) ──
+
+/** 자동 확인: 돈이 들지 않는 것만 (칸 · 마진 · 규칙 · 자료 · 사진 · 캡션) + 승인 체크리스트 + 마지막 AI 피드백 */
+export async function reviewCheckAction(id: string): Promise<AiState<AutoReview>> {
+  await requireAuth();
+  try { await gatePost(id, "view"); return { ok: await autoReview(id) }; } catch (e) { return { error: msg(e) }; }
+}
+
+/** AI 종합 피드백: 고칠 사람(편집)·승인할 사람(승인)만 부른다. 결과는 게시물에 남겨서 다른 사람이 다시 돈을 쓰지 않게 */
+export async function aiReviewAction(id: string): Promise<AiState<AiReview>> {
+  await requireAuth();
+  try {
+    const { ws: w, actor, role, post } = await gatePost(id, "view");
+    if (!can(role, "edit") && !can(role, "approve")) throw new OpError("AI 피드백은 편집자·검수자·소유자가 받을 수 있어요");
+    const auto = await autoReview(id);
+    await countFor(w.id, actor, "judge");
+    const fb = await reviewPost(w, post, auto.items.map((x) => `${x.ok ? "통과" : "확인"}: ${x.text}`), auto.research, actor);
+    const r: AiReview = { ...fb, by: actor.name, at: new Date().toISOString(), for: post.updatedAt };
+    await saveAiReview(id, r);
+    return { ok: r };
+  } catch (e) { return { error: msg(e) }; }
+}
+
 /** AI 제안 중 고른 것만 아이디어로 */
 export async function addAiIdeasAction(fd: FormData) {
   await requireAuth();
@@ -325,10 +349,10 @@ export async function postToolAction(fd: FormData) {
       // 지우기 (되돌릴 수 없음) — 누른 화면으로 돌아간다: 보관함 · 검수 · 그 밖은 제작 목록
       await removePost(id);
       const from = String(fd.get("from") ?? "");
-      to = from === "archive" ? `/w/${ws}?view=archive` : from === "review" ? `/w/${ws}/review` : `/w/${ws}?ok=removed`;
+      to = from === "archive" ? `/w/${ws}?view=archive` : `/w/${ws}?ok=removed`;
     }
     else throw new OpError("모르는 동작이에요");
-  } catch (e) { const from = String(fd.get("from") ?? ""); back(op === "restore" || from === "archive" ? `/w/${ws}?view=archive` : from === "review" ? `/w/${ws}/review` : `/w/${ws}/p/${id}`, e); }
+  } catch (e) { const from = String(fd.get("from") ?? ""); back(op === "restore" || from === "archive" ? `/w/${ws}?view=archive` : `/w/${ws}/p/${id}`, e); }
   revalidatePath(`/w/${ws}`, "layout");
   redirect(to);
 }

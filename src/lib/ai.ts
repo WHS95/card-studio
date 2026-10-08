@@ -4,7 +4,7 @@ import { validatePost, type Field } from "./fields";
 import { OpError } from "./ops";
 import { ask, askStream, aiReady, pickVia } from "./llm";
 import type { Actor } from "./auth";
-import type { PostData, SlideData, Workspace } from "./types";
+import type { AiReview, Post, PostData, SlideData, Workspace } from "./types";
 import { WRITING_GUIDE, fixList, lintPost } from "./writing";
 
 // 화면 안 AI (선택): 설정 · AI 에서 연결한 것(이 Mac 의 Claude Code·Codex, API 키)으로 작업 등급마다 부른다(llm.ts).
@@ -259,4 +259,36 @@ export async function draftPostStream(w: Workspace, p: DraftInput, extra: string
   const fitted: PostData = { photos: data.photos, caption: caption.slice(0, 2200), slides: raws.map((s, n) => fitSlide(t, s, n)).filter((x): x is SlideData => !!x).slice(0, t.maxSlides).map((s, n) => keepPhotos(s, n, p.current) as SlideData) };
   if (!validatePost(t, fitted)) return finish(fitted, "칸보다 긴 글을 칸 길이에 맞춰 잘랐어요. 잘린 곳을 확인해 주세요");
   throw new OpError("AI 초안이 칸 제한을 맞추지 못했어요. 다시 해 주세요");
+}
+
+// ── 검수: AI 종합 피드백 (편집기 '검수' 창, 사람이 누를 때만 · 판단 등급) ──
+
+/** 장 글을 AI 가 읽을 글로 (사진 칸·조절 값은 뺀다) */
+function slidesText(t: ReturnType<typeof templateOf>, data: PostData) {
+  return data.slides.map((s, n) => {
+    const k = t.kinds.find((x) => x.kind === s.kind);
+    const keep = Object.fromEntries(Object.entries(s).filter(([key, v]) => key !== "kind" && !/^(photo|video)/.test(key) && v !== null && v !== "" && !(k?.fields.find((f) => f.key === key)?.type === "choice")));
+    return `${n + 1}장 (${k?.label ?? s.kind}): ${JSON.stringify(keep)}`;
+  }).join("\n");
+}
+
+export type AiFeedback = Omit<AiReview, "by" | "at" | "for">;
+
+/** 게시물 전체를 보고 총평 · 잘된 점 · 고칠 것(고친 문구 제안). 자동 확인 결과는 받아서 되풀이하지 않는다. 승인은 하지 않는다 */
+export async function reviewPost(w: Workspace, p: Post, auto: string[], research: { title: string; summary: string; confidence: string }[], actor: Actor | null): Promise<AiFeedback> {
+  if (!p.data) throw new OpError("저장된 글이 없어요. 글을 채우고 저장한 뒤 검수해 주세요");
+  const t = templateOf(p.template);
+  const { text } = await ask("judge", actor, {
+    system: `너는 인스타그램 카드뉴스 편집장이다. 올리기 전에 게시물 전체를 보고 짧고 구체적으로 피드백한다. 승인은 사람이 한다.\n${RULES}`,
+    prompt: `${briefText(w)}\n\n게시물: ${p.title || "제목 없음"} (카테고리 ${p.category}, 템플릿 ${t.name}, ${p.data.slides.length}장)\n메모: ${p.note || "없음"}\n근거 자료:\n${research.map((r) => `- [${r.confidence === "check" ? "확인 필요" : r.confidence === "high" ? "믿을 만함" : "보통"}] ${r.title}: ${r.summary.slice(0, 300)}`).join("\n") || "없음"}\n\n장 글:\n${slidesText(t, p.data)}\n\n캡션:\n${p.data.caption || "(비어 있음)"}\n\n스튜디오 자동 확인 결과 (사람에게 이미 보여 줬으니 되풀이하지 말 것):\n${auto.map((x) => `- ${x}`).join("\n")}\n\n다음을 봐 줘: 표지가 넘겨 보고 싶게 하는지, 장 흐름(문제 → 내용 → 행동)이 자연스러운지, 브리프의 대상·말투에 맞는지, 근거 자료에 없는 사실·숫자가 있는지, 문구 규칙, 캡션 첫 두 줄과 행동 유도, 해시태그.\n고칠 것은 중요한 것부터 6개까지, 고친 문구를 직접 제안해(칸 글자 수 안에서). 고칠 게 없으면 fix 는 빈 배열.\n답은 \`\`\`json 블록 하나: {"verdict":"ready 또는 fix","summary":"한두 문장 총평","good":["잘된 점 1~3개"],"fix":[{"slide":장 번호(캡션이나 전체는 0),"what":"무엇이 문제인지 한 문장","how":"이렇게 고쳐 보세요 + 고친 문구"}]}`,
+  });
+  const o = jsonOf<Partial<AiFeedback>>(text);
+  const str = (v: unknown, n: number) => String(v ?? "").trim().slice(0, n);
+  const n = p.data.slides.length;
+  return {
+    verdict: o.verdict === "ready" ? "ready" : "fix",
+    summary: str(o.summary, 300) || "총평을 받지 못했어요",
+    good: (Array.isArray(o.good) ? o.good : []).map((x) => str(x, 200)).filter(Boolean).slice(0, 3),
+    fix: (Array.isArray(o.fix) ? o.fix : []).map((f) => ({ slide: Math.min(n, Math.max(0, Math.round(Number(f?.slide)) || 0)), what: str(f?.what, 200), how: str(f?.how, 400) })).filter((f) => f.what).slice(0, 6),
+  };
 }

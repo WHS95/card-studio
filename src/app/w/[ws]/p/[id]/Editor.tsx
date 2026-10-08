@@ -13,6 +13,7 @@ import AskAi from "../../../../AskAi";
 import { copyText } from "@/lib/client/copy";
 import Icon from "../../../../ui/Icon";
 import Manage from "./Manage";
+import ReviewPanel from "./ReviewPanel";
 import MetricsForm from "./MetricsForm";
 import { Bar, DraftBar, DraftToast, SkelSlide, TypingCard, draftTotal, type DraftNote, type Drafting } from "./Drafting";
 
@@ -46,6 +47,7 @@ const tags = (s: string) => s.match(/#[^\s#]+/g) ?? [];
 /** empty = 옮기거나 복제할 수 있는 빈 칸 (null 이면 게시물 관리 숨김: 보관함에 있거나 편집 권한 없음) */
 export default function Editor({ ws, post, empty }: { ws: Ws; post: Post; empty: string[] | null }) {
   const [sel, setSel] = useState(0); // 가운데에서 고치는 장
+  const [reviewing, setReviewing] = useState(false); // 검수 창
   const [template, setTemplate] = useState(post.template);
   const t = templateOf(template);
   const fmt = formatOf(t);
@@ -295,7 +297,8 @@ export default function Editor({ ws, post, empty }: { ws: Ws; post: Post; empty:
             <button type="button" className="btn primary" onClick={stopDraft}>멈추기</button>
           </> : <>
             {saveBtn("btn ed-save")}
-            <StatusBar post={post} dirty={dirty} canEdit={ws.canEdit} canApprove={ws.canApprove} wsId={ws.id} />
+            <button type="button" className={post.status === "draft" ? "btn primary ed-rv-btn" : "btn ed-rv-btn"} onClick={() => setReviewing(true)} disabled={!saved || !post.data} title={saved ? "자동 확인 · AI 피드백 · 승인" : "저장하면 검수할 수 있어요"}>검수</button>
+            <StatusBar post={post} dirty={dirty} canEdit={ws.canEdit} canApprove={ws.canApprove} />
           </>}
         </div>
       </div>
@@ -313,7 +316,7 @@ export default function Editor({ ws, post, empty }: { ws: Ws; post: Post; empty:
             <Icon name="warn" size={16} />
             <b>규칙 경고 {warns.length}</b>
             <span className="ed-warn-t">{warns.map((w) => w.text).join(" · ")}</span>
-            <span className="ed-warn-r">저장할 수 있어요 · 검수 화면에도 보여요</span>
+            <span className="ed-warn-r">저장할 수 있어요 · 검수 창에도 보여요</span>
           </div>
         )}
 
@@ -467,6 +470,7 @@ export default function Editor({ ws, post, empty }: { ws: Ws; post: Post; empty:
         <Modal handle={ws.handle} imgs={imgs} n={open} total={data.slides.length} caption={fullCaption} layers={layers} setLayers={setLayers}
           isVideo={(n) => !!videoAt(n)} renderVideo={renderVideo} onClose={() => setOpen(null)} onMove={setOpen} fmt={fmt} />
       )}
+      {reviewing && <ReviewPanel postId={post.id} title={title} status={post.status} ai={ws.ai} canEdit={ws.canEdit} canApprove={ws.canApprove} onClose={() => setReviewing(false)} onPick={(n) => setSel(n)} />}
       <DraftToast d={drafting} note={draftNote} onStop={stopDraft} onUndo={() => { setDraftNote(null); undo(); }} onRetry={() => runDraft(lastExtra.current)} onClose={() => setDraftNote(null)} />
     </div>
   );
@@ -476,10 +480,10 @@ const WARN_SHORT: Record<string, string> = { photoEvery: "사진", coverQuestion
 const STATUS_BTN: Record<string, string> = { approved: "승인하기", posted: "게시 표시", draft: "초안으로 돌리기", skip: "건너뛰기" };
 
 /** 상태 바꾸기: 저장 안 된 고침이 있으면 막는다 (화면과 다른 버전이 승인되지 않게) */
-function StatusBar({ post, dirty, canEdit, canApprove, wsId }: { post: Post; dirty: boolean; canEdit: boolean; canApprove: boolean; wsId: string }) {
+function StatusBar({ post, dirty, canEdit, canApprove }: { post: Post; dirty: boolean; canEdit: boolean; canApprove: boolean }) {
   const [st, act, pending] = useActionState(setStatusAction, undefined);
-  // 역할에 맞는 버튼만: 승인·게시 표시·게시 취소 = 검수 권한, 나머지 = 편집 권한 (서버도 같은 규칙)
-  const next = NEXT_STATUS[post.status].filter((s) => (s === "approved" || s === "posted" || post.status === "posted" ? canApprove : canEdit));
+  // 역할에 맞는 버튼만: 승인·게시 표시·게시 취소 = 검수 권한, 나머지 = 편집 권한 (서버도 같은 규칙). 초안 → 승인은 '검수' 창에서(체크리스트)
+  const next = NEXT_STATUS[post.status].filter((s) => !(s === "approved" && post.status === "draft")).filter((s) => (s === "approved" || s === "posted" || post.status === "posted" ? canApprove : canEdit));
   // 저장된 내용이 있는데 고친 게 저장 안 됐으면 막는다 (내용 없는 기획·건너뜀은 그대로 바꿀 수 있다)
   const block = dirty && !!post.data;
   return (
@@ -489,10 +493,7 @@ function StatusBar({ post, dirty, canEdit, canApprove, wsId }: { post: Post; dir
       {st?.error && <span className="err">{st.error}</span>}
       {post.status === "approved" && <input name="postedUrl" className="input posted-url" required pattern="https://(www\.)?instagram\.com/(p|reel)/.+" placeholder="게시 링크 (https://www.instagram.com/p/…)" />}
       {post.postedUrl && <a href={post.postedUrl} target="_blank" rel="noreferrer" className="small">게시물 보기</a>}
-      {next.map((s) => s === "approved" && post.status === "draft" ? (
-        block ? <button key={s} type="button" className="btn primary" disabled>승인…</button>
-          : <Link key={s} className="btn primary" href={`/w/${wsId}/review?p=${post.id}`}>승인…</Link>
-      ) : (
+      {next.map((s) => (
         <button key={s} name="status" value={s} disabled={block || pending} formNoValidate={s !== "posted"} className={s === "approved" || s === "posted" ? "btn primary" : "btn"}>{post.status === "posted" && s === "approved" ? "게시 취소" : post.status === "skip" && !post.data ? "기획으로" : STATUS_BTN[s]}</button>
       ))}
     </form>

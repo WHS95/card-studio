@@ -375,7 +375,7 @@ export const TOOLS: Tool[] = [
 ];
 
 export const INSTRUCTIONS = `카드뉴스 스튜디오(card-studio, ${BASE}) — 여러 서비스의 인스타 카드뉴스(1080×1350 캐러셀)를 기획·편집·검수·내보내기.
-순서(6단계 — 발행·성과 탭은 잠시 닫음): list_workspaces → get_flow(지금 할 일) → get_brief(목적·기둥·콘텐츠 규칙) → add_research(자료, 신뢰도) → add_ideas(주제, 검수 대기) → 사람이 승인 → schedule_ideas → list_templates(칸 정의) → update_post(제작) → check_safe_zone·render_slide → get_checklist → 사람이 체크하고 승인(set_status approved + checks) → export_post(발행은 사람이) → 7일 뒤 set_metrics → get_insights 제안.
+순서(5단계 — 검수는 편집기 '검수' 창, 발행·성과 탭은 잠시 닫음): list_workspaces → get_flow(지금 할 일) → get_brief(목적·기둥·콘텐츠 규칙) → add_research(자료, 신뢰도) → add_ideas(주제, 검수 대기) → 사람이 승인 → schedule_ideas → list_templates(칸 정의) → update_post(제작) → check_safe_zone·render_slide → get_checklist → 사람이 체크하고 승인(set_status approved + checks) → export_post(발행은 사람이) → 7일 뒤 set_metrics → get_insights 제안.
 규칙: 주제 승인·게시물 승인은 사람이 확인한 뒤에만. 게시(posted)는 실제 인스타 링크가 있을 때만. 무료 사진은 search_photos 로 찾아 add_media(출처 포함) → update_post 로 장 사진 칸에, 장소 이름이 나오면 실제 그 장소 사진만. 협찬은 #광고. 삭제·인스타 업로드 도구는 없다.
 문구: 장 글·캡션·주제를 쓸 때 아래 규칙을 지키고, update_post 뒤 check_writing 으로 살펴본다.
 ${WRITING_GUIDE}`;

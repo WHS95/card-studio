@@ -118,10 +118,11 @@ a.mk-row-title:hover { text-decoration: underline; }
   .mk-pmeta { flex-basis: 100%; padding-left: 72px; gap: 10px; flex-wrap: wrap; }
 }
 
-/* ── 6 검수 · 골라서 내려받기 ── */
+/* ── 제작 목록 · 골라서 내려받기 ── */
 .mk-pickbar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; padding: 10px 12px; border-radius: 12px; border: 1px solid var(--line2); background: #fff; }
 .mk-pickbar .btn { margin-left: auto; }
 .mk-pickall { display: inline-flex; gap: 6px; align-items: center; font-size: 13px; font-weight: 700; }
+.mk-pickall input { width: 18px; height: 18px; margin: 0; accent-color: var(--ink); }
 .mk-pickrow { gap: 10px; }
 .mk-pickrow .mk-check { width: 18px; height: 18px; flex-shrink: 0; accent-color: var(--ink); }
 .mk-pickmain { flex: 1; min-width: 0; display: flex; gap: 12px; align-items: center; color: var(--ink); text-decoration: none; }
